@@ -377,7 +377,7 @@ function ns.AddSlotRule(spellID, slot)
                 r = 1, g = 0.85, b = 0.1,
                 center = false, enabled = true,
             }
-        elseif ns.cdmEssentialSpells and ns.cdmEssentialSpells[spellID] then
+        elseif ns.HasRealCooldown and ns.HasRealCooldown(spellID) then
             -- A burst: "ready" means its cooldown is done.
             rule = {
                 kind = "cd", spell = spellID,
@@ -495,7 +495,8 @@ local function BuildPreset(quiet, intro)
         -- marked when its cooldown is done. Blizzard's own list of what
         -- matters for the spec, so there is nothing hardcoded here.
         if (ns.cdmEssentialSpells[spellID] or ns.cdmEssentialNames[lname])
-           and not havePower[spellID] and not haveBurst[spellID] then
+           and not havePower[spellID] and not haveBurst[spellID]
+           and ns.HasRealCooldown(spellID) then
             local spends = false
             if pt and canCost then
                 local ok, costs = pcall(canCost, spellID)

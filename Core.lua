@@ -723,6 +723,33 @@ local function CooldownReady(spellID)
 end
 ns.CooldownReady = CooldownReady
 
+-- A burst is a spell you wait for. Anything on the global cooldown alone is a
+-- filler, and marking every filler as "ready" lights the whole bar -- which is
+-- exactly what happened when the only test was "does not spend the resource":
+-- a Balance druid's fillers spend nothing either.
+local BURST_MIN_COOLDOWN = 20   -- seconds
+
+function ns.HasRealCooldown(spellID)
+    if not spellID then return false end
+    if _G.GetSpellBaseCooldown then
+        local ok, ms = pcall(_G.GetSpellBaseCooldown, spellID)
+        if ok and type(ms) == "number" then
+            return ms >= BURST_MIN_COOLDOWN * 1000
+        end
+    end
+    -- No base-cooldown API: fall back to whatever it is doing right now. A
+    -- spell sitting on a long cooldown is a burst; one that is ready tells us
+    -- nothing, so it is left out rather than guessed in.
+    if C_Spell and C_Spell.GetSpellCooldown then
+        local ok, info = pcall(C_Spell.GetSpellCooldown, spellID)
+        if ok and type(info) == "table" and info.isActive and not info.isOnGCD then
+            local d = tonumber(info.duration)
+            if d and d >= BURST_MIN_COOLDOWN then return true end
+        end
+    end
+    return false
+end
+
 function CG:Suppressed()
     if not self.db.enabled then return true end
     if self.db.combatOnly and not InCombatLockdown() then return true end
