@@ -490,9 +490,7 @@ local function Build()
     -- Resource threshold ----------------------------------------------------
     -- The scan can only guess this from what the spell costs, and a cost is
     -- not a decision: 40 astral power is what Starsurge takes, not when a
-    -- Balance druid wants to be told about it. So it is adjustable, with a
-    -- step that suits the resource -- one for combo points, five for a pool
-    -- that runs to a hundred.
+    -- Balance druid wants to be told about it. So it is adjustable.
     UI.countRow = CreateFrame("Frame", nil, UI)
     UI.countRow:SetSize(378, 20)
     UI.countRow:SetPoint("TOPLEFT", 264, -104)
@@ -503,26 +501,21 @@ local function Build()
     UI.countRow.label = Label(UI.countRow, "", 11, 0.75, 0.75, 0.75)
     UI.countRow.label:SetPoint("LEFT", 6, 0)
 
-    local function Step()
-        local mx = CG:GetMaxPower(CG.powerType) or 5
-        return mx > 20 and 5 or 1
-    end
-
-    local function Nudge(delta)
+    -- Minus and plus rather than a slider: these numbers are exact by nature
+    -- and a slider makes it fiddly to land on one. One per click; shift moves
+    -- by ten, so a hundred-point pool does not cost a hundred clicks.
+    local function Step(delta)
         local rule = CurrentRule()
         if not rule or rule.kind == "aura" or rule.kind == "cd" then return end
-        local mx = CG:GetMaxPower(CG.powerType) or 5
-        local base = rule.atMax and mx or (rule.min or 1)
-        local v = math.max(1, math.min(mx, base + delta))
+        local mx = math.max(1, CG:GetMaxPower(CG.powerType) or 5)
+        if IsShiftKeyDown() then delta = delta * 10 end
+        local cur = rule.atMax and mx or (rule.min or 1)
+        local v = math.min(math.max(1, cur + delta), mx)
         rule.min, rule.max, rule.atMax = v, nil, nil
         CG:Rebuild()
         Refresh()
     end
 
-    UI.countRow.minus = TextButton(UI.countRow, "−", 26, 16, function() Nudge(-Step()) end)
-    UI.countRow.minus:SetPoint("RIGHT", UI.countRow, "RIGHT", -96, 0)
-    UI.countRow.plus = TextButton(UI.countRow, "+", 26, 16, function() Nudge(Step()) end)
-    UI.countRow.plus:SetPoint("LEFT", UI.countRow.minus, "RIGHT", 4, 0)
     UI.countRow.max = TextButton(UI.countRow, L("max", "макс"), 56, 16, function()
         local rule = CurrentRule()
         if not rule or rule.kind == "aura" or rule.kind == "cd" then return end
@@ -530,7 +523,13 @@ local function Build()
         CG:Rebuild()
         Refresh()
     end)
-    UI.countRow.max:SetPoint("LEFT", UI.countRow.plus, "RIGHT", 6, 0)
+    UI.countRow.max:SetPoint("RIGHT", UI.countRow, "RIGHT", -6, 0)
+
+    UI.countRow.plus = TextButton(UI.countRow, "+", 22, 16, function() Step(1) end)
+    UI.countRow.plus:SetPoint("RIGHT", UI.countRow.max, "LEFT", -4, 0)
+
+    UI.countRow.minus = TextButton(UI.countRow, "-", 22, 16, function() Step(-1) end)
+    UI.countRow.minus:SetPoint("RIGHT", UI.countRow.plus, "LEFT", -4, 0)
 
     -- Marker gallery --------------------------------------------------------
     UI.tiles = {}
