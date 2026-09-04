@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.1.0
+
+**Ready and proc are now separate states.** They used to share one marker,
+which answered "can I press this?" but not "what does it cost me?" — and that
+is the question worth answering, because a procced finisher and a full resource
+bar ask for different decisions. Each spell now has four states:
+
+- **up** — your aura is on the unit
+- **gone** — the aura is missing
+- **ready** — the resource threshold is met, or a burst came off cooldown
+- **proc** — the spell lit up on its own; this cast is free
+
+Gold means you saved up for it, cyan means it is free. When a spell has its own
+proc state, its resource state stops lighting on procs, so the two never say the
+same thing at once.
+
+Run `/cg preset` again to pick up proc states for your spenders, or click the
+fourth pip on any spell in the options window.
+
+**Two markers on one state.** Shift-click (or right-click) a marker in the
+gallery to layer a second one on top of the first — a pixel outline plus a proc
+glow reads as one distinct mark. Click it again to remove it.
+
+**The resource threshold is set with buttons again.** The slider made it fiddly
+to land on an exact number; it is `-` and `+` now, one per click and ten with
+shift held. The old minus rendered as an empty box — it used a typographic
+minus the game font does not carry.
+
 ## 1.0.0
 
 First release.

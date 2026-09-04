@@ -501,7 +501,7 @@ local function RuleFingerprint(rule)
         tostring(rule.timer), tostring(rule.center), tostring(rule.unit),
         tostring(rule.min), tostring(rule.max), tostring(rule.atMax),
         tostring(rule.orProc), tostring(rule.swipe), tostring(rule.auraID),
-        tostring(rule.combat),
+        tostring(rule.combat), tostring(rule.style2),
     }, ",")
 end
 
@@ -523,6 +523,12 @@ function CG:Rebuild()
     -- spellID -> list of rules. Built BEFORE any teardown so an unchanged
     -- layout can bail out with the live frames untouched.
     local wanted, castMap, any = {}, {}, false
+    wipe(ns.procOwned)
+    for _, rule in ipairs(rules) do
+        if rule.enabled ~= false and rule.kind == "aura" and rule.proc and rule.spell then
+            ns.procOwned[rule.spell] = true
+        end
+    end
     for _, rule in ipairs(rules) do
         if rule.enabled ~= false and rule.spell then
             local ids = SpellVariants(rule.spell)
@@ -554,15 +560,29 @@ function CG:Rebuild()
     end
 
     -- Collect what WOULD be built, and fingerprint it.
-    local placeButtons, placeRules, sigParts, watched = {}, {}, {}, {}
+    local placeButtons, placeRules, placeStyles = {}, {}, {}
+    local sigParts, watched = {}, {}
+    local function place(button, rule, styleKey)
+        placeButtons[#placeButtons + 1] = button
+        placeRules[#placeRules + 1] = rule
+        placeStyles[#placeStyles + 1] = styleKey
+        sigParts[#sigParts + 1] =
+            tostring(button) .. "#" .. tostring(styleKey) .. "#" .. RuleFingerprint(rule)
+    end
     local function collect(button, spellID)
         local list = spellID and wanted[spellID]
         if not list then return end
         if button.action then watched[button.action] = true end
         for _, rule in ipairs(list) do
-            placeButtons[#placeButtons + 1] = button
-            placeRules[#placeRules + 1] = rule
-            sigParts[#sigParts + 1] = tostring(button) .. "#" .. RuleFingerprint(rule)
+            place(button, rule, rule.style)
+            -- A second marker for the same state. One frame carries one style,
+            -- so two styles means two frames on the same button driven by the
+            -- same rule -- they light and go dark together, and the pair reads
+            -- as one mark. Cheaper and far less fragile than teaching a frame
+            -- to run two sets of art at once.
+            if rule.style2 and rule.style2 ~= rule.style then
+                place(button, rule, rule.style2)
+            end
         end
     end
     ForEachActionButton(collect)
@@ -628,11 +648,22 @@ function CG:Rebuild()
 
     for i = 1, #placeButtons do
         local button, rule = placeButtons[i], placeRules[i]
+        local styleKey = placeStyles[i]
+        local primary = (styleKey == rule.style)
         local ov = self.pool:Acquire()
         ov:Attach(button)
-        ov:SetStyle(rule.style, rule.r, rule.g, rule.b, rule.alpha, rule.thick)
+        ov.secondary = (not primary) or nil
+        -- The second marker takes the style's own opacity: the rule's alpha
+        -- was chosen for the first one and a wash's 30% would gut a glow.
+        local alpha = rule.alpha
+        if not primary then alpha = ns.StyleAlpha(styleKey) end
+        ov:SetStyle(styleKey, rule.r, rule.g, rule.b, alpha, rule.thick)
         register(ov, rule)
-        ns.buttonCount[rule] = (ns.buttonCount[rule] or 0) + 1
+        -- Counted once per button, not once per marker: /cg list reports where
+        -- a rule sits, and two markers on one button is still one button.
+        if primary then
+            ns.buttonCount[rule] = (ns.buttonCount[rule] or 0) + 1
+        end
     end
 
     -- Center icons: one fixed slot per rule that asked for it, laid out as a
@@ -650,6 +681,7 @@ function CG:Rebuild()
             self:PositionAnchor()
             for i, rule in ipairs(centerRules) do
                 local ic = self.centerPool:Acquire()
+                ic.secondary = nil
                 ic:SetParent(a)
                 ic:Setup(size, ns.SpellIcon(rule.spell))
                 -- Always the plain frame here, whatever the button uses. On a
@@ -781,7 +813,7 @@ function CG:UpdatePower()
             if on and rule.combat ~= false and not InCombatLockdown() then
                 on = false
             end
-            if not on and rule.orProc ~= false
+            if not on and rule.orProc ~= false and not ns.procOwned[rule.spell]
                and ns.IsProcced and ns.IsProcced(rule.spell) then
                 on = true
             end
@@ -818,7 +850,11 @@ function CG:UpdatePower()
             -- "ready" is the resource threshold OR a proc: a finisher that
             -- procced is ready no matter what the bar says. Forcing the value
             -- to the threshold lights it through the same path, gate included.
-            if rule and rule.orProc ~= false
+            --
+            -- Unless the spell has a "proc" state of its own -- then the proc
+            -- belongs to that marker and this one stays about the resource, so
+            -- the two say different things instead of firing together.
+            if rule and rule.orProc ~= false and not ns.procOwned[rule.spell]
                and ns.IsProcced and ns.IsProcced(rule.spell) then
                 frame:ApplyState(minV, false, minV, nil, gateAllowed)
             elseif not ok then

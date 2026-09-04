@@ -158,7 +158,9 @@ end
 ns.ClearTimer = ClearTimer
 
 local function ShowTimer(frame, rule, remaining, total, durObj)
-    if rule.timer == false then
+    -- A rule with two markers has two frames on the one button; only the first
+    -- writes the countdown, or the same number is drawn twice on top of itself.
+    if rule.timer == false or frame.secondary then
         -- Widgets off, but the timing is still tracked so the warning colour
         -- keeps working.
         ClearTimer(frame)
@@ -468,7 +470,7 @@ ns.DebugWarnColor = function(frame, rule, itemFrame)
 end
 
 local function MirrorTimerText(frame, rule, itemFrame)
-    if rule.timer == false or rule.missing then return false end
+    if rule.timer == false or rule.missing or frame.secondary then return false end
     local fs = FindTimerFS(itemFrame)
     if not fs then return false end
     local ok, txt = pcall(fs.GetText, fs)

@@ -10,13 +10,14 @@ to addons.
 
 # English
 
-Highlights an action bar button on three states per spell:
+Highlights an action bar button on four states per spell:
 
 | State | Lights up when | Default look |
 |-------|----------------|--------------|
 | **up** | your aura is on the unit | green marching dashes |
 | **gone** | the aura is missing | red colour wash |
-| **ready / proc** | the resource threshold is met **or** the spell procced | gold glow |
+| **ready** | the resource threshold is met, or a burst came off cooldown | gold glow |
+| **proc** | the spell lit up on its own -- this cast is free | cyan shine |
 
 Works for combo points, holy power, chi, soul shards, arcane charges, essence,
 astral power, insanity, maelstrom, runes -- every class. The resource is
@@ -63,10 +64,17 @@ Re-scan after rearranging your bars with `/cg preset`; wipe the spec with
 
 ## The options window
 
-The list shows **one row per spell** with three pips on the right — green, red,
-gold — lit for the states that are set up. The strip above the gallery switches
-which state you are editing, and every gallery tile is a live preview: a real
-overlay running the same code as the bar, drawn on that spell's own icon.
+The list shows **one row per spell** with four pips on the right — green, red,
+gold, cyan — lit for the states that are set up. The strip above the gallery
+switches which state you are editing, and every gallery tile is a live preview:
+a real overlay running the same code as the bar, drawn on that spell's own icon.
+
+Clicking a tile picks the marker for that state. **Shift-click** (or right-click)
+layers a *second* marker on top of the first — a pixel outline plus a proc glow
+reads as one distinct mark. Shift-click it again to take it off.
+
+The resource threshold is set with `-` and `+`: one per click, ten with shift
+held, or **max** for "at the cap".
 
 The **watching:** row handles spells that apply another spell's debuff. Primal
 Wrath puts Rip on everything, so its button has no aura of its own. That is
@@ -240,13 +248,14 @@ in any amount you like:
 собственной ауре — для World of Warcraft 12.1 (Midnight), где API аур почти
 целиком закрыт для аддонов.
 
-Три состояния на заклинание:
+Четыре состояния на заклинание:
 
 | Состояние | Когда горит | Вид по умолчанию |
 |-----------|-------------|------------------|
 | **висит** | твоя аура на цели | зелёный бегущий пунктир |
 | **нет** | ауры нет | красная заливка |
-| **готово / прок** | набран ресурс **или** заклинание прокнуло | золотое свечение |
+| **готово** | набран ресурс или бурст вышел из кулдауна | золотое свечение |
+| **прок** | заклинание прокнуло — этот каст бесплатный | голубое сияние |
 
 Работает с комбо-очками, святой силой, ци, осколками души, чародейскими
 зарядами, сущностью, силой звёзд, безумием, маэльстромом, рунами — со всеми
@@ -295,10 +304,18 @@ in any amount you like:
 
 ## Окно настроек
 
-В списке **одна строка на заклинание**, справа три точки — зелёная, красная,
-золотая, — горят те, чьи состояния настроены. Полоска над галереей переключает
-редактируемое состояние, а каждая плитка галереи это живое превью: настоящий
-оверлей тем же кодом, что рисует на панели, на иконке этого заклинания.
+В списке **одна строка на заклинание**, справа четыре точки — зелёная, красная,
+золотая, голубая, — горят те, чьи состояния настроены. Полоска над галереей
+переключает редактируемое состояние, а каждая плитка галереи это живое превью:
+настоящий оверлей тем же кодом, что рисует на панели, на иконке этого
+заклинания.
+
+Клик по плитке выбирает отметку для состояния. **Shift+клик** (или правая
+кнопка) добавляет *вторую* отметку поверх первой — пиксельный контур плюс
+свечение прока читаются как одна заметная метка. Shift+клик ещё раз — снять.
+
+Порог ресурса ставится кнопками `-` и `+`: по одному за клик, по десять с
+зажатым Shift, или **макс** — «на максимуме».
 
 Строка **«следит за:»** нужна для заклинаний, вешающих чужой дебафф.
 Первобытный гнев накладывает Разорвать, своей ауры у его кнопки нет. Это
@@ -470,13 +487,14 @@ MIT, см. [LICENSE](LICENSE).
 按职业资源数量、触发（proc）和你自己的光环来标记动作条按钮 —— 面向
 《魔兽世界》12.1（Midnight），在这个版本里光环 API 对插件基本关闭了。
 
-每个法术有三种状态：
+每个法术有四种状态：
 
 | 状态 | 何时点亮 | 默认样式 |
 |------|----------|----------|
 | **生效中** | 你的光环在目标身上 | 绿色流动虚线框 |
 | **已消失** | 光环不在了 | 红色色块覆盖 |
-| **就绪 / 触发** | 资源达到阈值**或**法术触发**或**爆发技冷却结束 | 金色光效 |
+| **就绪** | 资源达到阈值，或爆发技冷却结束 | 金色光效 |
+| **触发** | 法术自行触发 —— 这一次施放是免费的 | 青色闪光 |
 
 适用于连击点、神圣能量、真气、灵魂碎片、奥术充能、精华等等。
 
@@ -510,9 +528,16 @@ MIT, см. [LICENSE](LICENSE).
 
 ## 设置窗口
 
-列表里**每个法术一行**，右侧三个小点（绿、红、金）表示哪些状态已经设置。
+列表里**每个法术一行**，右侧四个小点（绿、红、金、青）表示哪些状态已经设置。
 画廊上方的条切换正在编辑的状态，每块画廊图块都是实时预览：和动作条上跑的是
 同一套代码，画在该法术自己的图标上。
+
+点击图块为该状态选择标记。**Shift+点击**（或右键）会在第一个标记之上叠加
+*第二个* —— 像素描边加上触发光效，合起来是一个醒目的标记。再次 Shift+点击
+即可去掉。
+
+资源阈值用 `-` 和 `+` 设置：每次一点，按住 Shift 每次十点，或者用 **max**
+表示「达到上限」。
 
 **追踪：**这一行处理「用一个法术施放另一个法术的减益」的情况。原始狂怪会给所有
 目标挂上割裂，所以它的按钮没有自己的光环。这一点会被自动识别：如果冷却管理器

@@ -1,9 +1,9 @@
 --[[---------------------------------------------------------------------------
     ComboGlow - Options.lua
 
-    One row per SPELL, not per rule. A spell can carry three states (up, gone,
-    ready/proc) and listing them as three separate rows made the same icon
-    appear three times and hid the fact that states exist at all. Internally
+    One row per SPELL, not per rule. A spell can carry four states (up, gone,
+    ready, proc) and listing them as four separate rows made the same icon
+    appear four times and hid the fact that states exist at all. Internally
     each state is still its own rule; this window just groups them.
 
     Every gallery tile is a LIVE preview: a real overlay from the same
@@ -25,7 +25,7 @@ local selSpell, selSlot = nil, "active"
 
 local function L(en, ru) return ns.L(en, ru) end
 
-local SLOTS = { "active", "missing", "ready" }
+local SLOTS = { "active", "missing", "ready", "proc" }
 
 --[[-------------------------------------------------------------------------
     Small helpers -- plain frames and textures, no backdrop template needed
@@ -132,7 +132,7 @@ local function RefreshRows(list)
             row.icon:SetTexture(ns.SpellIcon(spell))
             row.text:SetText(ns.SpellName(spell))
             row.sel:SetShown(spell == selSpell)
-            -- Three pips: which states this spell has configured.
+            -- Which states this spell has configured.
             for j, slot in ipairs(SLOTS) do
                 local has = ns.FindSlotRule(spell, slot) ~= nil
                 row.pips[j]:SetAlpha(has and 1 or 0.15)
@@ -166,6 +166,7 @@ local function RefreshTiles()
             tile.overlay:Show()
             tile.overlay:StartArt()
             tile.sel:SetShown(rule ~= nil and rule.style == tile.styleKey)
+            tile.sel2:SetShown(rule ~= nil and rule.style2 == tile.styleKey)
             tile:SetAlpha(rule and 1 or 0.55)
         end
     end
@@ -183,12 +184,22 @@ local function RefreshDetails()
         UI.titleIcon:Hide()
     end
 
-    UI.hint:SetText(rule and L("pick a marker for this state", "выбери отметку для этого состояния")
-                         or L("state not set up - click a marker to add it",
-                              "состояние не настроено — кликни отметку, чтобы добавить"))
+    local hint
+    if rule then
+        hint = L("pick a marker - shift-click for a second one",
+                 "выбери отметку — с Shift добавится вторая")
+    elseif selSpell and not ns.CanAddSlot(selSpell, selSlot) then
+        hint = L("nothing to be ready for: no resource cost, no cooldown",
+                 "нечего ждать: ни стоимости ресурса, ни кулдауна")
+    else
+        hint = L("state not set up - click a marker to add it",
+                 "состояние не настроено — кликни отметку, чтобы добавить")
+    end
+    UI.hint:SetText(hint)
 
     for _, t in ipairs(UI.toggles) do
-        if not rule or (t.auraOnly and rule.kind ~= "aura") then
+        if not rule or (t.auraOnly and rule.kind ~= "aura")
+           or (t.hide and t.hide(rule)) then
             t:Hide()
         else
             t:Show()
@@ -215,8 +226,9 @@ local function RefreshDetails()
         UI.countRow:Hide()
     end
 
-    -- Which aura this state watches (aura states only).
-    if not rule or rule.kind ~= "aura" then
+    -- Which aura this state watches (aura states only). A proc watches no
+    -- aura -- the game announces it directly -- so the row stays hidden there.
+    if not rule or rule.kind ~= "aura" or rule.proc then
         UI.auraRow:Hide()
         UI.auraList:Hide()
     else
@@ -312,20 +324,23 @@ local function Build()
         icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         row.icon = icon
 
-        -- Three pips on the right: at a glance, which states are set up.
+        -- One pip per state on the right: at a glance, which are set up.
         row.pips = {}
-        local pipColors = { { 0, 1, 0 }, { 1, 0, 0 }, { 1, 0.85, 0.1 } }
-        for j = 1, 3 do
+        local pipColors = {
+            { 0, 1, 0 }, { 1, 0, 0 }, { 1, 0.85, 0.1 }, { 0.2, 0.9, 1 },
+        }
+        local n = #SLOTS
+        for j = 1, n do
             local p = row:CreateTexture(nil, "OVERLAY")
             p:SetSize(6, 6)
-            p:SetPoint("RIGHT", row, "RIGHT", -4 - (3 - j) * 9, 0)
-            p:SetColorTexture(unpack(pipColors[j]))
+            p:SetPoint("RIGHT", row, "RIGHT", -4 - (n - j) * 9, 0)
+            p:SetColorTexture(unpack(pipColors[j] or pipColors[1]))
             row.pips[j] = p
         end
 
         local text = Label(row, "", 11)
         text:SetPoint("LEFT", icon, "RIGHT", 5, 0)
-        text:SetPoint("RIGHT", row, "RIGHT", -32, 0)
+        text:SetPoint("RIGHT", row, "RIGHT", -8 - n * 9, 0)
         text:SetJustifyH("LEFT")
         text:SetWordWrap(false)
         row.text = text
@@ -361,12 +376,15 @@ local function Build()
     local slotDefs = {
         { key = "active",  label = L("up", "висит") },
         { key = "missing", label = L("gone", "нет") },
-        { key = "ready",   label = L("ready / proc", "готово / прок") },
+        -- Ready and proc are split: one says you saved up for it, the other
+        -- says this cast is free. Same button, different decision.
+        { key = "ready",   label = L("ready", "готово") },
+        { key = "proc",    label = L("proc", "прок") },
     }
     for i, def in ipairs(slotDefs) do
         local b = CreateFrame("Button", nil, UI)
-        b:SetSize(120, 20)
-        b:SetPoint("TOPLEFT", 264 + (i - 1) * 126, -80)
+        b:SetSize(90, 20)
+        b:SetPoint("TOPLEFT", 264 + (i - 1) * 96, -80)
         b.slot = def.key
 
         local bg = b:CreateTexture(nil, "BACKGROUND")
@@ -554,6 +572,15 @@ local function Build()
         sel:Hide()
         tile.sel = sel
 
+        -- The second marker, if the state has one. A different colour so the
+        -- pair is readable at a glance: teal is the marker, amber is the
+        -- one layered on top of it.
+        local sel2 = tile:CreateTexture(nil, "BACKGROUND")
+        sel2:SetAllPoints(tile)
+        sel2:SetColorTexture(0.95, 0.7, 0.1, 0.22)
+        sel2:Hide()
+        tile.sel2 = sel2
+
         local icon = tile:CreateTexture(nil, "ARTWORK")
         icon:SetSize(TILE, TILE)
         icon:SetPoint("TOP", 0, -4)
@@ -577,7 +604,8 @@ local function Build()
         name:SetJustifyH("CENTER")
         name:SetWordWrap(false)
 
-        tile:SetScript("OnClick", function(self)
+        tile:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        tile:SetScript("OnClick", function(self, button)
             if not selSpell then return end
             -- Clicking a marker on an empty state is what creates it: one
             -- click instead of hunting for an "add" button.
@@ -586,8 +614,21 @@ local function Build()
                 rule = ns.AddSlotRule(selSpell, selSlot)
                 if not rule then return end
             end
-            rule.style = self.styleKey
-            if self.defAlpha then rule.alpha = self.defAlpha end
+            -- Shift (or right-click) layers a SECOND marker on the same
+            -- state instead of replacing the first. A pixel outline plus a
+            -- proc glow reads as one distinct mark, which is how you tell a
+            -- free cast from a paid one without inventing new styles.
+            if IsShiftKeyDown() or button == "RightButton" then
+                if rule.style2 == self.styleKey or rule.style == self.styleKey then
+                    rule.style2 = nil
+                else
+                    rule.style2 = self.styleKey
+                end
+            else
+                rule.style = self.styleKey
+                if self.defAlpha then rule.alpha = self.defAlpha end
+                if rule.style2 == rule.style then rule.style2 = nil end
+            end
             CG:Rebuild()
             Refresh()
         end)
@@ -603,9 +644,13 @@ local function Build()
         { key = "timer", auraOnly = true, label = L("timer", "таймер"),
           get = function(r) return r.timer ~= false end,
           set = function(r) r.timer = not (r.timer ~= false) end },
+        -- Only offered where it can do anything: an aura state has no resource
+        -- to be ready for, and a spell with its own "proc" state has already
+        -- answered the question -- the proc belongs to that marker.
         { key = "orProc", auraOnly = false, label = L("also on proc", "также по проку"),
-          get = function(r) return r.kind ~= "aura" and r.orProc ~= false end,
-          set = function(r) if r.kind ~= "aura" then r.orProc = not (r.orProc ~= false) end end },
+          hide = function(r) return r.kind == "aura" or ns.procOwned[r.spell] end,
+          get = function(r) return r.orProc ~= false end,
+          set = function(r) r.orProc = not (r.orProc ~= false) end },
         { key = "center", auraOnly = false,
           label = L("show above the resource", "показывать над ресурсом"),
           get = function(r) return r.center end,
@@ -618,6 +663,7 @@ local function Build()
         t:SetPoint("TOPLEFT", 264 + ((i - 1) % 2) * 190,
                    -130 - 2 * TILE_PAD_Y - 10 - math.floor((i - 1) / 2) * 22)
         t.auraOnly = def.auraOnly
+        t.hide = def.hide
         t.get = def.get
 
         local box = t:CreateTexture(nil, "BACKGROUND")

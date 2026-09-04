@@ -186,8 +186,9 @@ local function AddRule(rangeToken, spellToken)
         #rules, ns.SpellName(spellID), RangeText(rule))
 end
 
--- The three states a spell can be marked in. Each is its own rule, so a spell
--- can carry all three at once with a different marker for each.
+-- The states an AURA rule can be in. The resource threshold is a rule of its
+-- own kind, not an aura state, so it is not here; the options window's four
+-- slots are the user-facing view (see ns.FindSlotRule).
 ns.STATES = { "active", "missing", "proc" }
 
 function ns.RuleState(rule)
@@ -202,12 +203,15 @@ function ns.StateLabel(state)
     return L("up", "висит")
 end
 
+-- A proc and a full resource bar are not the same news -- one cast is free,
+-- the other is paid for -- so they do not share a look. Gold means "you have
+-- the resource"; cyan means "this one is free".
 local STATE_DEFAULTS = {
     active  = { style = "pixel",  r = 0, g = 1, b = 0      },
     missing = { style = "fill",   r = 1, g = 0, b = 0      },
-    proc    = { style = "modern", r = 1, g = 0.85, b = 0.1 },
-    -- "ready" is the slot name the options window uses for the resource /
-    -- proc state; same look as a proc.
+    proc    = { style = "shine",  r = 0.2, g = 0.9, b = 1  },
+    -- "ready" is the slot name the options window uses for the resource
+    -- threshold (or, for a burst, its cooldown being up).
     ready   = { style = "modern", r = 1, g = 0.85, b = 0.1 },
 }
 
@@ -284,25 +288,37 @@ function ns.AddAuraRuleFor(spellID, helpful)
 end
 
 --[[-------------------------------------------------------------------------
-    The three slots of one spell
+    The four slots of one spell
 
-    "up" and "gone" are aura rules; "ready" is the resource threshold, which
-    also lights on a proc -- a finisher that procced is ready whatever the bar
-    says. Each slot is a separate rule, so a spell can carry all three with a
-    different marker for each, and a slot nobody configures simply does not
+    "up" and "gone" are aura rules. "ready" is the resource threshold -- or,
+    for a burst, its cooldown being up. "proc" is the free cast: the spell lit
+    up on its own, no resource spent.
+
+    Ready and proc used to be one slot, which answered "can I press this?" but
+    not "what does it cost me?" -- and that is the question worth answering,
+    because a procced finisher and a full resource bar ask for different
+    decisions. Each slot is a separate rule, so a spell can carry all four with
+    a different marker for each, and a slot nobody configures simply does not
     exist and draws nothing.
 ---------------------------------------------------------------------------]]
 function ns.FindSlotRule(spellID, slot)
     for i, r in ipairs(CG:GetRules()) do
         if r.spell == spellID then
             if slot == "ready" then
-                if r.kind ~= "aura" or r.proc then return r, i end
+                if r.kind ~= "aura" then return r, i end
+            elseif slot == "proc" then
+                if r.kind == "aura" and r.proc then return r, i end
             elseif r.kind == "aura" and not r.proc and ns.RuleState(r) == slot then
                 return r, i
             end
         end
     end
 end
+
+-- Spells that carry their own "proc" slot. The resource rule for such a spell
+-- must stop lighting on procs, or both markers fire at once and the split says
+-- nothing. Filled by Rebuild; read by the update loop.
+ns.procOwned = {}
 
 -- Does this spell spend the class resource? Decides whether "ready" means a
 -- count threshold or just a proc.
@@ -359,13 +375,31 @@ function ns.GuessAuraSpell(spellID)
     return found
 end
 
+-- "ready" needs something to be ready FOR. A spell that costs no resource and
+-- has no cooldown is always ready, which is not worth a marker -- the options
+-- window says so rather than leaving a click that quietly does nothing.
+function ns.CanAddSlot(spellID, slot)
+    if slot ~= "ready" then return true end
+    if SpendsResource(spellID) then return true end
+    return (ns.HasRealCooldown and ns.HasRealCooldown(spellID)) and true or false
+end
+
 function ns.AddSlotRule(spellID, slot)
     local existing = ns.FindSlotRule(spellID, slot)
     if existing then return existing end
 
     local rules = CG:GetRules()
     local rule
-    if slot == "ready" then
+    local dReady, dProc = ns.STATE_DEFAULTS.ready, ns.STATE_DEFAULTS.proc
+    if slot == "proc" then
+        rule = {
+            kind = "aura", spell = spellID, proc = true,
+            timer = false, style = dProc.style,
+            alpha = StyleAlpha(dProc.style),
+            r = dProc.r, g = dProc.g, b = dProc.b,
+            center = false, enabled = true,
+        }
+    elseif slot == "ready" then
         local cost = SpendsResource(spellID)
         if cost then
             rule = {
@@ -373,8 +407,9 @@ function ns.AddSlotRule(spellID, slot)
                 min    = (cost >= 2) and cost or 1,
                 atMax  = (cost < 2) or nil,
                 orProc = true,
-                style  = "modern",
-                r = 1, g = 0.85, b = 0.1,
+                style  = dReady.style,
+                alpha  = StyleAlpha(dReady.style),
+                r = dReady.r, g = dReady.g, b = dReady.b,
                 center = false, enabled = true,
             }
         elseif ns.HasRealCooldown and ns.HasRealCooldown(spellID) then
@@ -382,17 +417,15 @@ function ns.AddSlotRule(spellID, slot)
             rule = {
                 kind = "cd", spell = spellID,
                 combat = true, orProc = true,
-                style = "modern",
-                r = 1, g = 0.85, b = 0.1,
+                style = dReady.style,
+                alpha = StyleAlpha(dReady.style),
+                r = dReady.r, g = dReady.g, b = dReady.b,
                 center = false, enabled = true,
             }
         else
-            rule = {
-                kind = "aura", spell = spellID, proc = true,
-                timer = false, style = "modern",
-                r = 1, g = 0.85, b = 0.1,
-                center = false, enabled = true,
-            }
+            -- Nothing to be ready for: the spell costs no resource and has no
+            -- cooldown worth waiting on. "proc" is the slot that fits it.
+            return nil
         end
     else
         local d = ns.STATE_DEFAULTS[slot] or ns.STATE_DEFAULTS.active
@@ -542,17 +575,35 @@ local function BuildPreset(quiet, intro)
     if intro then Say(intro) end
 
     for _, entry in ipairs(spenders) do
+        local d = STATE_DEFAULTS.ready
         local rule = {
             spell   = entry.spell,
             min     = (entry.cost >= 2) and entry.cost or 1,
             atMax   = (entry.cost < 2) or nil,
-            style   = "modern",
-            r = 1, g = 0.85, b = 0.1,
+            style   = d.style,
+            r = d.r, g = d.g, b = d.b,
             center  = false,
             enabled = true,
         }
         rules[#rules + 1] = rule
         Say(L("+ %s at %s", "+ %s при %s"), ns.SpellName(entry.spell), RangeText(rule))
+
+        -- The same spell, free: a spender that procs costs nothing this once,
+        -- and that is a different decision from having saved up for it. Its
+        -- own rule, its own marker. A spender that never procs simply keeps a
+        -- state that never lights.
+        local p = STATE_DEFAULTS.proc
+        rules[#rules + 1] = {
+            kind    = "aura",
+            spell   = entry.spell,
+            proc    = true,
+            timer   = false,
+            style   = p.style,
+            alpha   = StyleAlpha(p.style),
+            r = p.r, g = p.g, b = p.b,
+            center  = false,
+            enabled = true,
+        }
     end
 
     for _, entry in ipairs(auras) do
@@ -595,9 +646,12 @@ local function BuildPreset(quiet, intro)
     end
 
     CG:Rebuild()
+    -- Each spender got two rules, resource and proc, so the count is not the
+    -- number of spells scanned.
+    local added = #spenders * 2 + #auras + #bursts
     Say(L("%d rules added. /cg list to review, /cg del <#> to drop one.",
-          "добавлено правил: %d. /cg list — посмотреть, /cg del <№> — удалить."), total)
-    return total
+          "добавлено правил: %d. /cg list — посмотреть, /cg del <№> — удалить."), added)
+    return added
 end
 ns.BuildPreset = BuildPreset
 
