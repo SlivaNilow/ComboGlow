@@ -621,6 +621,48 @@ local function IsProcced(spellID)
 end
 ns.IsProcced = IsProcced
 
+--[[-------------------------------------------------------------------------
+    Is this cast free right now?
+
+    Asked of the game, not of a description. GetSpellPowerCost reports the
+    CURRENT cost with every modifier applied, so a proc that removes the cost
+    shows up as a zero. Nothing to identify, nothing to parse, nothing to keep
+    up with patches -- and it is right for every class at once.
+
+    Reading the buff's description was a dead end: it says which spells the
+    buff is ABOUT, not which it makes free. Starlord and Starweaver both name
+    Starsurge because Starsurge triggers them, and neither makes it free.
+
+    baseCost is what the spell costs when nothing is helping, learned by
+    watching: the highest cost ever seen. Without it a spell that simply has no
+    cost would read as permanently free. Returns nil when the answer is not
+    available -- no cost data, a secret value, no baseline learned yet.
+---------------------------------------------------------------------------]]
+local function CostsNothing(rule)
+    local pt = rule.power or (ns.CG and ns.CG.powerType)
+    if pt == nil then return nil end
+    if not (C_Spell and C_Spell.GetSpellPowerCost) then return nil end
+    local ok, costs = pcall(C_Spell.GetSpellPowerCost, rule.spell)
+    if not ok or type(costs) ~= "table" then return nil end
+
+    for _, c in ipairs(costs) do
+        if c.type == pt then
+            local v = c.cost
+            if type(v) ~= "number" or IsSecret(v) then return nil end
+            -- Self-calibrating: talents move base costs around, and the
+            -- highest reading is the one with no proc behind it.
+            if v > (rule.baseCost or 0) then rule.baseCost = v end
+            if not (rule.baseCost and rule.baseCost > 0) then return nil end
+            return v == 0
+        end
+    end
+    -- No entry for this resource at all. That is "free" only if the spell is
+    -- known to cost something normally; otherwise it never did.
+    if rule.baseCost and rule.baseCost > 0 then return true end
+    return nil
+end
+ns.CostsNothing = CostsNothing
+
 -- Which spells currently have their "proc" state lit. Written by the aura
 -- pass, read by the power pass so a free cast can outrank a full bar.
 --
@@ -645,21 +687,41 @@ end
 function ns.ApplyAuraRule(frame, rule)
     -- A proc pointed at a buff is just an aura rule: "this buff is on me".
     -- Only an unpointed one falls back to the game's own spell alert.
-    if rule.proc and not HasExplicitAura(rule) then
-        ClearTimer(frame)
-        frame.pandemicOn = nil
-        ns.ResetMirror(frame)
-        local procced = IsProcced(rule.spell)
-        SetProcActive(rule.spell, procced)
-        if procced then
+    if rule.proc then
+        -- The cost answers it outright when it can. Any buffs the state holds
+        -- then only say how long the free window lasts.
+        local free = CostsNothing(rule)
+        if free == nil and not HasExplicitAura(rule) then
+            free = IsProcced(rule.spell)
+        end
+
+        if free ~= nil then
+            frame.pandemicOn = nil
+            ns.ResetMirror(frame)
+            SetProcActive(rule.spell, free)
+            if not free then
+                ClearTimer(frame)
+                frame:StopArt()
+                frame:Hide()
+                return false
+            end
+            if HasExplicitAura(rule) and rule.timer ~= false then
+                local f, rem, tot, d = ns.QueryAura(rule)
+                if f == true then
+                    ShowTimer(frame, rule, rem, tot, d)
+                else
+                    ClearTimer(frame)
+                end
+            else
+                ClearTimer(frame)
+            end
             if not frame:IsShown() then frame:Show() end
             frame.needSafeStyle = false
             frame:StartArt()
             return true
         end
-        frame:StopArt()
-        frame:Hide()
-        return false
+        -- Cost said nothing and there are buffs to watch: the generic path
+        -- below treats them as an ordinary "this aura is on me" rule.
     end
 
     local found, remaining, total, durObj = ns.QueryAura(rule)

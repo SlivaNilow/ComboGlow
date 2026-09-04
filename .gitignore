@@ -5,3 +5,7 @@
 Thumbs.db
 
 # Rendered artwork is committed; the source script lives in the repo history.
+
+# Working notes and the local release helper: mine, not the addon's.
+PUBLISHING.md
+release.ps1

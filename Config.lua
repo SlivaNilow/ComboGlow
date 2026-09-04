@@ -209,7 +209,11 @@ end
 local STATE_DEFAULTS = {
     active  = { style = "pixel",  r = 0, g = 1, b = 0      },
     missing = { style = "fill",   r = 1, g = 0, b = 0      },
-    proc    = { style = "shine",  r = 0.2, g = 0.9, b = 1  },
+    -- Drawn by us, not by an engine: the shine this used to use is Blizzard's
+    -- autocast sparkle, which comes out gold whatever colour it is handed --
+    -- indistinguishable from the gold "ready" glow, which is the one thing it
+    -- must never look like.
+    proc    = { style = "solid",  r = 0.2, g = 0.9, b = 1  },
     -- "ready" is the slot name the options window uses for the resource
     -- threshold (or, for a burst, its cooldown being up).
     ready   = { style = "modern", r = 1, g = 0.85, b = 0.1 },
@@ -483,12 +487,15 @@ function ns.AddSlotRule(spellID, slot)
     local rule
     local dReady, dProc = ns.STATE_DEFAULTS.ready, ns.STATE_DEFAULTS.proc
     if slot == "proc" then
-        -- Pointed at the buffs that make the cast free, when any can be found.
-        -- Then it is an ordinary aura rule with a real countdown; without one
-        -- it falls back to the game's spell alert, which has no duration.
-        local buffs = ns.GuessProcAuras(spellID)
+        -- A spender is answered by its cost: the state lights when the game
+        -- says this cast is currently free. Anything else falls back to the
+        -- buffs whose description names it, and then to the spell alert.
+        local spend = SpendsResource(spellID)
+        local costDriven = (spend or 0) > 0
+        local buffs = (not costDriven) and ns.GuessProcAuras(spellID) or nil
         rule = {
             kind = "aura", spell = spellID, proc = true,
+            baseCost = costDriven and spend or nil,
             auraIDs = buffs,
             unit = "player", helpful = true,
             timer = buffs and true or false,
@@ -631,7 +638,8 @@ local function BuildPreset(quiet, intro)
                                 { spell = spellID, cost = tonumber(c.cost) or 0 }
                         end
                         if not haveProc[spellID] then
-                            procs[#procs + 1] = spellID
+                            procs[#procs + 1] =
+                                { spell = spellID, cost = tonumber(c.cost) or 0 }
                         end
                         break
                     end
@@ -678,14 +686,22 @@ local function BuildPreset(quiet, intro)
         end
     end)
 
-    -- Proc states that already exist are re-checked against the buff list as
-    -- it stands right now. A patch or a talent swap can retire a buff or add
-    -- one, and a stored id that nothing tracks any more would leave the state
-    -- permanently dark with no sign of why. Planned here, applied below, so a
-    -- scan that finds nothing else still counts this as work to do.
+    -- Proc states that already exist are re-checked. Planned here, applied
+    -- below, so a scan that finds nothing else still counts this as work.
     local heals = {}
     for _, r in ipairs(rules) do
-        if r.kind == "aura" and r.proc and r.spell then
+      if r.kind == "aura" and r.proc and r.spell then
+        -- A spender is answered by its cost, exactly and in any language: the
+        -- state lights when the game says this cast is currently free. Buffs
+        -- are not consulted at all, and any that an earlier scan guessed are
+        -- dropped -- a description says which spells a buff is ABOUT, not
+        -- which it makes free, and half the Balance tree names Starsurge.
+        local spend = SpendsResource(r.spell)
+        if spend and spend > 0 then
+            if (r.baseCost or 0) < spend or r.auraIDs then
+                heals[#heals + 1] = { rule = r, cost = spend }
+            end
+        else
             -- What the descriptions say right now, plus anything picked by
             -- hand that is still tracked. Ids nothing tracks any more are
             -- dropped. Talents move this list around within a single patch --
@@ -719,6 +735,7 @@ local function BuildPreset(quiet, intro)
                 heals[#heals + 1] = { rule = r, ids = (#want > 0) and want or false }
             end
         end
+      end
     end
 
     local total = #spenders + #procs + #auras + #bursts + #heals
@@ -752,37 +769,41 @@ local function BuildPreset(quiet, intro)
     -- its own marker. Its own pass too, so a spell whose count rule already
     -- exists from an earlier scan still gets this state. A spender that never
     -- procs simply keeps a state that never lights.
-    for _, spellID in ipairs(procs) do
+    for _, entry in ipairs(procs) do
         local p = STATE_DEFAULTS.proc
-        local buffs = ns.GuessProcAuras(spellID)
+        -- baseCost is the whole mechanism for a spender: the state lights when
+        -- the game says this cast currently costs nothing. No buff to name, so
+        -- no buff is attached -- descriptions say which spells a buff is ABOUT,
+        -- not which it makes free, and half the Balance tree mentions Starsurge.
         rules[#rules + 1] = {
-            kind    = "aura",
-            spell   = spellID,
-            proc    = true,
-            auraIDs = buffs,
-            unit    = "player",
-            helpful = true,
-            timer   = buffs and true or false,
-            style   = p.style,
-            alpha   = StyleAlpha(p.style),
-            thick   = 3, warn = 4,
+            kind     = "aura",
+            spell    = entry.spell,
+            proc     = true,
+            baseCost = entry.cost,
+            unit     = "player",
+            helpful  = true,
+            timer    = false,
+            style    = p.style,
+            alpha    = StyleAlpha(p.style),
+            thick    = 3, warn = 4,
             r = p.r, g = p.g, b = p.b,
             wr = 1, wg = 0, wb = 0,
-            center  = false,
-            enabled = true,
+            center   = false,
+            enabled  = true,
         }
-        if buffs then
-            Say(L("+ %s is free while %s is up",
-                  "+ «%s» бесплатен, пока висит «%s»"),
-                ns.SpellName(spellID), ns.ProcAuraText(rules[#rules]))
-        else
-            Say(L("+ %s on proc", "+ «%s» по проку"), ns.SpellName(spellID))
-        end
+        Say(L("+ %s when it costs nothing", "+ «%s», когда бесплатен"),
+            ns.SpellName(entry.spell))
     end
 
     -- The re-check planned above, applied.
     for _, h in ipairs(heals) do
-        if h.ids then
+        if h.cost then
+            h.rule.baseCost = h.cost
+            h.rule.auraIDs, h.rule.timer = nil, false
+            Say(L("~ %s now lights when it costs nothing",
+                  "~ «%s» теперь горит, когда бесплатен"),
+                ns.SpellName(h.rule.spell))
+        elseif h.ids then
             h.rule.auraIDs, h.rule.timer = h.ids, true
             Say(L("~ %s is free while %s is up",
                   "~ «%s» бесплатен, пока висит «%s»"),
@@ -1158,26 +1179,37 @@ local function Handler(msg)
         for i, r in ipairs(CG:GetRules()) do
             if r.kind == "aura" and r.proc then
                 n = n + 1
-                local src = ns.ProcAuraText(r) or L("spell alert", "штатная подсветка")
+                local src
+                if (r.baseCost or 0) > 0 and not r.auraIDs then
+                    src = ("%s (%s %d)"):format(
+                        L("costs nothing", "ничего не стоит"),
+                        L("normally", "обычно"), r.baseCost)
+                else
+                    src = ns.ProcAuraText(r) or L("spell alert", "штатная подсветка")
+                end
                 local lit = ns.procActive[r.spell] and L("YES", "ДА")
                                                    or L("no / unknown", "нет / неизвестно")
                 Say("#%d %s -> %s | %s: %s", i, ns.SpellName(r.spell), src,
                     L("lit now", "горит сейчас"), lit)
-                if not ns.ProcAurasFit(r) then
-                    Say(L("   WARNING: none of those buffs names this spell",
-                          "   ВНИМАНИЕ: ни один из этих баффов не называет это заклинание"))
-                end
-                local fresh = ns.GuessProcAuras(r.spell)
-                if fresh then
-                    local now = ns.ProcAuraText(r)
-                    local want = ns.ProcAuraText({ auraIDs = fresh })
-                    if now ~= want then
-                        Say(L("   should be %s - /cg preset fixes it",
-                              "   должно быть «%s» — /cg preset исправит"), want)
+                -- Advice only where there is a choice to get wrong. A cost-
+                -- driven state has none: the game answers it outright.
+                if not ((r.baseCost or 0) > 0 and not r.auraIDs) then
+                    if not ns.ProcAurasFit(r) then
+                        Say(L("   WARNING: none of those buffs names this spell",
+                              "   ВНИМАНИЕ: ни один из этих баффов не называет это заклинание"))
                     end
-                else
-                    Say(L("   no tracked buff names this spell",
-                          "   ни один отслеживаемый бафф не называет это заклинание"))
+                    local fresh = ns.GuessProcAuras(r.spell)
+                    if fresh then
+                        local now = ns.ProcAuraText(r)
+                        local want = ns.ProcAuraText({ auraIDs = fresh })
+                        if now ~= want then
+                            Say(L("   naming it: %s (a mention is not a promise)",
+                                  "   упоминают его: %s (упоминание — ещё не обещание)"), want)
+                        end
+                    else
+                        Say(L("   no tracked buff names this spell",
+                              "   ни один отслеживаемый бафф не называет это заклинание"))
+                    end
                 end
             end
         end

@@ -236,21 +236,27 @@ local function RefreshDetails()
         UI.auraRow:Show()
         if rule.proc then
             local named = ns.ProcAuraText(rule)
-            local watching = named or L("the game's own proc alert",
-                                        "штатная подсветка прока")
+            local watching, warn
+            if (rule.baseCost or 0) > 0 and not named then
+                -- The exact answer, and the one that needs no configuring:
+                -- the game reports what the cast costs right now.
+                watching = L("the cast costs nothing", "каст ничего не стоит")
+                warn = L("no buff to pick - the game is asked directly",
+                         "бафф выбирать не нужно — спрашиваем у игры")
+            else
+                watching = named or L("the game's own proc alert",
+                                      "штатная подсветка прока")
+                if not named then
+                    warn = L("click to pick the buffs", "нажми, чтобы выбрать баффы")
+                elseif not ns.ProcAurasFit(rule) then
+                    warn = "|cffff6060" .. L("does not name this spell",
+                                             "не называет это заклинание") .. "|r"
+                else
+                    warn = ""
+                end
+            end
             UI.auraRow.label:SetText(L("free while: ", "бесплатен, пока: ")
                 .. "|cffffd100" .. watching .. "|r")
-            local warn
-            if not named then
-                warn = L("click to pick the buffs", "нажми, чтобы выбрать баффы")
-            elseif not ns.ProcAurasFit(rule) then
-                -- Pointed only at buffs that say nothing about this spell.
-                -- Almost always a near-identical name picked out of the list.
-                warn = "|cffff6060" .. L("does not name this spell",
-                                         "не называет это заклинание") .. "|r"
-            else
-                warn = ""
-            end
             UI.auraRow.hint:SetText(warn)
         else
             local named = rule.auraID and ns.SpellName(rule.auraID) or rule.auraName
@@ -484,8 +490,20 @@ local function Build()
         local ebg = e:CreateTexture(nil, "BACKGROUND")
         ebg:SetAllPoints(e)
         ebg:SetColorTexture(1, 1, 1, 0)
-        e:SetScript("OnEnter", function() ebg:SetColorTexture(0.05, 0.82, 0.62, 0.25) end)
-        e:SetScript("OnLeave", function() ebg:SetColorTexture(1, 1, 1, 0) end)
+        -- The game's own tooltip for the buff. A list of names says nothing
+        -- about what any of them does, and "Starweaver's Warp" versus
+        -- "Starweaver's Haze" is not a choice anyone can make from the names.
+        e:SetScript("OnEnter", function(self)
+            ebg:SetColorTexture(0.05, 0.82, 0.62, 0.25)
+            if not self.spellID then return end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            local ok = pcall(GameTooltip.SetSpellByID, GameTooltip, self.spellID)
+            if ok then GameTooltip:Show() else GameTooltip:Hide() end
+        end)
+        e:SetScript("OnLeave", function()
+            ebg:SetColorTexture(1, 1, 1, 0)
+            GameTooltip:Hide()
+        end)
         e.label = Label(e, "", 11, 0.9, 0.9, 0.9)
         e.label:SetPoint("LEFT", 4, 0)
         e:SetScript("OnClick", function(self)
@@ -560,14 +578,16 @@ local function Build()
                     if not harmful then
                         names[nm] = true
                         -- Marked and sorted first when the buff's description
-                        -- names THIS spell. Two buffs a word apart can make
-                        -- two different spells free, and picking by name alone
-                        -- is a coin flip.
+                        -- mentions this spell -- a hint about where to look,
+                        -- not a verdict. A buff can name a spell because the
+                        -- spell TRIGGERS it: Starlord and Starweaver both name
+                        -- Starsurge and neither makes it free. The tooltip on
+                        -- hover is what actually answers the question.
                         local mine = ns.AuraMentions(id, selSpell)
                         local box = chosen[id] and "|cff0cd29f[x]|r "
                                                 or "|cff606060[ ]|r "
                         local body = mine and (nm .. "  |cff0cd29f" ..
-                                     L("<- this spell", "<- это заклинание") .. "|r")
+                                     L("mentions it", "упоминает") .. "|r")
                                   or ("|cff909090" .. nm .. "|r")
                         rest[#rest + 1] = {
                             id = id, mine = mine, sort = nm, name = box .. body,
