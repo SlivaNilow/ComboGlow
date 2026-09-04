@@ -681,16 +681,21 @@ function CG:UpdatePower()
     wipe(powerCacheHas)
     local gateAllowed = self.db.secretMode and true or false
 
+    -- No goto/continue here: WoW runs Lua 5.1, where neither exists. The two
+    -- kinds are separate branches instead.
     for _, frame in ipairs(self.powerFrames) do
         local rule = frame.rule
 
-        -- Burst: ready means off cooldown, not a resource count. Kept to
-        -- combat by default, since a major cooldown sitting ready in town is
-        -- not something anyone needs reminding of.
         if rule and rule.kind == "cd" then
+            -- Burst: ready means off cooldown, not a resource count. Kept to
+            -- combat by default -- a major cooldown sitting ready in town is
+            -- not something anyone needs reminding of.
             local on = CooldownReady(rule.spell)
-            if on and rule.combat ~= false and not InCombatLockdown() then on = false end
-            if on and rule.orProc ~= false and ns.IsProcced and ns.IsProcced(rule.spell) then
+            if on and rule.combat ~= false and not InCombatLockdown() then
+                on = false
+            end
+            if not on and rule.orProc ~= false
+               and ns.IsProcced and ns.IsProcced(rule.spell) then
                 on = true
             end
             frame.needSafeStyle = false
@@ -700,41 +705,42 @@ function CG:UpdatePower()
             else
                 Silence(frame)
             end
-            goto continue
-        end
 
-        local pt = rule and (rule.power or self.powerType)
-        local ok = pt ~= nil
-        if ok and not powerCacheHas[pt] then
-            local cur = UnitPower("player", pt)
-            if type(cur) == "number" then
-                powerCache[pt] = cur
-                powerCacheHas[pt] = true
+        else
+            local pt = rule and (rule.power or self.powerType)
+            local ok = pt ~= nil
+            if ok and not powerCacheHas[pt] then
+                local cur = UnitPower("player", pt)
+                if type(cur) == "number" then
+                    powerCache[pt] = cur
+                    powerCacheHas[pt] = true
+                else
+                    ok = false
+                end
+            end
+
+            local minV, maxV = rule and rule.min or 1, rule and rule.max
+            if ok and rule.atMax then
+                -- "at maximum": the cap can move with talents, so it is read
+                -- live (with the last plain reading kept for restricted
+                -- content).
+                local mx = self:GetMaxPower(pt)
+                if mx then minV, maxV = mx, nil else ok = false end
+            end
+
+            -- "ready" is the resource threshold OR a proc: a finisher that
+            -- procced is ready no matter what the bar says. Forcing the value
+            -- to the threshold lights it through the same path, gate included.
+            if rule and rule.orProc ~= false
+               and ns.IsProcced and ns.IsProcced(rule.spell) then
+                frame:ApplyState(minV, false, minV, nil, gateAllowed)
+            elseif not ok then
+                Silence(frame)
             else
-                ok = false
+                local v = powerCache[pt]
+                frame:ApplyState(v, IsSecret(v), minV, maxV, gateAllowed)
             end
         end
-
-        local minV, maxV = rule and rule.min or 1, rule and rule.max
-        if ok and rule.atMax then
-            -- "at maximum": the cap can move with talents, so it is read live
-            -- (with the last plain reading kept for restricted content).
-            local mx = self:GetMaxPower(pt)
-            if mx then minV, maxV = mx, nil else ok = false end
-        end
-
-        -- "ready" is the resource threshold OR a proc: a finisher that procced
-        -- is ready no matter what the bar says. Forcing the value to the
-        -- threshold lights it through the same path, gate included.
-        if rule.orProc ~= false and ns.IsProcced and ns.IsProcced(rule.spell) then
-            frame:ApplyState(minV, false, minV, nil, gateAllowed)
-        elseif not ok then
-            Silence(frame)
-        else
-            local v = powerCache[pt]
-            frame:ApplyState(v, IsSecret(v), minV, maxV, gateAllowed)
-        end
-        ::continue::
     end
 end
 
