@@ -14,3 +14,4 @@ ignore:
     - PUBLISHING.md
     - logo.png
     - logo-128.png
+    - release.ps1
