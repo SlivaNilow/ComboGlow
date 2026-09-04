@@ -640,8 +640,15 @@ local function PrintList()
               "для этой специализации правил нет. Пример: /cg add max Потрошение"))
         return
     end
+    local nAura, nEss = 0, 0
+    for _ in pairs(ns.cdmAuraSpells or {}) do nAura = nAura + 1 end
+    for _ in pairs(ns.cdmEssentialSpells or {}) do nEss = nEss + 1 end
     Say(L("rules (spec %d, %d buttons scanned):", "правила (спек %d, кнопок просканировано: %d):"),
         CG.specID or 0, ns.scannedButtons or 0)
+    -- What the scan had to work with. An empty Cooldown Manager is the usual
+    -- reason a spec comes up with nothing, and it is invisible otherwise.
+    Say(L("  Cooldown Manager: %d tracked auras, %d essential cooldowns",
+          "  Cooldown Manager: аур отслеживается %d, бурстов %d"), nAura, nEss)
     for i, rule in ipairs(rules) do
         local flags = {}
         if rule.enabled == false then flags[#flags + 1] = L("off", "выкл") end

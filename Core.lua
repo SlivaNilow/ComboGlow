@@ -1054,6 +1054,12 @@ end
 function CG:AutoPreset(attempt)
     attempt = attempt or 1
     if not (ns.Say and ns.BuildPreset) then return end
+
+    -- Re-read the spec here rather than trusting what the event handler saw:
+    -- PLAYER_SPECIALIZATION_CHANGED can fire before GetSpecialization() answers
+    -- the new one, and acting on the stale id marks the OLD spec as done while
+    -- leaving the new one with nothing.
+    self:RefreshSpec()
     local sid = self.specID or 0
     if self.db.presetDone[sid] then return end
     if #self:GetRules() > 0 then
