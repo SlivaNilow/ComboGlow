@@ -1065,6 +1065,32 @@ function CG:AutoPreset(attempt)
     -- leaving the new one with nothing.
     self:RefreshSpec()
     local sid = self.specID or 0
+
+    -- Spec id 0 means the client has not answered yet. Creating rules under it
+    -- files them where nothing will ever look again, so wait instead.
+    if sid == 0 then
+        if attempt < 4 then
+            C_Timer.After(5, function() self:AutoPreset(attempt + 1) end)
+        end
+        return
+    end
+
+    -- Rescue anything an earlier run filed under 0 before the id settled.
+    local orphans = self.db.specs[0]
+    if orphans and #orphans > 0 and #self:GetRules() == 0 then
+        local rules = self:GetRules()
+        for i = 1, #orphans do rules[i] = orphans[i] end
+        self.db.specs[0] = nil
+        self:Rebuild()
+        if ns.Say then
+            ns.Say(ns.L("recovered %d rules saved before the specialization was known",
+                        "восстановлено правил, сохранённых до определения специализации: %d"),
+                   #rules)
+        end
+        self.db.presetDone[sid] = true
+        return
+    end
+
     if self.db.presetDone[sid] then return end
     if #self:GetRules() > 0 then
         self.db.presetDone[sid] = true

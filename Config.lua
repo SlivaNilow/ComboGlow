@@ -439,6 +439,16 @@ local function BuildPreset(quiet, intro)
     if ns.RebuildCDMMap then ns.RebuildCDMMap() end
     CG:RefreshSpec()
 
+    -- Rules are filed per specialization; with the id still unknown they would
+    -- go somewhere nothing reads back.
+    if (CG.specID or 0) == 0 then
+        if not quiet then
+            Say(L("specialization not known yet - try again in a moment",
+                  "специализация ещё не определилась — попробуй через секунду"))
+        end
+        return 0
+    end
+
     local pt = CG.powerType
     local rules = CG:GetRules()
 
