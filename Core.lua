@@ -203,6 +203,9 @@ ns.cdmFrames = {}
 -- no per-class table of dot ids to maintain.
 ns.cdmAuraSpells = {}
 ns.cdmAuraFrames = {}
+-- Spells in the Essential viewer: Blizzard's own idea of "the cooldowns that
+-- matter for this spec". Used as the burst list so there is no table to keep.
+ns.cdmEssentialSpells = {}
 ns.cdmViewerOf = setmetatable({}, { __mode = "k" })
 local CDM_AURA_VIEWERS = {
     BuffIconCooldownViewer = true,
@@ -214,6 +217,7 @@ function ns.RebuildCDMMap()
     wipe(ns.cdmAuraSpells)
     if not (C_CooldownViewer and C_CooldownViewer.GetCooldownViewerCooldownInfo) then return end
     wipe(ns.cdmAuraFrames)
+    wipe(ns.cdmEssentialSpells)
     wipe(ns.cdmViewerOf)
     local map = ns.cdmFrames
     local auraMap = ns.cdmAuraFrames
@@ -225,6 +229,9 @@ function ns.RebuildCDMMap()
         if type(id) ~= "number" or id <= 0 then return end
         if not map[id] then map[id] = frame end
         viewerOf[frame] = viewerOf[frame] or currentViewer
+        if currentViewer == "EssentialCooldownViewer" then
+            ns.cdmEssentialSpells[id] = true
+        end
         if isAuraViewer then
             auraSet[id] = true
             -- Aura rules must resolve to a BUFF viewer entry: on a cooldown
@@ -438,6 +445,7 @@ local function RuleFingerprint(rule)
         tostring(rule.timer), tostring(rule.center), tostring(rule.unit),
         tostring(rule.min), tostring(rule.max), tostring(rule.atMax),
         tostring(rule.orProc), tostring(rule.swipe), tostring(rule.auraID),
+        tostring(rule.combat),
     }, ",")
 end
 
@@ -512,8 +520,11 @@ function CG:Rebuild()
             -- is a situational choice rather than something you forgot to
             -- press -- so it would be a second nag for the same fact. The
             -- manual /cg center flag still forces one in.
-            local autoWanted = auto and rule.kind == "aura" and rule.missing
-                and not rule.auraID and not watched[rule.spell]
+            -- A burst whose cooldown is up is the same kind of nudge as a dot
+            -- that fell off, so it joins the strip too.
+            local autoWanted = auto and not watched[rule.spell]
+                and ((rule.kind == "aura" and rule.missing and not rule.auraID)
+                     or rule.kind == "cd")
             if (rule.center or autoWanted) and rule.enabled ~= false then
                 watched[rule.spell] = true
                 centerRules[#centerRules + 1] = rule
@@ -640,6 +651,18 @@ function CG:HideAll()
     for ic in self.centerPool:EnumerateActive() do Silence(ic) end
 end
 
+-- A burst is "ready" when its cooldown is done. The global cooldown does not
+-- count as being on cooldown -- everything is on the GCD constantly, and a
+-- marker that blinks off every button press is worse than none.
+local function CooldownReady(spellID)
+    if not (spellID and C_Spell and C_Spell.GetSpellCooldown) then return false end
+    local ok, info = pcall(C_Spell.GetSpellCooldown, spellID)
+    if not ok or type(info) ~= "table" then return false end
+    if info.isOnGCD then return true end
+    return not info.isActive
+end
+ns.CooldownReady = CooldownReady
+
 function CG:Suppressed()
     if not self.db.enabled then return true end
     if self.db.combatOnly and not InCombatLockdown() then return true end
@@ -660,6 +683,26 @@ function CG:UpdatePower()
 
     for _, frame in ipairs(self.powerFrames) do
         local rule = frame.rule
+
+        -- Burst: ready means off cooldown, not a resource count. Kept to
+        -- combat by default, since a major cooldown sitting ready in town is
+        -- not something anyone needs reminding of.
+        if rule and rule.kind == "cd" then
+            local on = CooldownReady(rule.spell)
+            if on and rule.combat ~= false and not InCombatLockdown() then on = false end
+            if on and rule.orProc ~= false and ns.IsProcced and ns.IsProcced(rule.spell) then
+                on = true
+            end
+            frame.needSafeStyle = false
+            if on then
+                if not frame:IsShown() then frame:Show() end
+                frame:StartArt()
+            else
+                Silence(frame)
+            end
+            goto continue
+        end
+
         local pt = rule and (rule.power or self.powerType)
         local ok = pt ~= nil
         if ok and not powerCacheHas[pt] then
@@ -691,6 +734,7 @@ function CG:UpdatePower()
             local v = powerCache[pt]
             frame:ApplyState(v, IsSecret(v), minV, maxV, gateAllowed)
         end
+        ::continue::
     end
 end
 
@@ -943,6 +987,8 @@ function CG:Initialize()
     self:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
     self:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
     self:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
+    self:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+    self:RegisterEvent("SPELL_UPDATE_USABLE")
 
     if EventRegistry and EventRegistry.RegisterCallback then
         pcall(EventRegistry.RegisterCallback, EventRegistry,
@@ -1006,7 +1052,8 @@ CG:SetScript("OnEvent", function(self, event, ...)
     if not self.initialized then return end
 
     if event == "UNIT_POWER_UPDATE" or event == "UNIT_POWER_FREQUENT"
-       or event == "UNIT_MAXPOWER" then
+       or event == "UNIT_MAXPOWER"
+       or event == "SPELL_UPDATE_COOLDOWN" or event == "SPELL_UPDATE_USABLE" then
         self:UpdatePower()
     elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
         local _, _, spellID = ...

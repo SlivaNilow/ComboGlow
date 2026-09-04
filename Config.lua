@@ -83,6 +83,9 @@ local function ParseRange(token)
 end
 
 local function RangeText(rule)
+    if rule.kind == "cd" then
+        return L("burst ready", "бурст готов")
+    end
     if rule.kind == "aura" then
         local what = rule.helpful and L("buff", "бафф") or L("debuff", "дебафф")
         local where = rule.unit or "target"
@@ -374,6 +377,15 @@ function ns.AddSlotRule(spellID, slot)
                 r = 1, g = 0.85, b = 0.1,
                 center = false, enabled = true,
             }
+        elseif ns.cdmEssentialSpells and ns.cdmEssentialSpells[spellID] then
+            -- A burst: "ready" means its cooldown is done.
+            rule = {
+                kind = "cd", spell = spellID,
+                combat = true, orProc = true,
+                style = "modern",
+                r = 1, g = 0.85, b = 0.1,
+                center = false, enabled = true,
+            }
         else
             rule = {
                 kind = "aura", spell = spellID, proc = true,
@@ -426,9 +438,11 @@ local function BuildPreset(quiet, intro)
 
     -- Tracked per STATE, not per spell: re-scanning should top up a state
     -- that is missing rather than skip a spell that already has one.
-    local havePower, haveUp, haveGone = {}, {}, {}
+    local havePower, haveUp, haveGone, haveBurst = {}, {}, {}, {}
     for _, r in ipairs(rules) do
-        if r.kind ~= "aura" then
+        if r.kind == "cd" then
+            haveBurst[r.spell] = true
+        elseif r.kind ~= "aura" then
             havePower[r.spell] = true
         elseif r.missing then
             haveGone[r.spell] = true
@@ -440,7 +454,7 @@ local function BuildPreset(quiet, intro)
     local canCost = C_Spell and C_Spell.GetSpellPowerCost
 
     -- Collect first, so nothing is printed for an empty scan.
-    local seen, spenders, auras = {}, {}, {}
+    local seen, spenders, auras, bursts = {}, {}, {}, {}
     ns.ForEachActionButton(function(_, spellID)
         if not spellID or seen[spellID] then return end
         seen[spellID] = true
@@ -455,6 +469,25 @@ local function BuildPreset(quiet, intro)
                         break
                     end
                 end
+            end
+        end
+
+        -- In the Essential viewer and does not spend the resource -> a burst,
+        -- marked when its cooldown is done. Blizzard's own list of what
+        -- matters for the spec, so there is nothing hardcoded here.
+        if ns.cdmEssentialSpells[spellID] and not havePower[spellID]
+           and not haveBurst[spellID] then
+            local spends = false
+            if pt and canCost then
+                local ok, costs = pcall(canCost, spellID)
+                if ok and type(costs) == "table" then
+                    for _, c in ipairs(costs) do
+                        if c.type == pt then spends = true break end
+                    end
+                end
+            end
+            if not spends then
+                bursts[#bursts + 1] = spellID
             end
         end
 
@@ -477,7 +510,7 @@ local function BuildPreset(quiet, intro)
         end
     end)
 
-    local total = #spenders + #auras
+    local total = #spenders + #auras + #bursts
     if total == 0 then
         if not quiet then
             Say(L("nothing to set up from your bars - use /cg add or /cg dot",
@@ -523,6 +556,22 @@ local function BuildPreset(quiet, intro)
         }
         rules[#rules + 1] = rule
         Say(L("+ %s (%s)", "+ %s (%s)"), ns.SpellName(entry.spell), RangeText(rule))
+    end
+
+    for _, spellID in ipairs(bursts) do
+        local rule = {
+            kind    = "cd",
+            spell   = spellID,
+            combat  = true,
+            orProc  = true,
+            style   = "modern",
+            r = 1, g = 0.85, b = 0.1,
+            center  = false,
+            enabled = true,
+        }
+        rules[#rules + 1] = rule
+        Say(L("+ %s (%s)", "+ %s (%s)"),
+            ns.SpellName(spellID), L("burst ready", "бурст готов"))
     end
 
     CG:Rebuild()
