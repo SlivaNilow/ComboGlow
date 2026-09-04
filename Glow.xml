@@ -1,0 +1,114 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+
+  <Script file="Glow.lua"/>
+
+  <!-- Overlay attached to an action button. All artwork lives inside "Art" so
+       the secret-value gate can reparent it into a clipping frame. -->
+  <Frame name="ComboGlowOverlayTemplate" mixin="ComboGlowOverlayMixin" hidden="true" virtual="true">
+    <Layers>
+      <Layer level="OVERLAY">
+        <FontString parentKey="TimerText" inherits="NumberFontNormal" hidden="true">
+          <Anchors><Anchor point="CENTER"/></Anchors>
+        </FontString>
+      </Layer>
+    </Layers>
+    <Frames>
+      <Cooldown parentKey="CD" inherits="CooldownFrameTemplate" hidden="true">
+        <Anchors><Anchor point="CENTER"/></Anchors>
+      </Cooldown>
+      <Frame parentKey="Art" setAllPoints="true">
+        <Frames>
+          <Frame parentKey="Wrap">
+            <Anchors><Anchor point="CENTER"/></Anchors>
+          </Frame>
+        </Frames>
+        <Layers>
+          <Layer level="OVERLAY">
+            <Texture parentKey="Proc" atlas="UI-HUD-ActionBar-Proc-Loop-Flipbook" hidden="true">
+              <Anchors><Anchor point="CENTER"/></Anchors>
+            </Texture>
+            <Texture parentKey="Highlight" file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD" hidden="true">
+              <Anchors><Anchor point="CENTER"/></Anchors>
+            </Texture>
+            <Texture parentKey="Border" file="Interface\SpellActivationOverlay\IconAlert" alphaMode="ADD" hidden="true">
+              <TexCoords left="0.00781250" right="0.50781250" top="0.27734375" bottom="0.52734375"/>
+              <Anchors><Anchor point="CENTER"/></Anchors>
+            </Texture>
+          </Layer>
+        </Layers>
+        <Animations>
+          <AnimationGroup parentKey="ProcLoop" looping="REPEAT">
+            <FlipBook parentKey="FlipAnim" childKey="Proc" duration="1" order="0"
+                      flipBookRows="6" flipBookColumns="5" flipBookFrames="30"
+                      flipBookFrameWidth="0" flipBookFrameHeight="0"/>
+          </AnimationGroup>
+          <AnimationGroup parentKey="Pulse" looping="REPEAT">
+            <Alpha childKey="Border" duration="0.45" fromAlpha="1"    toAlpha="0.35" order="1"/>
+            <Alpha childKey="Border" duration="0.45" fromAlpha="0.35" toAlpha="1"    order="2"/>
+          </AnimationGroup>
+        </Animations>
+      </Frame>
+    </Frames>
+    <Scripts>
+      <OnHide method="OnHide"/>
+    </Scripts>
+  </Frame>
+
+  <!-- Center-of-screen icon. Same Art layout (plus the spell icon itself) so
+       the shared start/stop code in Glow.lua works on both. -->
+  <Frame name="ComboGlowCenterIconTemplate" mixin="ComboGlowCenterIconMixin" hidden="true" virtual="true">
+    <Layers>
+      <Layer level="OVERLAY">
+        <FontString parentKey="TimerText" inherits="NumberFontNormal" hidden="true">
+          <Anchors><Anchor point="CENTER"/></Anchors>
+        </FontString>
+      </Layer>
+    </Layers>
+    <Frames>
+      <Cooldown parentKey="CD" inherits="CooldownFrameTemplate" hidden="true">
+        <Anchors><Anchor point="CENTER"/></Anchors>
+      </Cooldown>
+      <Frame parentKey="Art" setAllPoints="true">
+        <Frames>
+          <Frame parentKey="Wrap">
+            <Anchors><Anchor point="CENTER"/></Anchors>
+          </Frame>
+        </Frames>
+        <Layers>
+          <Layer level="BACKGROUND">
+            <Texture parentKey="Icon">
+              <Anchors><Anchor point="CENTER"/></Anchors>
+            </Texture>
+          </Layer>
+          <Layer level="OVERLAY">
+            <Texture parentKey="Proc" atlas="UI-HUD-ActionBar-Proc-Loop-Flipbook" hidden="true">
+              <Anchors><Anchor point="CENTER"/></Anchors>
+            </Texture>
+            <Texture parentKey="Highlight" file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD" hidden="true">
+              <Anchors><Anchor point="CENTER"/></Anchors>
+            </Texture>
+            <Texture parentKey="Border" file="Interface\SpellActivationOverlay\IconAlert" alphaMode="ADD" hidden="true">
+              <TexCoords left="0.00781250" right="0.50781250" top="0.27734375" bottom="0.52734375"/>
+              <Anchors><Anchor point="CENTER"/></Anchors>
+            </Texture>
+          </Layer>
+        </Layers>
+        <Animations>
+          <AnimationGroup parentKey="ProcLoop" looping="REPEAT">
+            <FlipBook parentKey="FlipAnim" childKey="Proc" duration="1" order="0"
+                      flipBookRows="6" flipBookColumns="5" flipBookFrames="30"
+                      flipBookFrameWidth="0" flipBookFrameHeight="0"/>
+          </AnimationGroup>
+          <AnimationGroup parentKey="Pulse" looping="REPEAT">
+            <Alpha childKey="Border" duration="0.45" fromAlpha="1"    toAlpha="0.35" order="1"/>
+            <Alpha childKey="Border" duration="0.45" fromAlpha="0.35" toAlpha="1"    order="2"/>
+          </AnimationGroup>
+        </Animations>
+      </Frame>
+    </Frames>
+    <Scripts>
+      <OnHide method="OnHide"/>
+    </Scripts>
+  </Frame>
+
+</Ui>

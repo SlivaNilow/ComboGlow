@@ -1,0 +1,5 @@
+# WoW writes these next to the addon; they are not source.
+*.bak
+*.orig
+.DS_Store
+Thumbs.db

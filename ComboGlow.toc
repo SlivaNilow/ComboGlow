@@ -1,0 +1,17 @@
+## Interface: 120100, 120007, 120005, 120000
+## Title: ComboGlow
+## Notes: Highlights action bar abilities at a chosen class-resource count (combo points, holy power, chi, ...)
+## Notes-ruRU: Подсветка способностей на панели при заданном количестве ресурса (КП, святая сила, ци, ...)
+## Author: built for Ellesmere UI setups
+## Version: 1.0.0
+## IconTexture: Interface\Icons\ability_rogue_eviscerate
+## Category: Combat
+## Category-ruRU: Бой
+## SavedVariablesPerCharacter: ComboGlowDB
+## OptionalDeps: EllesmereUI, EllesmereUIActionBars
+
+Glow.xml
+Core.lua
+Auras.lua
+Config.lua
+Options.lua
