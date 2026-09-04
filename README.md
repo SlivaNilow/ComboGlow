@@ -52,10 +52,13 @@ gold — lit for the states that are set up. The strip above the gallery switche
 which state you are editing, and every gallery tile is a live preview: a real
 overlay running the same code as the bar, drawn on that spell's own icon.
 
-The **watching:** row matters for spells that apply another spell's debuff.
-Primal Wrath puts Rip on everything, so its button has no aura of its own —
-point it at Rip and the button lights from Rip's debuff. Every class has a pair
-like it.
+The **watching:** row handles spells that apply another spell's debuff. Primal
+Wrath puts Rip on everything, so its button has no aura of its own. That is
+detected automatically: for a spell the Cooldown Manager does not track as an
+aura, its own description is searched for the name of one that is — the game
+already says "applying Rip", so there is nothing to look up. One match is
+taken and announced in chat; anything ambiguous is left for you to point by
+hand through the same row.
 
 ## Markers
 
@@ -265,9 +268,11 @@ in any amount you like:
 оверлей тем же кодом, что рисует на панели, на иконке этого заклинания.
 
 Строка **«следит за:»** нужна для заклинаний, вешающих чужой дебафф.
-Первобытный гнев накладывает Разорвать, своей ауры у его кнопки нет — указываешь
-ему следить за Разорвать, и кнопка загорается от его дебаффа. Такая пара есть у
-каждого класса.
+Первобытный гнев накладывает Разорвать, своей ауры у его кнопки нет. Это
+определяется само: если Cooldown Manager не отслеживает ауру самого заклинания,
+в его описании ищется имя того, которое отслеживается — игра и так пишет
+«применяя Разорвать», искать нечего. Единственное совпадение подставляется и
+объявляется в чат; неоднозначное оставляется тебе, задаётся той же строкой.
 
 ## Отметки
 

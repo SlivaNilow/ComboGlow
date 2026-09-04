@@ -314,6 +314,48 @@ local function SpendsResource(spellID)
     return nil
 end
 
+--[[-------------------------------------------------------------------------
+    "This spell applies that spell's debuff"
+
+    Primal Wrath puts Rip on everything, so its button has no aura of its own
+    and had to be pointed at Rip by hand -- which means knowing that in the
+    first place. The game already says so: the spell description names the
+    other spell. So for a spell the Cooldown Manager does not track as an aura,
+    its description is searched for the name of one that IS tracked.
+
+    Exactly one match is taken; two or more is ambiguous and left alone rather
+    than guessed at. Matching is on the client's own localised names, so it
+    works in any language without a table.
+---------------------------------------------------------------------------]]
+function ns.GuessAuraSpell(spellID)
+    if not (C_Spell and C_Spell.GetSpellDescription) then return nil end
+    if ns.cdmAuraFrames and ns.cdmAuraFrames[spellID] then return nil end
+
+    local ok, desc = pcall(C_Spell.GetSpellDescription, spellID)
+    if not ok or type(desc) ~= "string" or desc == "" then return nil end
+
+    -- Candidates: what the Cooldown Manager tracks as auras, plus anything
+    -- this spec already has an aura rule for.
+    local candidates = {}
+    for id in pairs(ns.cdmAuraSpells or {}) do candidates[id] = true end
+    for _, r in ipairs(CG:GetRules()) do
+        if r.kind == "aura" and r.spell then candidates[r.spell] = true end
+    end
+
+    local found
+    for id in pairs(candidates) do
+        if id ~= spellID then
+            local name = ns.SpellName(id)
+            -- Short names would match half the tooltip by accident.
+            if name and #name >= 5 and desc:find(name, 1, true) then
+                if found and found ~= id then return nil end
+                found = id
+            end
+        end
+    end
+    return found
+end
+
 function ns.AddSlotRule(spellID, slot)
     local existing = ns.FindSlotRule(spellID, slot)
     if existing then return existing end
@@ -350,6 +392,7 @@ function ns.AddSlotRule(spellID, slot)
             timer   = true,
             style   = d.style,
             swipe   = false,
+            auraID  = ns.GuessAuraSpell(spellID),
             alpha   = StyleAlpha(d.style), thick = 3, warn = 4,
             r = d.r, g = d.g, b = d.b,
             wr = 1, wg = 0, wb = 0,
@@ -358,6 +401,11 @@ function ns.AddSlotRule(spellID, slot)
     end
     rules[#rules + 1] = rule
     CG:Rebuild()
+    if rule.auraID then
+        Say(L("%s has no aura of its own - watching %s (change it in /cg)",
+              "у «%s» нет своей ауры — слежу за «%s» (изменить можно в /cg)"),
+            ns.SpellName(spellID), ns.SpellName(rule.auraID))
+    end
     return rule, #rules
 end
 
