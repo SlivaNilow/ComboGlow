@@ -591,7 +591,9 @@ function CG:Rebuild()
     local centerRules = {}
     if self.db.center.enabled then
         local auto = self.db.center.autoMissing ~= false
-        local watched = {}
+        -- One slot per spell, not per rule. Named apart from the outer
+        -- "watched" (action slots) it would otherwise shadow.
+        local onStrip = {}
         for _, rule in ipairs(rules) do
             -- Auto-added: "gone" states that watch their OWN aura.
             --
@@ -602,11 +604,11 @@ function CG:Rebuild()
             -- manual /cg center flag still forces one in.
             -- A burst whose cooldown is up is the same kind of nudge as a dot
             -- that fell off, so it joins the strip too.
-            local autoWanted = auto and not watched[rule.spell]
+            local autoWanted = auto and not onStrip[rule.spell]
                 and ((rule.kind == "aura" and rule.missing and not rule.auraID)
                      or rule.kind == "cd")
             if (rule.center or autoWanted) and rule.enabled ~= false then
-                watched[rule.spell] = true
+                onStrip[rule.spell] = true
                 centerRules[#centerRules + 1] = rule
                 sigParts[#sigParts + 1] = "c" .. RuleFingerprint(rule)
             end
