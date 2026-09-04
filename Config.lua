@@ -563,7 +563,7 @@ local function PrintHelp()
         { "/cg center <#>",            L("also show it in the middle of the screen", "показывать иконку в центре экрана") },
         { "/cg power <#> <name>",      L("resource: auto, combo, holy, chi, shards, arcane, essence, ...", "ресурс: auto, combo, holy, chi, shards, arcane, essence, ...") },
         { "/cg move",                  L("unlock / lock the centre anchor", "разблокировать / заблокировать якорь в центре") },
-        { "/cg size <px>",             L("centre icon size", "размер иконок в центре") },
+        { "/cg size <px>",             L("size of the reminder icons", "размер иконок в полосе напоминаний") },
         { "/cg test",                  L("show everything for 6 seconds", "показать всё на 6 секунд") },
         { "/cg on | off",              L("enable / disable the addon", "включить / выключить аддон") },
         { "/cg combat on|off",         L("only glow while in combat", "подсвечивать только в бою") },
@@ -908,7 +908,7 @@ local function Handler(msg)
         if rule then
             rule.center = not rule.center
             CG:Rebuild()
-            Say(L("centre icon: %s", "иконка в центре: %s"),
+            Say(L("in the reminder strip: %s", "в полосе напоминаний: %s"),
                 rule.center and L("on", "вкл") or L("off", "выкл"))
         end
 
@@ -940,7 +940,7 @@ local function Handler(msg)
         if n and n >= 16 and n <= 200 then
             CG.db.center.size = n
             CG:Rebuild()
-            Say(L("centre icon size: %d", "размер иконок в центре: %d"), n)
+            Say(L("reminder icon size: %d", "размер иконок в полосе: %d"), n)
         else
             Say(L("usage: /cg size <16-200>", "формат: /cg size <16-200>"))
         end

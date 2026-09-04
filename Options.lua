@@ -544,7 +544,7 @@ local function Build()
           get = function(r) return r.kind ~= "aura" and r.orProc ~= false end,
           set = function(r) if r.kind ~= "aura" then r.orProc = not (r.orProc ~= false) end end },
         { key = "center", auraOnly = false,
-          label = L("copy to screen centre", "дублировать в центр экрана"),
+          label = L("show above the resource", "показывать над ресурсом"),
           get = function(r) return r.center end,
           set = function(r) r.center = not r.center end },
     }

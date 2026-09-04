@@ -123,7 +123,7 @@ duration is secret: it is baked into a step colour curve the engine evaluates.
 | `/cg color <#> r g b` | colour, 0–255 |
 | `/cg alpha <#\|all> <0-100>` \| `/cg thick <#\|all> <1-10>` | brightness, frame thickness |
 | `/cg timer <#> on\|off` | time left on the icon |
-| `/cg center <#>` | mirror the mark to the middle of the screen |
+| `/cg center <#>` | show this state in the reminder strip too |
 | `/cg poll <ms>` | how often aura state is re-read (0 = events only) |
 | `/cg mirror on\|off` | Cooldown Manager fallback |
 | `/cg secret on\|off` | restricted-content mode |
@@ -350,7 +350,7 @@ in any amount you like:
 | `/cg color <№> r g b` | цвет, 0–255 |
 | `/cg alpha <№\|all> <0-100>` \| `/cg thick <№\|all> <1-10>` | яркость, толщина рамки |
 | `/cg timer <№> on\|off` | остаток времени на иконке |
-| `/cg center <№>` | дублировать отметку в центр экрана |
+| `/cg center <№>` | показывать это состояние ещё и в полосе напоминаний |
 | `/cg poll <мс>` | как часто перечитывать ауры (0 = только события) |
 | `/cg mirror on\|off` | запасной путь через Cooldown Manager |
 | `/cg secret on\|off` | режим закрытых значений |

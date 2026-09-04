@@ -466,6 +466,18 @@ function ComboGlowCenterIconMixin:Setup(size, iconID)
     self.Art.Border:SetSize(size * 1.4, size * 1.4)
     if self.Art.Highlight then self.Art.Highlight:SetSize(size, size) end
     ns.SetupTimer(self, size, size)
+
+    -- These icons are smaller than an action button and are read at a glance
+    -- from the corner of the eye, so the countdown gets proportionally more
+    -- room than it does on the bar.
+    if self.TimerText then
+        local font = self.TimerText:GetFont()
+        if font then
+            self.TimerText:SetFont(font, math.max(12, math.floor(size * 0.46)), "OUTLINE")
+        end
+        self.TimerText:ClearAllPoints()
+        self.TimerText:SetPoint("CENTER", self, "CENTER", 0, -size * 0.30)
+    end
 end
 
 ComboGlowCenterIconMixin.SetStyle    = SetStyle
