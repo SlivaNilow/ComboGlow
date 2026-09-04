@@ -1,25 +1,31 @@
 --[[---------------------------------------------------------------------------
     ComboGlow - Options.lua
 
-    A rule list on the left, a gallery of the ready-made markers on the right.
-    Every tile is a LIVE preview: a real overlay from the same template, running
-    the same code as the bar, drawn on the rule's own spell icon. Picking a look
-    is then a matter of looking at it, not of remembering a keyword.
+    One row per SPELL, not per rule. A spell can carry three states (up, gone,
+    ready/proc) and listing them as three separate rows made the same icon
+    appear three times and hid the fact that states exist at all. Internally
+    each state is still its own rule; this window just groups them.
+
+    Every gallery tile is a LIVE preview: a real overlay from the same
+    template, running the same code as the bar, drawn on the spell's own icon.
 -----------------------------------------------------------------------------]]
 
 local ADDON, ns = ...
 local CG = ns.CG
 
-local ROWS       = 12      -- visible rule rows before the wheel scrolls
+local ROWS       = 12      -- visible spell rows before the wheel scrolls
 local ROW_H      = 22
 local TILE       = 46      -- preview icon size
 local TILE_PAD_X = 92
 local TILE_PAD_Y = 74
 local COLS       = 4
 
-local UI, selected, offset = nil, 1, 0
+local UI, offset = nil, 0
+local selSpell, selSlot = nil, "active"
 
 local function L(en, ru) return ns.L(en, ru) end
+
+local SLOTS = { "active", "missing", "ready" }
 
 --[[-------------------------------------------------------------------------
     Small helpers -- plain frames and textures, no backdrop template needed
@@ -65,46 +71,72 @@ local function TextButton(parent, text, w, h, onClick)
 end
 
 --[[-------------------------------------------------------------------------
-    Refresh
+    Selection
 ---------------------------------------------------------------------------]]
-local function CurrentRule()
-    local rules = CG:GetRules()
-    return rules[selected], rules
+-- Distinct spells, in the order their first rule appears.
+local function SpellList()
+    local list, seen = {}, {}
+    for _, r in ipairs(CG:GetRules()) do
+        if r.spell and not seen[r.spell] then
+            seen[r.spell] = true
+            list[#list + 1] = r.spell
+        end
+    end
+    return list
 end
 
-local function RefreshRows()
-    local rules = CG:GetRules()
-    local total = #rules
-    if selected > total then selected = total end
-    if selected < 1 then selected = 1 end
+local function CurrentRule()
+    if not selSpell then return nil end
+    return ns.FindSlotRule(selSpell, selSlot)
+end
 
+-- Keeps the selection pointing at something that exists.
+local function Normalise()
+    local list = SpellList()
+    if #list == 0 then
+        selSpell = nil
+        return list
+    end
+    local ok = false
+    for _, id in ipairs(list) do
+        if id == selSpell then ok = true break end
+    end
+    if not ok then selSpell = list[1] end
+
+    if not ns.FindSlotRule(selSpell, selSlot) then
+        for _, slot in ipairs(SLOTS) do
+            if ns.FindSlotRule(selSpell, slot) then
+                selSlot = slot
+                break
+            end
+        end
+    end
+    return list
+end
+
+--[[-------------------------------------------------------------------------
+    Refresh
+---------------------------------------------------------------------------]]
+local function RefreshRows(list)
+    local total = #list
     local maxOffset = math.max(0, total - ROWS)
     if offset > maxOffset then offset = maxOffset end
 
     for i = 1, ROWS do
         local row = UI.rows[i]
-        local idx = i + offset
-        local rule = rules[idx]
-        if not rule then
+        local spell = list[i + offset]
+        if not spell then
             row:Hide()
         else
-            row.index = idx
-            row.icon:SetTexture(ns.SpellIcon(rule.spell))
-            local kind
-            if rule.kind ~= "aura" then
-                kind = L("ready / proc", "готово / прок")
-            elseif rule.proc then
-                kind = L("proc", "прок")
-            elseif rule.missing then
-                kind = L("gone", "нет")
-            else
-                kind = L("up", "висит")
+            row.spell = spell
+            row.icon:SetTexture(ns.SpellIcon(spell))
+            row.text:SetText(ns.SpellName(spell))
+            row.sel:SetShown(spell == selSpell)
+            -- Three pips: which states this spell has configured.
+            for j, slot in ipairs(SLOTS) do
+                local has = ns.FindSlotRule(spell, slot) ~= nil
+                row.pips[j]:SetAlpha(has and 1 or 0.15)
             end
-            row.text:SetText(("%d. %s |cff888888(%s)|r"):format(idx, ns.SpellName(rule.spell), kind))
-            row.text:SetTextColor(rule.enabled == false and 0.5 or 1,
-                                  rule.enabled == false and 0.5 or 1,
-                                  rule.enabled == false and 0.5 or 1)
-            row.sel:SetShown(idx == selected)
             row:Show()
         end
     end
@@ -113,35 +145,48 @@ end
 
 local function RefreshTiles()
     local rule = CurrentRule()
+    local r, g, b, alphaSrc, thick
+    if rule then
+        r, g, b, alphaSrc, thick = rule.r, rule.g, rule.b, rule.alpha, rule.thick
+    else
+        -- Nothing configured for this state yet: the gallery still previews,
+        -- and clicking a tile is what creates it.
+        local d = ns.STATE_DEFAULTS[selSlot] or ns.STATE_DEFAULTS.active
+        r, g, b, thick = d.r, d.g, d.b, 3
+    end
+
     for _, tile in ipairs(UI.tiles) do
-        if not rule then
+        if not selSpell then
             tile:Hide()
         else
             tile:Show()
-            tile.icon:SetTexture(ns.SpellIcon(rule.spell))
-            -- Same overlay code as the action bar, so what you see here is
-            -- exactly what lands on the button.
-            local alpha = tile.defAlpha or rule.alpha
-            tile.overlay:SetStyle(tile.styleKey, rule.r, rule.g, rule.b, alpha, rule.thick)
+            tile.icon:SetTexture(ns.SpellIcon(selSpell))
+            tile.overlay:SetStyle(tile.styleKey, r, g, b, tile.defAlpha or alphaSrc, thick)
             tile.overlay.needSafeStyle = false
             tile.overlay:Show()
             tile.overlay:StartArt()
-            -- The time-shaped markers have nothing to show standing still, so
-            -- the preview runs a dummy countdown.
-            if tile.styleKey == "swipe" or tile.styleKey == "ring" then
-                tile.overlay.CD:SetDrawEdge(tile.styleKey == "ring")
-                tile.overlay.CD:Show()
-                tile.overlay.CD:SetCooldown(GetTime() - 12, 20)
-            else
-                tile.overlay.CD:Hide()
-            end
-            tile.sel:SetShown(rule.style == tile.styleKey)
+            tile.sel:SetShown(rule ~= nil and rule.style == tile.styleKey)
+            tile:SetAlpha(rule and 1 or 0.55)
         end
     end
 end
 
-local function RefreshToggles()
+local function RefreshDetails()
     local rule = CurrentRule()
+
+    if selSpell then
+        UI.title:SetText(ns.SpellName(selSpell))
+        UI.titleIcon:SetTexture(ns.SpellIcon(selSpell))
+        UI.titleIcon:Show()
+    else
+        UI.title:SetText(L("no spell selected", "заклинание не выбрано"))
+        UI.titleIcon:Hide()
+    end
+
+    UI.hint:SetText(rule and L("pick a marker for this state", "выбери отметку для этого состояния")
+                         or L("state not set up - click a marker to add it",
+                              "состояние не настроено — кликни отметку, чтобы добавить"))
+
     for _, t in ipairs(UI.toggles) do
         if not rule or (t.auraOnly and rule.kind ~= "aura") then
             t:Hide()
@@ -150,16 +195,8 @@ local function RefreshToggles()
             t.check:SetShown(t.get(rule) and true or false)
         end
     end
-    if rule then
-        UI.title:SetText(ns.SpellName(rule.spell))
-        UI.titleIcon:SetTexture(ns.SpellIcon(rule.spell))
-        UI.titleIcon:Show()
-    else
-        UI.title:SetText(L("no rule selected", "правило не выбрано"))
-        UI.titleIcon:Hide()
-    end
 
-    -- Which aura the rule watches.
+    -- Which aura this state watches (aura states only).
     if not rule or rule.kind ~= "aura" then
         UI.auraRow:Hide()
         UI.auraList:Hide()
@@ -171,18 +208,17 @@ local function RefreshToggles()
         UI.auraRow.label:SetText(L("watching: ", "следит за: ") .. "|cffffd100" .. watching .. "|r")
     end
 
-    -- Slot strip: lit = a rule exists, brightest = the one being edited.
+    -- Slot strip: bright = editing, lit = configured, dim = empty.
     for _, b in ipairs(UI.slots) do
-        if not rule then
+        if not selSpell then
             b:Hide()
         else
             b:Show()
-            local slotRule, idx = ns.FindSlotRule(rule.spell, b.slot)
-            local current = idx == selected
-            if current then
+            local has = ns.FindSlotRule(selSpell, b.slot) ~= nil
+            if b.slot == selSlot then
                 b.bg:SetColorTexture(0.05, 0.82, 0.62, 0.35)
                 b.text:SetTextColor(1, 1, 1)
-            elseif slotRule then
+            elseif has then
                 b.bg:SetColorTexture(1, 1, 1, 0.12)
                 b.text:SetTextColor(0.85, 0.85, 0.85)
             else
@@ -191,13 +227,17 @@ local function RefreshToggles()
             end
         end
     end
+
+    UI.del.text:SetText(rule and L("Delete state", "Удалить состояние")
+                             or L("Delete spell", "Удалить заклинание"))
 end
 
 local function Refresh()
     if not UI or not UI:IsShown() then return end
-    RefreshRows()
+    local list = Normalise()
+    RefreshRows(list)
     RefreshTiles()
-    RefreshToggles()
+    RefreshDetails()
 end
 ns.RefreshOptions = Refresh
 
@@ -222,8 +262,8 @@ local function Build()
     local header = Label(UI, "|cff0cd29fComboGlow|r", 15)
     header:SetPoint("TOPLEFT", 14, -12)
 
-    local hint = Label(UI, L("pick a marker for the selected rule", "выбери отметку для выбранного правила"), 11, 0.6, 0.6, 0.6)
-    hint:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -4)
+    UI.hint = Label(UI, "", 11, 0.6, 0.6, 0.6)
+    UI.hint:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -4)
 
     local close = TextButton(UI, "X", 22, 22, function() UI:Hide() end)
     close:SetPoint("TOPRIGHT", -10, -10)
@@ -233,7 +273,7 @@ local function Build()
     div:SetPoint("BOTTOMLEFT", 250, 44)
     div:SetWidth(1)
 
-    -- Rule list ------------------------------------------------------------
+    -- Spell list ------------------------------------------------------------
     UI.rows = {}
     for i = 1, ROWS do
         local row = CreateFrame("Button", nil, UI)
@@ -252,14 +292,26 @@ local function Build()
         icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         row.icon = icon
 
+        -- Three pips on the right: at a glance, which states are set up.
+        row.pips = {}
+        local pipColors = { { 0, 1, 0 }, { 1, 0, 0 }, { 1, 0.85, 0.1 } }
+        for j = 1, 3 do
+            local p = row:CreateTexture(nil, "OVERLAY")
+            p:SetSize(6, 6)
+            p:SetPoint("RIGHT", row, "RIGHT", -4 - (3 - j) * 9, 0)
+            p:SetColorTexture(unpack(pipColors[j]))
+            row.pips[j] = p
+        end
+
         local text = Label(row, "", 11)
         text:SetPoint("LEFT", icon, "RIGHT", 5, 0)
-        text:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+        text:SetPoint("RIGHT", row, "RIGHT", -32, 0)
         text:SetJustifyH("LEFT")
+        text:SetWordWrap(false)
         row.text = text
 
         row:SetScript("OnClick", function(self)
-            selected = self.index or 1
+            selSpell = self.spell
             Refresh()
         end)
         UI.rows[i] = row
@@ -271,10 +323,11 @@ local function Build()
         Refresh()
     end)
 
-    UI.empty = Label(UI, L("no rules yet - use the buttons below", "правил нет — используй кнопки внизу"), 11, 0.7, 0.7, 0.7)
+    UI.empty = Label(UI, L("nothing here yet - use the buttons below",
+                           "пока пусто — используй кнопки внизу"), 11, 0.7, 0.7, 0.7)
     UI.empty:SetPoint("TOPLEFT", 14, -62)
 
-    -- Selected rule --------------------------------------------------------
+    -- Selected spell --------------------------------------------------------
     UI.titleIcon = UI:CreateTexture(nil, "ARTWORK")
     UI.titleIcon:SetSize(20, 20)
     UI.titleIcon:SetPoint("TOPLEFT", 264, -56)
@@ -283,9 +336,7 @@ local function Build()
     UI.title = Label(UI, "", 13)
     UI.title:SetPoint("LEFT", UI.titleIcon, "RIGHT", 6, 0)
 
-    -- State slots ----------------------------------------------------------
-    -- Three slots per spell, always offered. A slot with no rule behind it is
-    -- dim and draws nothing; clicking it creates one.
+    -- State slots -----------------------------------------------------------
     UI.slots = {}
     local slotDefs = {
         { key = "active",  label = L("up", "висит") },
@@ -307,24 +358,19 @@ local function Build()
         fs:SetPoint("CENTER")
         b.text = fs
 
+        -- Selecting an empty state does NOT create a rule: picking a marker
+        -- does. Otherwise merely looking around litters the spec with rules.
         b:SetScript("OnClick", function(self)
-            local rule = CurrentRule()
-            if not rule then return end
-            local _, idx = ns.FindSlotRule(rule.spell, self.slot)
-            if not idx then
-                local _, newIdx = ns.AddSlotRule(rule.spell, self.slot)
-                idx = newIdx
-            end
-            selected = idx or selected
+            selSlot = self.slot
             Refresh()
         end)
         UI.slots[i] = b
     end
 
-    -- Which aura this rule watches ------------------------------------------
+    -- Which aura this state watches -----------------------------------------
     -- Some spells apply another spell's debuff: Primal Wrath puts Rip on
     -- everything, and every class has a pair like it. The button then has no
-    -- aura of its own, so the rule has to be pointed at the other spell's.
+    -- aura of its own, so the state has to be pointed at the other spell's.
     UI.auraRow = CreateFrame("Button", nil, UI)
     UI.auraRow:SetSize(378, 18)
     UI.auraRow:SetPoint("TOPLEFT", 264, -104)
@@ -368,12 +414,10 @@ local function Build()
 
     UI.auraRow:SetScript("OnClick", function()
         if UI.auraList:IsShown() then UI.auraList:Hide() return end
-        local rule = CurrentRule()
-        if not rule then return end
+        if not selSpell then return end
 
-        -- Candidates: itself, plus every other spell this spec has a rule for.
         local seen, list = {}, { { id = nil, name = L("its own aura", "своя аура") } }
-        seen[rule.spell] = true
+        seen[selSpell] = true
         for _, r in ipairs(CG:GetRules()) do
             if r.spell and not seen[r.spell] then
                 seen[r.spell] = true
@@ -395,12 +439,8 @@ local function Build()
         UI.auraList:Show()
     end)
 
-    -- Marker gallery -------------------------------------------------------
+    -- Marker gallery --------------------------------------------------------
     UI.tiles = {}
-    -- Only the visually distinct ones. Several EllesmereUI engines land on the
-    -- same "green glow" or "green dashes" once tinted, and a gallery of
-    -- lookalikes is worse than a short list; the rest stay reachable through
-    -- /cg style.
     local gallery = {}
     for _, style in ipairs(ns.STYLES) do
         if not style.hidden then gallery[#gallery + 1] = style end
@@ -414,6 +454,7 @@ local function Build()
         tile:SetSize(TILE + 26, TILE + 26)
         tile:SetPoint("TOPLEFT", 264 + col * TILE_PAD_X, -130 - rowN * TILE_PAD_Y)
         tile.styleKey = style.key
+        tile.defAlpha = style.defAlpha
 
         local sel = tile:CreateTexture(nil, "BACKGROUND")
         sel:SetAllPoints(tile)
@@ -437,8 +478,6 @@ local function Build()
         ov.TimerText:Hide()
         tile.overlay = ov
 
-        -- Short one-line names: the full ones wrapped onto three lines and
-        -- covered the preview they were labelling.
         local name = Label(tile, style.short or style.label, 10, 0.75, 0.75, 0.75)
         name:SetPoint("BOTTOM", 0, 2)
         name:SetPoint("LEFT", 2, 0)
@@ -446,13 +485,16 @@ local function Build()
         name:SetJustifyH("CENTER")
         name:SetWordWrap(false)
 
-        tile.defAlpha = style.defAlpha
         tile:SetScript("OnClick", function(self)
+            if not selSpell then return end
+            -- Clicking a marker on an empty state is what creates it: one
+            -- click instead of hunting for an "add" button.
             local rule = CurrentRule()
-            if not rule then return end
+            if not rule then
+                rule = ns.AddSlotRule(selSpell, selSlot)
+                if not rule then return end
+            end
             rule.style = self.styleKey
-            -- Each marker carries the brightness that suits it: a wash at the
-            -- frame's full opacity hides the icon completely.
             if self.defAlpha then rule.alpha = self.defAlpha end
             CG:Rebuild()
             Refresh()
@@ -460,20 +502,18 @@ local function Build()
         UI.tiles[i] = tile
     end
 
-    -- Toggles --------------------------------------------------------------
+    -- Toggles ---------------------------------------------------------------
     UI.toggles = {}
     local defs = {
-        { key = "enabled", auraOnly = false, label = L("rule on", "правило вкл"),
+        { key = "enabled", auraOnly = false, label = L("state on", "состояние вкл"),
           get = function(r) return r.enabled ~= false end,
           set = function(r) r.enabled = not (r.enabled ~= false) end },
-        -- The state itself is picked in the slot strip above, not here, so two
-        -- rules can never end up claiming the same slot.
-        { key = "orProc", auraOnly = false, label = L("also on proc", "также по проку"),
-          get = function(r) return r.kind ~= "aura" and r.orProc ~= false end,
-          set = function(r) if r.kind ~= "aura" then r.orProc = not (r.orProc ~= false) end end },
         { key = "timer", auraOnly = true, label = L("timer", "таймер"),
           get = function(r) return r.timer ~= false end,
           set = function(r) r.timer = not (r.timer ~= false) end },
+        { key = "orProc", auraOnly = false, label = L("also on proc", "также по проку"),
+          get = function(r) return r.kind ~= "aura" and r.orProc ~= false end,
+          set = function(r) if r.kind ~= "aura" then r.orProc = not (r.orProc ~= false) end end },
         { key = "center", auraOnly = false, label = L("centre icon", "иконка в центре"),
           get = function(r) return r.center end,
           set = function(r) r.center = not r.center end },
@@ -482,7 +522,8 @@ local function Build()
     for i, def in ipairs(defs) do
         local t = CreateFrame("Button", nil, UI)
         t:SetSize(126, 18)
-        t:SetPoint("TOPLEFT", 264 + ((i - 1) % 3) * 132, -130 - 2 * TILE_PAD_Y - 10 - math.floor((i - 1) / 3) * 22)
+        t:SetPoint("TOPLEFT", 264 + ((i - 1) % 3) * 132,
+                   -130 - 2 * TILE_PAD_Y - 10 - math.floor((i - 1) / 3) * 22)
         t.auraOnly = def.auraOnly
         t.get = def.get
 
@@ -511,7 +552,7 @@ local function Build()
         UI.toggles[i] = t
     end
 
-    -- Bottom bar -----------------------------------------------------------
+    -- Bottom bar ------------------------------------------------------------
     local bottom = Line(UI)
     bottom:SetPoint("BOTTOMLEFT", 12, 38)
     bottom:SetPoint("BOTTOMRIGHT", -12, 38)
@@ -524,23 +565,33 @@ local function Build()
     bPreset:SetPoint("BOTTOMLEFT", 12, 10)
 
     local bDot = TextButton(UI, L("Add last cast", "Добавить последний каст"), 160, 22, function()
-        if ns.AddAuraRuleFor and CG.lastCast then
-            ns.AddAuraRuleFor(CG.lastCast)
-            Refresh()
-        elseif ns.Say then
-            ns.Say(L("cast something first", "сначала примени способность"))
+        if not CG.lastCast then
+            if ns.Say then ns.Say(L("cast something first", "сначала примени способность")) end
+            return
         end
+        selSpell = CG.lastCast
+        selSlot = "active"
+        ns.AddSlotRule(CG.lastCast, "active")
+        Refresh()
     end)
     bDot:SetPoint("LEFT", bPreset, "RIGHT", 8, 0)
 
-    local bDel = TextButton(UI, L("Delete rule", "Удалить правило"), 120, 22, function()
-        local rule, rules = CurrentRule()
-        if not rule then return end
-        table.remove(rules, selected)
+    UI.del = TextButton(UI, "", 140, 22, function()
+        local rules = CG:GetRules()
+        local rule, idx = CurrentRule()
+        if rule and idx then
+            table.remove(rules, idx)
+        elseif selSpell then
+            -- No rule in this state: the button removes the whole spell.
+            for i = #rules, 1, -1 do
+                if rules[i].spell == selSpell then table.remove(rules, i) end
+            end
+            selSpell = nil
+        end
         CG:Rebuild()
         Refresh()
     end)
-    bDel:SetPoint("BOTTOMRIGHT", -12, 10)
+    UI.del:SetPoint("BOTTOMRIGHT", -12, 10)
 
     UI:SetScript("OnHide", function()
         for _, tile in ipairs(UI.tiles) do

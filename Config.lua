@@ -200,9 +200,12 @@ function ns.StateLabel(state)
 end
 
 local STATE_DEFAULTS = {
-    active  = { style = "solid",  r = 0, g = 1, b = 0    },
-    missing = { style = "solid",  r = 1, g = 0, b = 0    },
+    active  = { style = "solid",  r = 0, g = 1, b = 0      },
+    missing = { style = "solid",  r = 1, g = 0, b = 0      },
     proc    = { style = "modern", r = 1, g = 0.85, b = 0.1 },
+    -- "ready" is the slot name the options window uses for the resource /
+    -- proc state; same look as a proc.
+    ready   = { style = "modern", r = 1, g = 0.85, b = 0.1 },
 }
 ns.STATE_DEFAULTS = STATE_DEFAULTS
 
