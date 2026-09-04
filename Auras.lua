@@ -274,6 +274,15 @@ function ns.FindMirror(rule)
     local aura = ns.cdmAuraFrames
     if aura then
         local f = aura[id] or aura[rule.spell]
+        -- By name as well: the viewer often tracks the aura's id while the rule
+        -- carries the id that casts it.
+        if not f and ns.cdmAuraNames then
+            local n = (ns.SpellName(id) or ""):lower()
+            f = ns.cdmAuraNames[n]
+            if not f and id ~= rule.spell then
+                f = ns.cdmAuraNames[(ns.SpellName(rule.spell) or ""):lower()]
+            end
+        end
         if f then return f, true end
     end
     local map = ns.cdmFrames

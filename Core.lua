@@ -246,6 +246,12 @@ ns.cdmFrames = {}
 -- no per-class table of dot ids to maintain.
 ns.cdmAuraSpells = {}
 ns.cdmAuraFrames = {}
+-- The same lists keyed by NAME. A viewer often tracks the aura's id while the
+-- bar holds the id that casts it -- Moonfire casts as one spell and lands as
+-- another -- so an id-only match silently found nothing for those specs. The
+-- name is shared, and it is the client's own localised string on both sides.
+ns.cdmAuraNames = {}
+ns.cdmEssentialNames = {}
 -- Spells in the Essential viewer: Blizzard's own idea of "the cooldowns that
 -- matter for this spec". Used as the burst list so there is no table to keep.
 ns.cdmEssentialSpells = {}
@@ -261,6 +267,8 @@ function ns.RebuildCDMMap()
     if not (C_CooldownViewer and C_CooldownViewer.GetCooldownViewerCooldownInfo) then return end
     wipe(ns.cdmAuraFrames)
     wipe(ns.cdmEssentialSpells)
+    wipe(ns.cdmAuraNames)
+    wipe(ns.cdmEssentialNames)
     wipe(ns.cdmViewerOf)
     local map = ns.cdmFrames
     local auraMap = ns.cdmAuraFrames
@@ -272,11 +280,16 @@ function ns.RebuildCDMMap()
         if type(id) ~= "number" or id <= 0 then return end
         if not map[id] then map[id] = frame end
         viewerOf[frame] = viewerOf[frame] or currentViewer
+        local name = ns.SpellName(id)
+        if name and not name:find("^spell:") then name = name:lower() else name = nil end
+
         if currentViewer == "EssentialCooldownViewer" then
             ns.cdmEssentialSpells[id] = true
+            if name then ns.cdmEssentialNames[name] = true end
         end
         if isAuraViewer then
             auraSet[id] = true
+            if name and not ns.cdmAuraNames[name] then ns.cdmAuraNames[name] = frame end
             -- Aura rules must resolve to a BUFF viewer entry: on a cooldown
             -- viewer entry IsActive() means "the spell is on cooldown", which
             -- has nothing to do with the aura being up.

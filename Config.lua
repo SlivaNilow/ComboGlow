@@ -474,6 +474,9 @@ local function BuildPreset(quiet, intro)
     ns.ForEachActionButton(function(_, spellID)
         if not spellID or seen[spellID] then return end
         seen[spellID] = true
+        -- Matched by id and by name: a viewer may track the aura while the bar
+        -- holds the spell that applies it.
+        local lname = (ns.SpellName(spellID) or ""):lower()
 
         -- Spends the class resource -> a count rule.
         if pt and canCost and not havePower[spellID] then
@@ -491,8 +494,8 @@ local function BuildPreset(quiet, intro)
         -- In the Essential viewer and does not spend the resource -> a burst,
         -- marked when its cooldown is done. Blizzard's own list of what
         -- matters for the spec, so there is nothing hardcoded here.
-        if ns.cdmEssentialSpells[spellID] and not havePower[spellID]
-           and not haveBurst[spellID] then
+        if (ns.cdmEssentialSpells[spellID] or ns.cdmEssentialNames[lname])
+           and not havePower[spellID] and not haveBurst[spellID] then
             local spends = false
             if pt and canCost then
                 local ok, costs = pcall(canCost, spellID)
@@ -508,7 +511,7 @@ local function BuildPreset(quiet, intro)
         end
 
         -- Tracked as an aura by the Cooldown Manager -> a dot/buff rule.
-        if ns.cdmAuraSpells[spellID] then
+        if ns.cdmAuraSpells[spellID] or ns.cdmAuraNames[lname] then
             local harmful = true
             if C_Spell and C_Spell.IsSpellHarmful then
                 local ok, v = pcall(C_Spell.IsSpellHarmful, spellID)

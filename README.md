@@ -32,10 +32,11 @@ Rip's own icon already reports, and choosing to use it is a decision, not a
 reminder. `/cg move` to drag the strip elsewhere, `/cg centeroff` to turn it
 off, `/cg center <#>` to force something in.
 
-> **Tested on one setup only.** Written and used with the EllesmereUI suite on
-> a Feral druid and a Holy paladin, ruRU client, 12.1. Other action bar addons
-> are supported in code (Blizzard's own, Dominos, anything on
-> LibActionButton-1.0) but have not been tried. Bug reports welcome.
+> **Only one spec is actually verified.** Everything here was built and used on
+> a **Feral druid** with the EllesmereUI suite, ruRU client, 12.1. Holy paladin
+> is partly checked. Other specs and other action bar addons (Blizzard's own,
+> Dominos, anything on LibActionButton-1.0) are supported in code but have not
+> been confirmed in play -- expect rough edges and please report them.
 
 It is a standalone folder: EllesmereUI updates cannot overwrite it, but when
 that suite is loaded ComboGlow borrows its glow engine (`EllesmereUI.Glows`)
@@ -262,10 +263,11 @@ in any amount you like:
 `/cg move` — перетащить, `/cg centeroff` — выключить, `/cg center <№>` —
 затащить что-то принудительно.
 
-> **Проверено только на одной сборке.** Написано и обкатано с сюитой
-> EllesmereUI на друиде-фераль и пала-хиле, клиент ruRU, 12.1. Остальные
-> аддоны панелей в коде поддержаны (стандартные панели Blizzard, Dominos, всё
-> на LibActionButton-1.0), но вживую не проверялись. Баг-репорты приветствуются.
+> **По-настоящему проверена одна специализация.** Всё писалось и обкатывалось
+> на **друиде-феральном** с сюитой EllesmereUI, клиент ruRU, 12.1. Пал-хил
+> проверен частично. Остальные спеки и другие аддоны панелей (стандартные
+> Blizzard, Dominos, всё на LibActionButton-1.0) в коде поддержаны, но вживую
+> не подтверждены — жди шероховатостей и присылай их.
 
 Отдельная папка: обновления EllesmereUI её не затирают, но если сюита
 загружена, ComboGlow берёт её движок подсветки (`EllesmereUI.Glows`), поэтому
@@ -484,9 +486,10 @@ MIT, см. [LICENSE](LICENSE).
 割裂自己的图标说的是同一件事，而是否使用范围终结技是玩家的判断，不是提醒。
 `/cg move` 拖动位置，`/cg centeroff` 关闭。
 
-> **只在一套环境下测试过。** 使用 EllesmereUI 套件，野性德鲁伊和神圣圣骑士，
-> ruRU 客户端，12.1。代码里支持其他动作条插件（暴雪原生、Dominos、任何基于
-> LibActionButton-1.0 的），但没有实测。欢迎反馈问题。
+> **只有一个专精真正验证过。** 全部内容是在 **野性德鲁伊** 上写成和使用的，
+> 配合 EllesmereUI 套件，ruRU 客户端，12.1。神圣圣骑士只部分验证。其他专精和
+> 其他动作条插件（暴雪原生、Dominos、任何基于 LibActionButton-1.0 的）代码里
+> 支持，但没有实测 —— 请预期粗糙之处，并把问题反馈回来。
 >
 > 插件内的界面目前只有英文和俄文。中文界面还没做 —— 如果有需要请提 issue。
 
