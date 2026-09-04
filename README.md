@@ -19,8 +19,17 @@ Highlights an action bar button on three states per spell:
 | **ready / proc** | the resource threshold is met **or** the spell procced | gold glow |
 
 Works for combo points, holy power, chi, soul shards, arcane charges, essence
-and the rest. Optionally mirrors the same marks as icons in the middle of the
-screen.
+and the rest.
+
+A **reminder strip** sits above your class resource bar: every "gone" state
+puts its icon there while the aura is missing, so what needs pressing is next
+to the resource you are already watching. `/cg move` to drag it elsewhere,
+`/cg centeroff` to turn it off.
+
+> **Tested on one setup only.** Written and used with the EllesmereUI suite on
+> a Feral druid and a Holy paladin, ruRU client, 12.1. Other action bar addons
+> are supported in code (Blizzard's own, Dominos, anything on
+> LibActionButton-1.0) but have not been tried. Bug reports welcome.
 
 It is a standalone folder: EllesmereUI updates cannot overwrite it, but when
 that suite is loaded ComboGlow borrows its glow engine (`EllesmereUI.Glows`)
@@ -233,8 +242,17 @@ in any amount you like:
 | **готово / прок** | набран ресурс **или** заклинание прокнуло | золотое свечение |
 
 Работает с комбо-очками, святой силой, ци, осколками души, чародейскими
-зарядами, сущностью и остальными. По желанию дублирует отметки иконками в
-центре экрана.
+зарядами, сущностью и остальными.
+
+**Полоса напоминаний** висит над панелью классового ресурса: каждое состояние
+«нет» выкладывает туда свою иконку, пока ауры не хватает — то, что надо нажать,
+оказывается рядом с ресурсом, на который ты и так смотришь. `/cg move` —
+перетащить в другое место, `/cg centeroff` — выключить.
+
+> **Проверено только на одной сборке.** Написано и обкатано с сюитой
+> EllesmereUI на друиде-фераль и пала-хиле, клиент ruRU, 12.1. Остальные
+> аддоны панелей в коде поддержаны (стандартные панели Blizzard, Dominos, всё
+> на LibActionButton-1.0), но вживую не проверялись. Баг-репорты приветствуются.
 
 Отдельная папка: обновления EllesmereUI её не затирают, но если сюита
 загружена, ComboGlow берёт её движок подсветки (`EllesmereUI.Glows`), поэтому

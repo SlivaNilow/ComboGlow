@@ -75,7 +75,7 @@ ns.AutoPowerType = AutoPowerType
 --[[-------------------------------------------------------------------------
     Saved variables
 ---------------------------------------------------------------------------]]
-local DB_VERSION = 7
+local DB_VERSION = 8
 
 local DEFAULTS = {
     version    = DB_VERSION,
@@ -88,12 +88,16 @@ local DEFAULTS = {
     presetDone = {},     -- [specID] = the default rules were offered once
     center = {
         enabled = true,
-        size    = 52,
-        spacing = 10,
-        point   = "CENTER",
+        size    = 44,
+        spacing = 8,
+        point   = "auto",  -- sit above the class resource bar
+        gap     = 10,
         x       = 0,
         y       = -170,
         locked  = true,
+        -- Every "glow while the aura is GONE" state is a reminder by nature,
+        -- so it joins the strip without a second toggle.
+        autoMissing = true,
     },
     specs = {},
 }
@@ -359,6 +363,8 @@ local function CreateAnchor()
     anchor:SetScript("OnDragStart", function(self) self:StartMoving() end)
     anchor:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
+        -- Dragging is an explicit choice: it leaves the automatic placement
+        -- above the resource bar and pins the strip where it was dropped.
         local point, _, _, x, y = self:GetPoint()
         local c = CG.db.center
         c.point, c.x, c.y = point, math.floor(x + 0.5), math.floor(y + 0.5)
@@ -366,11 +372,41 @@ local function CreateAnchor()
     return anchor
 end
 
+-- Frames the class resource bar might be, best first. Sitting just above it
+-- puts the reminders where the eye already is during a rotation; the middle of
+-- the screen is where the character model is, which is exactly the wrong place.
+local RESOURCE_BAR_FRAMES = {
+    "ERB_SecondaryFrame",          -- EllesmereUIResourceBars
+    "ClassNameplateBarFrame",
+    "ComboPointPlayerFrame",
+}
+
+local function FindResourceBar()
+    for _, name in ipairs(RESOURCE_BAR_FRAMES) do
+        local f = _G[name]
+        if f and f.IsShown and f:IsShown() and f.GetTop and f:GetTop() then
+            return f
+        end
+    end
+end
+
 function CG:PositionAnchor()
     local a = CreateAnchor()
     local c = self.db.center
     a:ClearAllPoints()
-    a:SetPoint(c.point or "CENTER", UIParent, c.point or "CENTER", c.x or 0, c.y or -170)
+
+    if c.point == "auto" or c.point == nil then
+        local bar = FindResourceBar()
+        if bar then
+            a:SetPoint("BOTTOM", bar, "TOP", 0, c.gap or 10)
+            return
+        end
+        -- No bar found: above the action bars, out of the model's way.
+        a:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 320)
+        return
+    end
+
+    a:SetPoint(c.point, UIParent, c.point, c.x or 0, c.y or -170)
 end
 
 function CG:SetAnchorLocked(locked)
@@ -466,8 +502,11 @@ function CG:Rebuild()
 
     local centerRules = {}
     if self.db.center.enabled then
+        local auto = self.db.center.autoMissing ~= false
         for _, rule in ipairs(rules) do
-            if rule.center and rule.enabled ~= false then
+            local wanted = rule.center
+                or (auto and rule.kind == "aura" and rule.missing)
+            if wanted and rule.enabled ~= false then
                 centerRules[#centerRules + 1] = rule
                 sigParts[#sigParts + 1] = "c" .. RuleFingerprint(rule)
             end
@@ -798,6 +837,18 @@ function CG:Initialize()
     -- colour wash while it is gone. Only rewrites what the old default
     -- produced (the plain frame in that state's own colour), so a marker
     -- picked by hand survives.
+    -- v8: the strip used to sit in the middle of the screen, which is where
+    -- the character model is. Moved above the class resource bar, where the
+    -- eye already is. Only the untouched default is relocated.
+    if hadDB and fromVersion < 8 then
+        local c = self.db.center
+        if c.point == "CENTER" and c.x == 0 and c.y == -170 then
+            c.point = "auto"
+            c.size = 44
+            c.spacing = 8
+        end
+    end
+
     if hadDB and fromVersion < 7 then
         for _, rules in pairs(self.db.specs) do
             for _, r in ipairs(rules) do
