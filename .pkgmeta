@@ -15,3 +15,4 @@ ignore:
     - logo.png
     - logo-128.png
     - release.ps1
+    - CHANGELOG.md
