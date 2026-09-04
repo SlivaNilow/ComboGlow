@@ -1,0 +1,16 @@
+# Packaging manifest for CurseForge / Wago automatic packaging.
+#
+# The repository root IS the addon folder, so the packager only needs to know
+# what to call it and what to leave out. Without this file everything here ends
+# up inside the installed addon, including the repository's own paperwork.
+
+package-as: ComboGlow
+
+ignore:
+    - .github
+    - .gitignore
+    - .pkgmeta
+    - INTEGRATION.md
+    - PUBLISHING.md
+    - logo.png
+    - logo-128.png
