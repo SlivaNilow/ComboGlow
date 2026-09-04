@@ -33,8 +33,13 @@ ns.STYLES = {
     { key = "pixel",   euiIndex = 1,   fallback = "border",                     short = "Pixel",      label = "Pixel Glow"         },
     { key = "button",  euiIndex = 2,   fallback = "border",                     hidden = true, short = "Button",     label = "Action Button Glow" },
     { key = "shine",   euiIndex = 3,   fallback = "border",                     short = "Shine",      label = "Auto-Cast Shine"    },
-    { key = "gcd",     euiIndex = 5,   fallback = "proc",                       hidden = true, short = "Ants",       label = "GCD Ants"           },
-    { key = "modern",  euiIndex = 6,   fallback = "proc",                       short = "Modern",     label = "Modern WoW Glow"    },
+    -- fixedColor: Blizzard's own proc artwork. It is a gold animation with no
+    -- colour input -- ours is accepted and ignored, by the engine and by the
+    -- texture we fall back to alike. Worth saying out loud: two states set to
+    -- different colours look identical if both land here, which is exactly how
+    -- a proc ended up indistinguishable from "ready".
+    { key = "gcd",     euiIndex = 5,   fallback = "proc", fixedColor = true,    hidden = true, short = "Ants",       label = "GCD Ants"           },
+    { key = "modern",  euiIndex = 6,   fallback = "proc", fixedColor = true,    short = "Modern",     label = "Modern WoW Glow"    },
     { key = "classic", euiIndex = 7,   fallback = "border",                     hidden = true, short = "Classic",    label = "Classic WoW Glow"   },
 }
 -- Shape Glow (EllesmereUI index 4) is deliberately absent: without the mask and

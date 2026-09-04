@@ -118,7 +118,7 @@ ns.AutoPowerType = AutoPowerType
 --[[-------------------------------------------------------------------------
     Saved variables
 ---------------------------------------------------------------------------]]
-local DB_VERSION = 11
+local DB_VERSION = 12
 
 local DEFAULTS = {
     version    = DB_VERSION,
@@ -1117,17 +1117,26 @@ function CG:Initialize()
             end
         end
     end
-    -- v11: proc states were created with the autocast shine, which renders
-    -- gold whatever colour it is given -- the same gold as "ready", which is
-    -- the one marker it must not be confused with. Moved to the frame we draw
-    -- ourselves, where the colour is ours. A style chosen by hand since then
-    -- is anything but "shine", so nothing deliberate is lost.
-    if hadDB and fromVersion < 11 then
+    -- v12: proc states drawn with Blizzard's proc artwork. It is a gold
+    -- animation that ignores the colour it is given, so a proc looked exactly
+    -- like "ready" -- the one marker it must never be confused with. Moved to
+    -- the frame we draw ourselves, where the colour is ours.
+    --
+    -- v11 did this for "shine" alone, which was the wrong culprit: shine takes
+    -- a colour perfectly well. The gold ones are the ones flagged fixedColor.
+    if hadDB and fromVersion < 12 then
         for _, rules in pairs(self.db.specs) do
             for _, r in ipairs(rules) do
-                if r.kind == "aura" and r.proc and r.style == "shine" then
-                    r.style = "solid"
-                    r.alpha = nil
+                if r.kind == "aura" and r.proc then
+                    local st = ns.StyleByKey(r.style)
+                    if st and st.fixedColor then
+                        local d = ns.STATE_DEFAULTS and ns.STATE_DEFAULTS.proc
+                        r.style = "solid"
+                        r.alpha = nil
+                        r.r = d and d.r or 0.2
+                        r.g = d and d.g or 0.9
+                        r.b = d and d.b or 1
+                    end
                 end
             end
         end

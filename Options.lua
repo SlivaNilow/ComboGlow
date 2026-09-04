@@ -723,7 +723,14 @@ local function Build()
         ov.TimerText:Hide()
         tile.overlay = ov
 
-        local name = Label(tile, style.short or style.label, 10, 0.75, 0.75, 0.75)
+        -- Said on the tile, because the preview cannot say it: this marker is
+        -- Blizzard's own gold proc artwork and the colour you pick does
+        -- nothing. Two states set to different colours look identical here.
+        local caption = style.short or style.label
+        if style.fixedColor then
+            caption = caption .. " |cff909090" .. L("(gold)", "(золотой)") .. "|r"
+        end
+        local name = Label(tile, caption, 10, 0.75, 0.75, 0.75)
         name:SetPoint("BOTTOM", 0, 2)
         name:SetPoint("LEFT", 2, 0)
         name:SetPoint("RIGHT", -2, 0)

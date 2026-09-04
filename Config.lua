@@ -209,10 +209,10 @@ end
 local STATE_DEFAULTS = {
     active  = { style = "pixel",  r = 0, g = 1, b = 0      },
     missing = { style = "fill",   r = 1, g = 0, b = 0      },
-    -- Drawn by us, not by an engine: the shine this used to use is Blizzard's
-    -- autocast sparkle, which comes out gold whatever colour it is handed --
-    -- indistinguishable from the gold "ready" glow, which is the one thing it
-    -- must never look like.
+    -- Drawn by us, so the colour is ours. Deliberately not "modern": that is
+    -- Blizzard's proc artwork, a gold animation that ignores the colour it is
+    -- handed -- and gold is what "ready" already means. A proc looking like a
+    -- full resource bar defeats the entire point of splitting them.
     proc    = { style = "solid",  r = 0.2, g = 0.9, b = 1  },
     -- "ready" is the slot name the options window uses for the resource
     -- threshold (or, for a burst, its cooldown being up).
