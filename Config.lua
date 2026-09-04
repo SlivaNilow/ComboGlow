@@ -424,9 +424,17 @@ local function BuildPreset(quiet, intro)
     local pt = CG.powerType
     local rules = CG:GetRules()
 
-    local havePower, haveAura = {}, {}
+    -- Tracked per STATE, not per spell: re-scanning should top up a state
+    -- that is missing rather than skip a spell that already has one.
+    local havePower, haveUp, haveGone = {}, {}, {}
     for _, r in ipairs(rules) do
-        if r.kind == "aura" then haveAura[r.spell] = true else havePower[r.spell] = true end
+        if r.kind ~= "aura" then
+            havePower[r.spell] = true
+        elseif r.missing then
+            haveGone[r.spell] = true
+        elseif not r.proc then
+            haveUp[r.spell] = true
+        end
     end
 
     local canCost = C_Spell and C_Spell.GetSpellPowerCost
@@ -451,13 +459,21 @@ local function BuildPreset(quiet, intro)
         end
 
         -- Tracked as an aura by the Cooldown Manager -> a dot/buff rule.
-        if ns.cdmAuraSpells[spellID] and not haveAura[spellID] then
+        if ns.cdmAuraSpells[spellID] then
             local harmful = true
             if C_Spell and C_Spell.IsSpellHarmful then
                 local ok, v = pcall(C_Spell.IsSpellHarmful, spellID)
                 if ok and v ~= nil then harmful = v and true or false end
             end
-            auras[#auras + 1] = { spell = spellID, harmful = harmful }
+            if not haveUp[spellID] then
+                auras[#auras + 1] = { spell = spellID, harmful = harmful, slot = "active" }
+            end
+            -- Harmful ones also get the "gone" state, which is what fills the
+            -- reminder strip. Not for your own buffs: a personal cooldown is
+            -- missing most of the time and nagging about it is noise.
+            if harmful and not haveGone[spellID] then
+                auras[#auras + 1] = { spell = spellID, harmful = harmful, slot = "missing" }
+            end
         end
     end)
 
@@ -487,19 +503,20 @@ local function BuildPreset(quiet, intro)
     end
 
     for _, entry in ipairs(auras) do
+        local d = STATE_DEFAULTS[entry.slot] or STATE_DEFAULTS.active
         local rule = {
             kind     = "aura",
             spell    = entry.spell,
             helpful  = (not entry.harmful) or nil,
             unit     = entry.harmful and "target" or "player",
-            missing  = false,
+            missing  = (entry.slot == "missing") or false,
             timer    = true,
-            style    = STATE_DEFAULTS.active.style,
+            style    = d.style,
             swipe    = false,
-            alpha    = StyleAlpha(STATE_DEFAULTS.active.style),
+            alpha    = StyleAlpha(d.style),
             thick    = 3,
             warn     = 4,
-            r = 0, g = 1, b = 0,
+            r = d.r, g = d.g, b = d.b,
             wr = 1, wg = 0, wb = 0,
             center  = false,
             enabled = true,
