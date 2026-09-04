@@ -358,10 +358,16 @@ local function Build()
         fs:SetPoint("CENTER")
         b.text = fs
 
-        -- Selecting an empty state does NOT create a rule: picking a marker
-        -- does. Otherwise merely looking around litters the spec with rules.
+        -- Clicking an empty state CREATES it. Not doing so was a mistake:
+        -- the slot looked dead, and everything that configures a state --
+        -- the marker gallery, the "watching" row -- needs the rule to exist
+        -- before it has anything to act on. An unwanted one is removed with
+        -- the button below.
         b:SetScript("OnClick", function(self)
             selSlot = self.slot
+            if selSpell and not ns.FindSlotRule(selSpell, selSlot) then
+                ns.AddSlotRule(selSpell, selSlot)
+            end
             Refresh()
         end)
         UI.slots[i] = b

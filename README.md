@@ -1,257 +1,426 @@
 # ComboGlow
 
-Подсветка способностей на панели команд при заданном количестве классового
-ресурса: комбо-очки, святая сила, ци, осколки души, чародейские заряды,
-сущность и т.д. Дополнительно — иконка в центре экрана.
+Marks action bar buttons by class-resource count, proc, and your own aura —
+for World of Warcraft 12.1 (Midnight), where the aura APIs are largely closed
+to addons.
 
-Отдельная папка аддона: обновления EllesmereUI её не затирают, но если
-EllesmereUI загружен, ComboGlow использует его движок подсветки
-(`EllesmereUI.Glows`), поэтому свечение выглядит так же, как в остальном
-интерфейсе.
+**[English](#english) · [Русский](#русский)**
 
-## Быстрый старт
+---
 
-При первом входе на специализацию аддон сам сканирует панели и создаёт
-правило на **каждое заклинание, которое тратит классовый ресурс**. Ничего
-вводить не нужно, в чат придёт список добавленного.
+# English
 
-Фиксированная стоимость становится порогом «столько и больше» (Слово Славы —
-3 святой силы), переменная — «на максимуме» (финишеры на комбо-очках
-показывают минимум 1, поэтому для них берётся текущий кап: 5, или 6 с
-талантом). Никаких зашитых ID и списков по классам — только то, что реально
-лежит у тебя на панелях в этом патче.
+Highlights an action bar button on three states per spell:
 
-Повторить вручную или после перестановки панелей: `/cg preset`.
-Стереть всё на этой спеке: `/cg clear`.
+| State | Lights up when | Default look |
+|-------|----------------|--------------|
+| **up** | your aura is on the unit | green frame |
+| **gone** | the aura is missing | red frame |
+| **ready / proc** | the resource threshold is met **or** the spell procced | gold glow |
 
-```
-/cg                          справка
-/cg add max Потрошение       свечение при максимуме КП
-/cg add 3-4 Мясорубка        свечение при 3–4 очках
-/cg last max                 правило для последней применённой способности
-/cg list                     список правил
-/cg test                     показать всё на 6 секунд
-```
+Works for combo points, holy power, chi, soul shards, arcane charges, essence
+and the rest. Optionally mirrors the same marks as icons in the middle of the
+screen.
 
-Правила хранятся **отдельно для каждой специализации** и для каждого
-персонажа.
+It is a standalone folder: EllesmereUI updates cannot overwrite it, but when
+that suite is loaded ComboGlow borrows its glow engine (`EllesmereUI.Glows`)
+so the animated markers match the rest of the interface.
 
-## Формат количества
+## Getting started
 
-| Запись | Значение |
-|--------|----------|
-| `5`    | 5 и больше |
-| `5+`   | то же самое |
-| `=5`   | ровно 5 |
-| `3-4`  | от 3 до 4 |
-| `max`  | на текущем максимуме ресурса (учитывает таланты, поднимающие капу) |
+Nothing to configure. The first time you log in on a specialization the addon
+scans your bars and creates a rule for **every spell that spends the class
+resource**, printing what it added.
 
-## Все команды
+A fixed cost becomes an "at least this much" threshold (Word of Glory — 3 holy
+power); a variable one becomes "at maximum" (combo point finishers report a
+minimum of 1, so the current cap is used: 5, or 6 with the talent). Spells the
+Cooldown Manager tracks as auras get an aura rule as well. No hardcoded spell
+ids and no per-class tables, so nothing rots across patches.
 
-| Команда | Что делает |
-|---------|-----------|
-| `/cg list` | список правил текущего спека |
-| `/cg add <кол-во> <название или ID>` | добавить правило |
-| `/cg last <кол-во>` | добавить правило для последней применённой способности |
-| `/cg del <№>` | удалить правило |
-| `/cg toggle <№>` | включить / выключить правило |
-| `/cg style <№> <стиль>` | стиль свечения (`/cg styles` — список) |
-| `/cg color <№> r g b` | цвет, значения 0–255 |
-| `/cg center <№>` | дублировать правило иконкой в центре экрана |
-| `/cg power <№> <ресурс>` | явно задать ресурс: `auto`, `combo`, `holy`, `chi`, `shards`, `arcane`, `essence`, `runes`, `rage`, `energy`, … |
-| `/cg move` | разблокировать якорь центра, перетащить, снова `/cg move` |
-| `/cg size <16-200>` | размер иконок в центре |
-| `/cg centeron` / `/cg centeroff` | центральные иконки вкл/выкл |
-| `/cg combat on\|off` | подсвечивать только в бою |
-| `/cg cdm on\|off` | подсвечивать также иконки Cooldown Manager |
-| `/cg secret on\|off` | режим работы в инстансах с закрытыми значениями |
-| `/cg on` / `/cg off` | аддон целиком |
+Open the options window with `/cg`. Pick a spell on the left, a state on top,
+then click a marker — that click is also what creates the state, so setting one
+up is a single click.
 
-## Ауры: дебаффы на цели и баффы на себе
+Re-scan after rearranging your bars with `/cg preset`; wipe the spec with
+`/cg clear`.
 
-Второй тип правил — подсветка кнопки, пока висит **твоя** аура от этого
-заклинания, с остатком времени прямо на иконке.
+## The options window
 
-```
-/cg dot Кровоточащая рана     рамка + таймер, пока твой дебафф на цели
-/cg dot                       то же для последнего применённого заклинания
-/cg missing 3                 перевернуть: светиться когда дебафф СЛЕТЕЛ
-/cg buff Наполнение светом    бафф на себе (хпал, прокки)
-/cg unit 4 focus              следить за фокусом вместо цели
-/cg warn 3 4                  краснеть за 4 секунды до конца
-/cg auracheck                 диагностика: что отвечает API прямо сейчас
-```
+The list shows **one row per spell** with three pips on the right — green, red,
+gold — lit for the states that are set up. The strip above the gallery switches
+which state you are editing, and every gallery tile is a live preview: a real
+overlay running the same code as the bar, drawn on that spell's own icon.
 
-Аура ищется **по имени заклинания**, поэтому связка «каст → дебафф с другим
-ID» (Рваная рана, Лунный огонь и т.п.) работает сама. Если имя не совпадает,
-можно задать явно: `/cg aura <№> <имя или spellID>`.
+The **watching:** row matters for spells that apply another spell's debuff.
+Primal Wrath puts Rip on everything, so its button has no aura of its own —
+point it at Rip and the button lights from Rip's debuff. Every class has a pair
+like it.
 
-### Три состояния на заклинание
+## Markers
 
-| Состояние | Когда горит | Цвет по умолчанию |
-|-----------|-------------|-------------------|
+Six in the gallery, all visually distinct:
+
+| Key | What it is |
+|-----|------------|
+| `solid` | crisp coloured frame around the icon |
+| `fill` | colour wash over the icon |
+| `active` | Blizzard's soft highlight border |
+| `pixel` | marching dashes |
+| `shine` | orbiting sparkles |
+| `modern` | proc glow |
+
+`pixel`, `shine` and `modern` are drawn by EllesmereUI's engine when it is
+loaded, and fall back to built-in looks when it is not. A few more styles
+(`button`, `gcd`, `classic`) remain available through `/cg style` but are kept
+out of the gallery: once tinted they are indistinguishable from the ones above.
+
+A few seconds before the aura runs out the frame turns red — `/cg warn <#>
+<seconds>`, 4 by default, `0` disables. The threshold works even when the
+duration is secret: it is baked into a step colour curve the engine evaluates.
+
+## Count formats
+
+| Written | Means |
+|---------|-------|
+| `5` | 5 or more |
+| `5+` | the same |
+| `=5` | exactly 5 |
+| `3-4` | between 3 and 4 |
+| `max` | at the current maximum (follows talents that raise the cap) |
+
+## Commands
+
+| Command | What it does |
+|---------|--------------|
+| `/cg` | open the options window |
+| `/cg help` | command list |
+| `/cg preset` | scan the bars and set up what it finds |
+| `/cg clear` | remove every rule of this spec |
+| `/cg list` | list the rules, with data source and button count |
+| `/cg add <count> <spell>` | resource rule |
+| `/cg dot [spell]` \| `/cg buff [spell]` | aura rule; with no argument, the spell you cast last |
+| `/cg missing <#>` | flip a rule to "glow while gone" |
+| `/cg unit <#> <unit>` | player, target, focus, mouseover, pet |
+| `/cg aura <#> <name\|id>` | watch a different aura than the spell itself |
+| `/cg warn <#> <seconds>` | turn red this long before it ends |
+| `/cg style <#\|all> <key>` | marker |
+| `/cg color <#> r g b` | colour, 0–255 |
+| `/cg alpha <#\|all> <0-100>` \| `/cg thick <#\|all> <1-10>` | brightness, frame thickness |
+| `/cg timer <#> on\|off` | time left on the icon |
+| `/cg center <#>` | mirror the mark to the middle of the screen |
+| `/cg poll <ms>` | how often aura state is re-read (0 = events only) |
+| `/cg mirror on\|off` | Cooldown Manager fallback |
+| `/cg secret on\|off` | restricted-content mode |
+| `/cg auracheck` \| `/cg cdtest` | diagnostics |
+
+Rules are stored **per specialization, per character**.
+
+## Why AdiButtonAuras stopped working, and what this does instead
+
+AdiButtonAuras targets `## Interface: 110200` (11.2) and enumerates auras with
+`GetAuraDataByIndex` / `GetAuraSlots` / `GetDebuffDataByIndex`. Under 12.1's
+aura restrictions those **hard error** rather than returning nothing.
+
+There is not a single enumeration here. Only direct per-spell queries:
+
+* `C_UnitAuras.GetAuraDataBySpellName(unit, name, "HARMFUL|PLAYER")` — is your
+  own aura there;
+* `C_UnitAuras.GetUnitAuraBySpellID` / `GetPlayerAuraBySpellID` for the ids
+  Blizzard kept readable;
+* `C_UnitAuras.GetAuraDuration` → `Cooldown:SetCooldownFromDurationObject`,
+  which renders engine-side and so survives a secret number;
+* `C_Secrets.ShouldAurasBeSecret` / `ShouldSpellAuraBeSecret` to know which
+  mode we are in.
+
+In practice on 12.1 `ShouldAurasBeSecret` answers **true everywhere**, even on
+a target dummy in a city, and `ShouldSpellAuraBeSecret` is true for ordinary
+dots. So debuffs on a target cannot be read at all, and everything rests on the
+Cooldown Manager mirror below: presence yes, remaining time no. Your own buffs
+from Blizzard's readable set work fully, with a real timer.
+
+`/cg auracheck` prints exactly what the API answers where you are standing.
+
+## The Cooldown Manager mirror
+
+When the aura cannot be read, the engine still knows: a Cooldown Manager item
+frame tracks aura presence itself. Its answer is a **secret boolean**, which
+must never be tested in Lua — it goes to `SetAlphaFromBoolean` and is resolved
+engine-side. The remaining time rides the same trick: the engine has already
+written it into its own FontString and `SetText` accepts secret strings, so the
+text is passed through verbatim.
+
+Only works for spells tracked in the Cooldown Manager, which is why it is a
+fallback. `/cg mirror off` disables it.
+
+## Display latency
+
+The default UI redraws on `UNIT_AURA`, and when that event is late a debuff
+appears a second after it landed, or only after re-targeting. Two extra paths:
+
+* **instant on cast** — a successful cast of a tracked spell flips the display
+  without waiting for confirmation, running the previous known duration. Real
+  data overrides the guess; the window is 2 s, so an immunity or a miss clears
+  itself.
+* **polling** — aura state is re-read every 200 ms, not only on the event.
+  `/cg poll 100`, `/cg poll 0` to rely on events alone.
+
+`/cg auracheck` reports the measured gap between your cast and the first
+successful read, so "is the data late or just the redraw" is answered with a
+number.
+
+## Bars
+
+Buttons are found on:
+
+* **EllesmereUIActionBars** (`EABButton<slot>`) — that module builds its own
+  buttons and deliberately removes them from Blizzard's registry, so they have
+  to be looked up by name or an EUI setup yields nothing at all;
+* Blizzard's own bars (`ActionBarButtonEventsFrame.frames`);
+* Dominos;
+* anything built on `LibActionButton-1.0` (Bartender4, ElvUI, …);
+* Cooldown Manager icons, optionally, with `/cg cdm on`.
+
+Macros are resolved to the spell they cast, and base spells and overrides
+(forms, talents that swap ids) are matched.
+
+## Secret values
+
+Under restrictions `UnitPower()` can return a *secret value*: a number that can
+be handed to a C function but never compared in Lua. So visibility above a
+threshold is produced geometrically rather than by a condition — the value goes
+into `StatusBar:SetValue()` and the fill drives a clipping frame containing the
+glow, so the whole comparison happens inside the engine.
+
+If that path ever misbehaves, `/cg secret off` disables it: markers then simply
+do not show in restricted instances and work normally everywhere else.
+
+## Notes
+
+* `/cg` is a short alias. If another addon claims it, ComboGlow falls back to
+  `/cgl`, then `/cglow`; `/comboglow` always works.
+* The addon only reads `UnitPower` and draws frames. It casts nothing and
+  presses nothing — ordinary UI code.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE).
+
+## Support
+
+If it saved you an evening of fighting Midnight's secret values, you can chip
+in any amount you like:
+
+**YooMoney:** https://yoomoney.ru/to/4100119613908309
+
+---
+
+# Русский
+
+Подсветка кнопок панели по количеству классового ресурса, проку и твоей
+собственной ауре — для World of Warcraft 12.1 (Midnight), где API аур почти
+целиком закрыт для аддонов.
+
+Три состояния на заклинание:
+
+| Состояние | Когда горит | Вид по умолчанию |
+|-----------|-------------|------------------|
 | **висит** | твоя аура на цели | зелёная рамка |
 | **нет** | ауры нет | красная рамка |
 | **готово / прок** | набран ресурс **или** заклинание прокнуло | золотое свечение |
 
-Третье — одно условие, а не два: правило на ресурс загорается и по проку тоже,
-поэтому Свирепый укус подсветится и на 5 КП, и когда он прокнул сам. Прок
-берётся из `C_SpellActivationOverlay.IsSpellOverlayed` — это то, чем игра
-зажигает собственную подсветку, значение обычное и доступно всегда.
+Работает с комбо-очками, святой силой, ци, осколками души, чародейскими
+зарядами, сущностью и остальными. По желанию дублирует отметки иконками в
+центре экрана.
 
-Все три слота предлагаются для любого заклинания; ненастроенный слот просто
-ничего не рисует. Способность вроде Разорвать, которая одновременно финишер и
-дот, спокойно занимает все три.
+Отдельная папка: обновления EllesmereUI её не затирают, но если сюита
+загружена, ComboGlow берёт её движок подсветки (`EllesmereUI.Glows`), поэтому
+анимированные отметки выглядят как в остальном интерфейсе.
 
-За несколько секунд до конца ауры рамка краснеет — `/cg warn <№> <секунд>`,
-по умолчанию 4, `0` выключает. Порог работает даже с секретной длительностью:
-он запечён в ступенчатую цветовую кривую, которую вычисляет движок.
+## Быстрый старт
 
-Таймер и отметка независимы: в режиме «нет» кнопка показывает тихий отсчёт,
-пока аура висит, и загорается, когда она слетела.
+Настраивать ничего не нужно. При первом входе на специализацию аддон сам
+сканирует панели и создаёт правило на **каждое заклинание, которое тратит
+классовый ресурс**, и пишет в чат, что добавил.
 
-### Окно настроек
+Фиксированная стоимость становится порогом «столько и больше» (Слово Славы — 3
+святой силы), переменная — «на максимуме» (финишеры на комбо-очках отдают
+минимум 1, поэтому берётся текущий кап: 5, или 6 с талантом). Заклинания,
+которые Cooldown Manager отслеживает как ауры, получают ещё и правило на ауру.
+Никаких зашитых ID и списков по классам — ничего не протухает от патча к
+патчу.
 
-```
-/cg
-```
+Окно настроек — `/cg`. Слева выбираешь заклинание, сверху состояние, потом
+кликаешь отметку; этот же клик состояние и создаёт, так что настройка в один
+клик.
 
-Слева список правил, сверху три состояния, ниже галерея отметок — каждая
-плитка живое превью на иконке выбранного заклинания, тем же кодом, что рисует
-на панели. Отдельная строка **«следит за: …»** нужна для заклинаний, которые
-вешают чужой дебафф: Первобытный гнев накладывает Разорвать, поэтому его
-кнопке указывают следить за аурой Разорвать.
+Пересканировать после перестановки панелей — `/cg preset`, стереть всё на
+спеке — `/cg clear`.
 
-### Запасной путь через Cooldown Manager
+## Окно настроек
 
-Если прямое чтение ауры в текущих условиях не работает, состояние берётся у
-движка: Cooldown Manager сам отслеживает наличие ауры на своих иконках.
-Его ответ — **секретный булев**, его нельзя проверить в Lua, поэтому он
-уходит в `SetAlphaFromBoolean` и разрешается на стороне движка. Остаток
-времени берётся тем же приёмом: движок уже написал строку в свою
-FontString, а `SetText` принимает секретные строки, поэтому текст
-переносится как есть.
+В списке **одна строка на заклинание**, справа три точки — зелёная, красная,
+золотая, — горят те, чьи состояния настроены. Полоска над галереей переключает
+редактируемое состояние, а каждая плитка галереи это живое превью: настоящий
+оверлей тем же кодом, что рисует на панели, на иконке этого заклинания.
 
-Работает только для заклинаний, которые отслеживаются в Cooldown Manager —
-поэтому это именно запасной путь. Выключается: `/cg mirror off`.
-
-### Задержка отображения
-
-Стандартный интерфейс и панели аур перерисовываются по событию `UNIT_AURA`.
-Если оно приходит поздно, дебафф «появляется» через секунду или только после
-перевыбора цели. Здесь этот путь не единственный:
-
-* **мгновенно по касту.** Успешный каст отслеживаемого заклинания сразу
-  переключает подсветку, не дожидаясь подтверждения ауры. Таймер при этом
-  берётся из прошлой известной длительности этого же правила. Как только
-  придут настоящие данные, они перебивают догадку. Окно — 2 секунды: если
-  подтверждения нет (иммун, промах, цель умерла), подсветка гаснет сама.
-* **опрос.** Состояние аур перечитывается каждые 200 мс, а не только по
-  событию. Настраивается: `/cg poll 100`, `/cg poll 0` — выключить и жить
-  только на событиях.
-
-Насколько опаздывают сами данные — покажет `/cg auracheck`: в колонке `lag`
-стоит замеренное время между твоим кастом и первым удачным чтением ауры.
-Меньше ~200 мс — это просто пинг, и виновата перерисовка. Секунда и больше —
-опаздывает уже сам API.
-
-### Почему AdiButtonAuras не работает, а это должно
-
-У AdiButtonAuras в `.toc` стоит `## Interface: 110200` (11.2), и внутри он
-перебирает ауры через `GetAuraDataByIndex` / `GetAuraSlots` /
-`GetDebuffDataByIndex`. В 12.1 под ограничениями (мифик+, рейды — там даже вне
-боя) такие переборы **падают с ошибкой**, а не просто отдают пустоту.
-
-Здесь ни одного перебора нет. Только точечные запросы:
-
-* `C_UnitAuras.GetAuraDataBySpellName(unit, name, "HARMFUL|PLAYER")` — есть ли
-  конкретно твоя аура;
-* `C_UnitAuras.GetAuraDuration(unit, auraInstanceID)` — объект длительности;
-* `Cooldown:SetCooldownFromDurationObject(...)` — рисует остаток на движке,
-  поэтому работает даже когда само число secret;
-* `C_Secrets.ShouldAurasBeSecret()` / `ShouldSpellAuraBeSecret(spellID)` —
-  проверка режима.
-
-Если время читается обычным числом — рисуются цифры. Если оно secret — текст
-переносится из движковой FontString как есть. Если API вообще отказывается
-отвечать, правило просто молчит: в режиме «светиться когда НЕТ ауры»
-неизвестность трактуется как «аура есть», чтобы не орать ложной тревогой
-весь бой.
-
-На практике в 12.1 `ShouldAurasBeSecret` возвращает `true` **везде**, даже на
-манекене в городе, а `ShouldSpellAuraBeSecret` — `true` для обычных дотов. То
-есть для дебаффов на цели прямое чтение не работает в принципе, и всё держится
-на зеркале Cooldown Manager: наличие есть, времени нет. Собственные баффы из
-белого списка Blizzard читаются нормально, с настоящим таймером.
-
-Что именно происходит в конкретном подземелье — покажет `/cg auracheck`.
+Строка **«следит за:»** нужна для заклинаний, вешающих чужой дебафф.
+Первобытный гнев накладывает Разорвать, своей ауры у его кнопки нет — указываешь
+ему следить за Разорвать, и кнопка загорается от его дебаффа. Такая пара есть у
+каждого класса.
 
 ## Отметки
 
-В галерее шесть — все визуально разные:
+В галерее шесть, все визуально разные:
 
 | Ключ | Что это |
 |------|---------|
-| `solid` | сплошная цветная рамка вокруг иконки |
+| `solid` | чёткая цветная рамка вокруг иконки |
 | `fill` | заливка иконки цветом |
 | `active` | мягкая рамка Blizzard |
 | `pixel` | бегущий пунктир |
 | `shine` | искры по кругу |
 | `modern` | проковое свечение |
 
-Три из них (`pixel`, `shine`, `modern`) рисует движок EllesmereUI, если он
-загружен; без него они заменяются на собственные виды. Ещё несколько стилей
-(`button`, `gcd`, `classic`) остались доступны командой `/cg style`, но в
-галерею не выведены: после тонировки они неотличимы от уже перечисленных.
+`pixel`, `shine` и `modern` рисует движок EllesmereUI, если он загружен; без
+него заменяются собственными видами. Ещё несколько стилей (`button`, `gcd`,
+`classic`) доступны через `/cg style`, но в галерею не выведены: после
+тонировки они неотличимы от перечисленных.
 
-## Что с панелями
+За несколько секунд до конца ауры рамка краснеет — `/cg warn <№> <секунд>`, по
+умолчанию 4, `0` выключает. Порог работает даже с секретной длительностью: он
+запечён в ступенчатую цветовую кривую, которую вычисляет движок.
 
-Ищутся кнопки:
+## Формат количества
 
-* **EllesmereUIActionBars** (`EABButton<слот>`). Этот модуль делает свои
-  кнопки и намеренно вычёркивает их из реестра Blizzard, поэтому искать их
-  надо отдельно — иначе на EUI-сборке не находится вообще ничего;
-* стандартных панелей Blizzard (`ActionBarButtonEventsFrame.frames`);
+| Запись | Значение |
+|--------|----------|
+| `5` | 5 и больше |
+| `5+` | то же самое |
+| `=5` | ровно 5 |
+| `3-4` | от 3 до 4 |
+| `max` | на текущем максимуме (учитывает таланты, поднимающие капу) |
+
+## Команды
+
+| Команда | Что делает |
+|---------|-----------|
+| `/cg` | открыть окно настроек |
+| `/cg help` | список команд |
+| `/cg preset` | просканировать панели и настроить найденное |
+| `/cg clear` | удалить все правила этой спеки |
+| `/cg list` | список правил, с источником данных и числом кнопок |
+| `/cg add <кол-во> <заклинание>` | правило на ресурс |
+| `/cg dot [закл]` \| `/cg buff [закл]` | правило на ауру; без аргумента — последний каст |
+| `/cg missing <№>` | перевернуть: светиться когда ауры нет |
+| `/cg unit <№> <юнит>` | player, target, focus, mouseover, pet |
+| `/cg aura <№> <имя\|id>` | следить за другой аурой, а не за самим заклинанием |
+| `/cg warn <№> <секунд>` | краснеть за столько до конца |
+| `/cg style <№\|all> <ключ>` | отметка |
+| `/cg color <№> r g b` | цвет, 0–255 |
+| `/cg alpha <№\|all> <0-100>` \| `/cg thick <№\|all> <1-10>` | яркость, толщина рамки |
+| `/cg timer <№> on\|off` | остаток времени на иконке |
+| `/cg center <№>` | дублировать отметку в центр экрана |
+| `/cg poll <мс>` | как часто перечитывать ауры (0 = только события) |
+| `/cg mirror on\|off` | запасной путь через Cooldown Manager |
+| `/cg secret on\|off` | режим закрытых значений |
+| `/cg auracheck` \| `/cg cdtest` | диагностика |
+
+Правила хранятся **отдельно для каждой специализации и персонажа**.
+
+## Почему AdiButtonAuras перестал работать, и что здесь вместо него
+
+У AdiButtonAuras в `.toc` стоит `## Interface: 110200` (11.2), и ауры он
+перебирает через `GetAuraDataByIndex` / `GetAuraSlots` / `GetDebuffDataByIndex`.
+Под ограничениями 12.1 такие переборы **падают с ошибкой**, а не отдают пустоту.
+
+Здесь нет ни одного перебора. Только точечные запросы:
+
+* `C_UnitAuras.GetAuraDataBySpellName(unit, name, "HARMFUL|PLAYER")` — есть ли
+  конкретно твоя аура;
+* `C_UnitAuras.GetUnitAuraBySpellID` / `GetPlayerAuraBySpellID` для ID, которые
+  Blizzard оставила читаемыми;
+* `C_UnitAuras.GetAuraDuration` → `Cooldown:SetCooldownFromDurationObject` —
+  рисует на движке, поэтому переживает секретное число;
+* `C_Secrets.ShouldAurasBeSecret` / `ShouldSpellAuraBeSecret` — в каком мы
+  режиме.
+
+На практике в 12.1 `ShouldAurasBeSecret` возвращает **true везде**, даже на
+манекене в городе, а `ShouldSpellAuraBeSecret` — true для обычных дотов. То
+есть дебаффы на цели не читаются в принципе, и всё держится на зеркале
+Cooldown Manager: наличие есть, времени нет. Собственные баффы из читаемого
+набора Blizzard работают полностью, с настоящим таймером.
+
+`/cg auracheck` печатает, что именно отвечает API там, где ты стоишь.
+
+## Зеркало Cooldown Manager
+
+Если ауру прочитать нельзя, движок всё равно её знает: иконка Cooldown Manager
+сама отслеживает наличие. Её ответ — **секретный булев**, его нельзя проверять
+в Lua, поэтому он уходит в `SetAlphaFromBoolean` и разрешается на стороне
+движка. Остаток времени тем же приёмом: движок уже написал его в свою
+FontString, а `SetText` принимает секретные строки, так что текст переносится
+как есть.
+
+Работает только для заклинаний, отслеживаемых в Cooldown Manager — потому это
+и запасной путь. Выключается `/cg mirror off`.
+
+## Задержка отображения
+
+Стандартный интерфейс перерисовывается по `UNIT_AURA`, и когда событие
+опаздывает, дебафф появляется через секунду или только после перевыбора цели.
+Два дополнительных пути:
+
+* **мгновенно по касту** — успешный каст отслеживаемого заклинания сразу
+  переключает отметку, не дожидаясь подтверждения, и берёт прошлую известную
+  длительность. Настоящие данные перебивают догадку; окно 2 секунды, так что
+  иммун или промах гаснут сами.
+* **опрос** — состояние перечитывается каждые 200 мс, а не только по событию.
+  `/cg poll 100`, `/cg poll 0` — жить только на событиях.
+
+`/cg auracheck` показывает замеренный разрыв между твоим кастом и первым
+удачным чтением, так что «опаздывают данные или перерисовка» отвечается цифрой.
+
+## Панели
+
+Кнопки ищутся:
+
+* **EllesmereUIActionBars** (`EABButton<слот>`) — этот модуль делает свои
+  кнопки и намеренно вычёркивает их из реестра Blizzard, поэтому искать их надо
+  по имени, иначе на EUI-сборке не находится вообще ничего;
+* стандартные панели Blizzard (`ActionBarButtonEventsFrame.frames`);
 * Dominos;
-* всего, что построено на `LibActionButton-1.0` (Bartender4, ElvUI и др.);
-* иконок Cooldown Manager — по желанию, `/cg cdm on`.
+* всё на `LibActionButton-1.0` (Bartender4, ElvUI и др.);
+* иконки Cooldown Manager — по желанию, `/cg cdm on`.
 
-Макросы разбираются: если в слоте макрос, берётся заклинание, которое он
-кастует. Учитываются базовые заклинания и оверрайды (формы, таланты,
-подменяющие ID).
+Макросы разбираются до заклинания, которое они кастуют; учитываются базовые
+заклинания и оверрайды (формы, таланты, подменяющие ID).
 
-## Про «секретные» значения в 12.x
+## Секретные значения
 
-В инстансах с ограничениями `UnitPower()` может вернуть *secret value* —
-такое число можно скормить C-функции, но нельзя сравнить в Lua. Поэтому
-видимость там строится геометрией, а не условием: значение уходит в
-`StatusBar:SetValue()`, а полоса заполнения двигает обрезающий фрейм, внутри
-которого лежит свечение. Сравнение целиком происходит внутри движка.
+Под ограничениями `UnitPower()` может вернуть *secret value* — число, которое
+можно отдать C-функции, но нельзя сравнить в Lua. Поэтому видимость выше порога
+строится геометрией, а не условием: значение уходит в `StatusBar:SetValue()`, а
+полоса заполнения двигает обрезающий фрейм со свечением внутри, и всё сравнение
+происходит внутри движка.
 
-Если что-то в этом режиме поведёт себя странно, выключается одной командой:
-
-```
-/cg secret off
-```
-
-Тогда в таких инстансах подсветка просто не показывается, а везде остальном
-работает как обычно.
+Если этот путь поведёт себя странно — `/cg secret off`: тогда в таких инстансах
+отметки просто не показываются, а везде остальном всё работает как обычно.
 
 ## Мелочи
 
-* `/cg` — короткий алиас; если он занят другим аддоном, используй `/cglow`
-  или `/comboglow`.
+* `/cg` — короткий алиас. Если его занял другой аддон, ComboGlow берёт `/cgl`,
+  потом `/cglow`; `/comboglow` работает всегда.
 * Аддон только читает `UnitPower` и рисует рамки. Ничего не кастует и не
   нажимает — обычный UI-код.
 
 ## Лицензия
 
-MIT — см. [LICENSE](LICENSE). Форкать, править и включать в свои сборки можно
-свободно.
+MIT, см. [LICENSE](LICENSE).
 
 ## Поблагодарить
 
-Если аддон сэкономил тебе пару вечеров возни с секретными значениями Midnight —
-можно поддержать разработку любой комфортной суммой:
+Если аддон сэкономил тебе вечер возни с секретными значениями Midnight — можно
+поддержать любой комфортной суммой:
 
 **ЮMoney:** https://yoomoney.ru/to/4100119613908309
