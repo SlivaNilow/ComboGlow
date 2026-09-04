@@ -25,15 +25,19 @@ CG.powerType = nil
 ---------------------------------------------------------------------------]]
 local PT = Enum.PowerType
 
+-- A hint, not the answer: every one of these is wrong for at least one spec of
+-- its own class, which is why the detection below has the last word.
 local CLASS_POWER = {
     ROGUE       = PT.ComboPoints,
-    DRUID       = PT.ComboPoints,
+    DRUID       = PT.ComboPoints,   -- cat form; Balance is astral power
     PALADIN     = PT.HolyPower,
-    MONK        = PT.Chi,
+    MONK        = PT.Chi,           -- Windwalker; Brewmaster and Mistweaver have none
     WARLOCK     = PT.SoulShards,
-    MAGE        = PT.ArcaneCharges,
+    MAGE        = PT.ArcaneCharges, -- Arcane only
     EVOKER      = PT.Essence,
     DEATHKNIGHT = PT.Runes,
+    PRIEST      = PT.Insanity,      -- Shadow only
+    SHAMAN      = PT.Maelstrom,     -- Elemental
 }
 
 -- Aliases accepted by "/cg power". Built defensively: an Enum key that does
@@ -66,9 +70,48 @@ function ns.ResolvePowerToken(token)
     return nil, false
 end
 
-local function AutoPowerType()
-    local _, class = UnitClass("player")
-    return CLASS_POWER[class]
+-- Specs whose resource is not the one their class is usually associated with.
+-- A druid is combo points in cat form and astral power as Balance; a priest has
+-- no secondary resource until Shadow.
+local SPEC_POWER = {
+    [102] = PT.LunarPower,  -- Balance
+    [258] = PT.Insanity,    -- Shadow
+    [262] = PT.Maelstrom,   -- Elemental
+}
+
+-- Resources worth counting, in the order they are preferred when the class and
+-- spec hints come up empty. Primary pools (mana, energy, rage) are deliberately
+-- absent: they refill constantly, so "you have enough" is not a moment.
+local SECONDARY_POWERS = {}
+do
+    local order = {
+        PT.ComboPoints, PT.HolyPower, PT.Chi, PT.SoulShards, PT.ArcaneCharges,
+        PT.Essence, PT.Runes, PT.LunarPower, PT.Insanity, PT.Maelstrom,
+    }
+    for _, p in ipairs(order) do
+        if p ~= nil then SECONDARY_POWERS[#SECONDARY_POWERS + 1] = p end
+    end
+end
+
+local function AutoPowerType(specID)
+    local hint = SPEC_POWER[specID or 0]
+    if hint == nil then
+        local _, class = UnitClass("player")
+        hint = CLASS_POWER[class]
+    end
+    if hint ~= nil then
+        local m = UnitPowerMax("player", hint)
+        if type(m) == "number" and not IsSecret(m) and m > 0 then return hint end
+    end
+
+    -- Neither hint fits this spec: take whichever secondary resource the
+    -- character actually has. Cheaper than maintaining a table of every spec
+    -- Blizzard ships, and right by construction.
+    for _, p in ipairs(SECONDARY_POWERS) do
+        local m = UnitPowerMax("player", p)
+        if type(m) == "number" and not IsSecret(m) and m > 0 then return p end
+    end
+    return hint
 end
 ns.AutoPowerType = AutoPowerType
 
@@ -815,7 +858,7 @@ ns.GetSpecID = GetSpecID
 
 function CG:RefreshSpec()
     self.specID = GetSpecID()
-    self.powerType = AutoPowerType()
+    self.powerType = AutoPowerType(self.specID)
 end
 
 local REBUILD_EVENTS = {

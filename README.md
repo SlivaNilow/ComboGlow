@@ -18,8 +18,11 @@ Highlights an action bar button on three states per spell:
 | **gone** | the aura is missing | red colour wash |
 | **ready / proc** | the resource threshold is met **or** the spell procced | gold glow |
 
-Works for combo points, holy power, chi, soul shards, arcane charges, essence
-and the rest.
+Works for combo points, holy power, chi, soul shards, arcane charges, essence,
+astral power, insanity, maelstrom, runes -- every class. The resource is
+detected from the character rather than from a table of specs, so a Balance
+druid gets astral power and a Shadow priest insanity without either being
+named anywhere.
 
 A **reminder strip** sits above your class resource bar: every "gone" state
 puts its icon there while the aura is missing, so what needs pressing is next
@@ -245,7 +248,10 @@ in any amount you like:
 | **готово / прок** | набран ресурс **или** заклинание прокнуло | золотое свечение |
 
 Работает с комбо-очками, святой силой, ци, осколками души, чародейскими
-зарядами, сущностью и остальными.
+зарядами, сущностью, силой звёзд, безумием, маэльстромом, рунами — со всеми
+классами. Ресурс определяется по самому персонажу, а не по таблице спеков,
+поэтому баланс получает силу звёзд, а шп безумие, хотя ни тот, ни другой нигде
+не перечислены.
 
 **Полоса напоминаний** висит над панелью классового ресурса: каждое состояние
 «нет» выкладывает туда свою иконку, пока ауры не хватает — то, что надо нажать,
