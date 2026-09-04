@@ -617,6 +617,7 @@ local function PrintHelp()
         { "/cg missing <#>",           L("flip it: glow while the aura is GONE", "перевернуть: светиться когда ауры НЕТ") },
         { "/cg unit <#> <unit>",       L("player | target | focus | mouseover | pet", "player | target | focus | mouseover | pet") },
         { "/cg aura <#> <name|id>",    L("look for a different aura than the spell itself", "искать другую ауру, а не само заклинание") },
+        { "/cg count <#|all> <n>",     L("resource level a count rule lights at", "уровень ресурса, при котором загорается правило") },
         { "/cg warn <#> <sec>",        L("turn red this many seconds before it runs out (0 = never)", "краснеть за столько секунд до конца (0 = никогда)") },
         { "/cg alpha <#> <0-100>",     L("brightness of the marker", "яркость метки") },
         { "/cg thick <#> <1-10>",      L("frame thickness in pixels", "толщина рамки в пикселях") },
@@ -845,6 +846,27 @@ local function Handler(msg)
                 rule.warn)
         elseif not idx then
             Say(L("usage: /cg warn <#> <seconds>", "формат: /cg warn <№> <секунд>"))
+        end
+
+    elseif cmd == "count" or cmd == "at" then
+        local idx, value = rest:match("^(%S+)%s+(%S+)$")
+        if not idx then
+            Say(L("usage: /cg count <#|all> <n | n-n | =n | max>",
+                  "формат: /cg count <№|all> <n | n-n | =n | max>"))
+        else
+            local minV, maxV, atMax = ParseRange(value)
+            if minV == nil and not atMax then
+                Say(L("bad count: %s", "неверное количество: %s"), value)
+            else
+                local n = EachRule(idx, function(r)
+                    if r.kind == "aura" or r.kind == "cd" then return end
+                    r.min, r.max, r.atMax = minV or 1, maxV, atMax or nil
+                end)
+                if n > 0 then
+                    CG:Rebuild()
+                    Say(L("threshold set on %d rules", "порог задан для правил: %d"), n)
+                end
+            end
         end
 
     elseif cmd == "alpha" then
