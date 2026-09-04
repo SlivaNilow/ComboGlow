@@ -23,8 +23,11 @@ and the rest.
 
 A **reminder strip** sits above your class resource bar: every "gone" state
 puts its icon there while the aura is missing, so what needs pressing is next
-to the resource you are already watching. `/cg move` to drag it elsewhere,
-`/cg centeroff` to turn it off.
+to the resource you are already watching. A state redirected at another
+spell's aura stays out of it — Primal Wrath's "Rip is not up" is the same fact
+Rip's own icon already reports, and choosing to use it is a decision, not a
+reminder. `/cg move` to drag the strip elsewhere, `/cg centeroff` to turn it
+off, `/cg center <#>` to force something in.
 
 > **Tested on one setup only.** Written and used with the EllesmereUI suite on
 > a Feral druid and a Holy paladin, ruRU client, 12.1. Other action bar addons
@@ -246,8 +249,12 @@ in any amount you like:
 
 **Полоса напоминаний** висит над панелью классового ресурса: каждое состояние
 «нет» выкладывает туда свою иконку, пока ауры не хватает — то, что надо нажать,
-оказывается рядом с ресурсом, на который ты и так смотришь. `/cg move` —
-перетащить в другое место, `/cg centeroff` — выключить.
+оказывается рядом с ресурсом, на который ты и так смотришь. Состояния,
+перенаправленные на чужую ауру, туда не попадают: «Разорвать не висит» у
+Первобытного гнева это тот же факт, о котором уже говорит иконка самого
+Разорвать, а решение применить аое принимает игрок — это не напоминание.
+`/cg move` — перетащить, `/cg centeroff` — выключить, `/cg center <№>` —
+затащить что-то принудительно.
 
 > **Проверено только на одной сборке.** Написано и обкатано с сюитой
 > EllesmereUI на друиде-фераль и пала-хиле, клиент ruRU, 12.1. Остальные

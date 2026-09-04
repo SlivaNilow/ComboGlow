@@ -503,10 +503,19 @@ function CG:Rebuild()
     local centerRules = {}
     if self.db.center.enabled then
         local auto = self.db.center.autoMissing ~= false
+        local watched = {}
         for _, rule in ipairs(rules) do
-            local wanted = rule.center
-                or (auto and rule.kind == "aura" and rule.missing)
-            if wanted and rule.enabled ~= false then
+            -- Auto-added: "gone" states that watch their OWN aura.
+            --
+            -- A redirected one is excluded on purpose. Primal Wrath's "gone"
+            -- means "Rip is not up", which Rip's own icon already says, and it
+            -- is a situational choice rather than something you forgot to
+            -- press -- so it would be a second nag for the same fact. The
+            -- manual /cg center flag still forces one in.
+            local autoWanted = auto and rule.kind == "aura" and rule.missing
+                and not rule.auraID and not watched[rule.spell]
+            if (rule.center or autoWanted) and rule.enabled ~= false then
+                watched[rule.spell] = true
                 centerRules[#centerRules + 1] = rule
                 sigParts[#sigParts + 1] = "c" .. RuleFingerprint(rule)
             end
