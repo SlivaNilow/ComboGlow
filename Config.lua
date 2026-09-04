@@ -433,6 +433,12 @@ end
 -- retries instead of complaining). intro: printed only once something is
 -- actually about to be added. Returns how many rules were created.
 local function BuildPreset(quiet, intro)
+    -- Read the Cooldown Manager fresh: this runs right after a spec change,
+    -- when the viewers have just been rebuilt for the new spec, and the whole
+    -- scan depends on that list.
+    if ns.RebuildCDMMap then ns.RebuildCDMMap() end
+    CG:RefreshSpec()
+
     local pt = CG.powerType
     local rules = CG:GetRules()
 

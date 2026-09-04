@@ -527,14 +527,18 @@ function CG:Rebuild()
         end
     end
 
+    -- Before the early exit below, not after: the scan that CREATES the first
+    -- rules reads this map, and a spec with no rules yet would never get here
+    -- to build it. Chicken and egg -- a freshly changed spec found nothing to
+    -- set up and said so.
+    ns.RebuildCDMMap()
+    ns.mirrorEnabled = self.db.mirror ~= false
+
     if not self.db.enabled or #rules == 0 or not any then
         self:Teardown()
         self.lastSig = nil
         return
     end
-
-    ns.RebuildCDMMap()
-    ns.mirrorEnabled = self.db.mirror ~= false
 
     -- Collect what WOULD be built, and fingerprint it.
     local placeButtons, placeRules, sigParts, watched = {}, {}, {}, {}
