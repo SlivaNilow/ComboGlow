@@ -3,3 +3,5 @@
 *.orig
 .DS_Store
 Thumbs.db
+
+# Rendered artwork is committed; the source script lives in the repo history.
