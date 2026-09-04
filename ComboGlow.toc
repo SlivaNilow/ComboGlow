@@ -2,7 +2,9 @@
 ## Title: ComboGlow
 ## Notes: Highlights action bar abilities at a chosen class-resource count (combo points, holy power, chi, ...)
 ## Notes-ruRU: Подсветка способностей на панели при заданном количестве ресурса (КП, святая сила, ци, ...)
-## Author: built for Ellesmere UI setups
+## Author: SLCode
+## X-Website: https://github.com/SlivaNilow/ComboGlow
+## X-License: MIT
 ## Version: 1.0.0
 ## IconTexture: Interface\Icons\ability_rogue_eviscerate
 ## Category: Combat
