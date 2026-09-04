@@ -375,6 +375,51 @@ function ns.GuessAuraSpell(spellID)
     return found
 end
 
+--[[-------------------------------------------------------------------------
+    "Which buff makes this spell free?"
+
+    The search above, run backwards. Some procs are announced by the game's own
+    spell alert, which is plain and reliable -- but plenty are just a buff and
+    light nothing. Starweaver's Warp says "your next Starfall costs no Astral
+    Power" and never touches the overlay API, so nothing fires and the proc
+    state stays dark.
+
+    Which buff belongs to which spell is not something to hardcode: it differs
+    per class and changes with patches. The game already says it -- the buff's
+    description names the spell. So the tracked player buffs are searched for
+    one that names THIS spell.
+
+    Exactly one match is taken; two or more is ambiguous and left for the user
+    to point by hand. Harmful auras are skipped -- a debuff naming the spell is
+    not a proc -- and so are short names, which match half a tooltip by chance.
+---------------------------------------------------------------------------]]
+function ns.GuessProcAura(spellID)
+    if not (C_Spell and C_Spell.GetSpellDescription) then return nil end
+    local name = ns.SpellName(spellID)
+    if not name or name:find("^spell:") or #name < 5 then return nil end
+    name = name:lower()
+
+    local found
+    for id in pairs(ns.cdmAuraSpells or {}) do
+        if id ~= spellID then
+            local harmful = false
+            if C_Spell.IsSpellHarmful then
+                local okH, v = pcall(C_Spell.IsSpellHarmful, id)
+                if okH and v then harmful = true end
+            end
+            if not harmful then
+                local ok, desc = pcall(C_Spell.GetSpellDescription, id)
+                if ok and type(desc) == "string" and desc ~= ""
+                   and desc:lower():find(name, 1, true) then
+                    if found and found ~= id then return nil end
+                    found = id
+                end
+            end
+        end
+    end
+    return found
+end
+
 -- "ready" needs something to be ready FOR. A spell that costs no resource and
 -- has no cooldown is always ready, which is not worth a marker -- the options
 -- window says so rather than leaving a click that quietly does nothing.
@@ -392,11 +437,20 @@ function ns.AddSlotRule(spellID, slot)
     local rule
     local dReady, dProc = ns.STATE_DEFAULTS.ready, ns.STATE_DEFAULTS.proc
     if slot == "proc" then
+        -- Pointed at the buff that makes the cast free, when one can be found.
+        -- Then it is an ordinary aura rule with a real countdown; without one
+        -- it falls back to the game's spell alert, which has no duration.
+        local buff = ns.GuessProcAura(spellID)
         rule = {
             kind = "aura", spell = spellID, proc = true,
-            timer = false, style = dProc.style,
+            auraID = buff,
+            unit = "player", helpful = true,
+            timer = buff and true or false,
+            style = dProc.style,
             alpha = StyleAlpha(dProc.style),
+            thick = 3, warn = 4,
             r = dProc.r, g = dProc.g, b = dProc.b,
+            wr = 1, wg = 0, wb = 0,
             center = false, enabled = true,
         }
     elseif slot == "ready" then
@@ -446,7 +500,11 @@ function ns.AddSlotRule(spellID, slot)
     end
     rules[#rules + 1] = rule
     CG:Rebuild()
-    if rule.auraID then
+    if rule.auraID and rule.proc then
+        Say(L("%s is free while %s is up (change it in /cg)",
+              "«%s» бесплатен, пока висит «%s» (изменить можно в /cg)"),
+            ns.SpellName(spellID), ns.SpellName(rule.auraID))
+    elseif rule.auraID then
         Say(L("%s has no aura of its own - watching %s (change it in /cg)",
               "у «%s» нет своей ауры — слежу за «%s» (изменить можно в /cg)"),
             ns.SpellName(spellID), ns.SpellName(rule.auraID))
@@ -593,17 +651,27 @@ local function BuildPreset(quiet, intro)
         -- own rule, its own marker. A spender that never procs simply keeps a
         -- state that never lights.
         local p = STATE_DEFAULTS.proc
+        local buff = ns.GuessProcAura(entry.spell)
         rules[#rules + 1] = {
             kind    = "aura",
             spell   = entry.spell,
             proc    = true,
-            timer   = false,
+            auraID  = buff,
+            unit    = "player",
+            helpful = true,
+            timer   = buff and true or false,
             style   = p.style,
             alpha   = StyleAlpha(p.style),
+            thick   = 3, warn = 4,
             r = p.r, g = p.g, b = p.b,
+            wr = 1, wg = 0, wb = 0,
             center  = false,
             enabled = true,
         }
+        if buff then
+            Say(L("  free while %s is up", "  бесплатен, пока висит «%s»"),
+                ns.SpellName(buff))
+        end
     end
 
     for _, entry in ipairs(auras) do

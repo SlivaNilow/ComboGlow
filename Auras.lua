@@ -582,9 +582,15 @@ local function IsProcced(spellID)
 end
 ns.IsProcced = IsProcced
 
+-- Which spells currently have their "proc" state lit. Written by the aura
+-- pass, read by the power pass so a free cast can outrank a full bar.
+ns.procActive = {}
+
 -- Applies one aura rule to one overlay/icon. Returns true if it is showing.
 function ns.ApplyAuraRule(frame, rule)
-    if rule.proc then
+    -- A proc pointed at a buff is just an aura rule: "this buff is on me".
+    -- Only an unpointed one falls back to the game's own spell alert.
+    if rule.proc and not rule.auraID then
         ClearTimer(frame)
         frame.pandemicOn = nil
         ns.ResetMirror(frame)

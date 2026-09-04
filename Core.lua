@@ -509,6 +509,7 @@ function CG:Teardown()
     self.pool:ReleaseAll()
     self.centerPool:ReleaseAll()
     ns.UntrackAuraFrames()
+    wipe(ns.procActive)
     wipe(self.powerFrames)
     wipe(self.auraFrames)
     wipe(self.watchedSlots)
@@ -807,7 +808,13 @@ function CG:UpdatePower()
     for _, frame in ipairs(self.powerFrames) do
         local rule = frame.rule
 
-        if rule and rule.kind == "cd" then
+        -- The spell's proc state is lit right now, so this one keeps quiet:
+        -- two markers on one button saying "press me" is one too many, and the
+        -- free cast is the one worth reading.
+        if rule and rule.spell and ns.procActive[rule.spell] then
+            Silence(frame)
+
+        elseif rule and rule.kind == "cd" then
             -- Burst: ready means off cooldown, not a resource count. Kept to
             -- combat by default -- a major cooldown sitting ready in town is
             -- not something anyone needs reminding of.
@@ -876,9 +883,24 @@ function CG:UpdateAuras()
         for _, f in ipairs(self.auraFrames) do Silence(f) end
         return
     end
+    -- A proc outranks the resource: a free cast is the better news, so while
+    -- the proc marker is lit the "ready" one stands down. The power pass reads
+    -- these flags, and a flip re-runs it -- an aura event does not reach the
+    -- power frames on its own, so without this the resource marker would stay
+    -- lit until the next power tick.
+    local procChanged = false
     for _, frame in ipairs(self.auraFrames) do
-        ns.ApplyAuraRule(frame, frame.rule)
+        local rule = frame.rule
+        local on = ns.ApplyAuraRule(frame, rule)
+        if rule and rule.proc and rule.spell then
+            local now = (on and true) or nil
+            if ns.procActive[rule.spell] ~= now then
+                ns.procActive[rule.spell] = now
+                procChanged = true
+            end
+        end
     end
+    if procChanged then self:UpdatePower() end
 end
 
 function CG:QueueAuraUpdate()

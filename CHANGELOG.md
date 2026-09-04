@@ -12,9 +12,20 @@ bar ask for different decisions. Each spell now has four states:
 - **ready** — the resource threshold is met, or a burst came off cooldown
 - **proc** — the spell lit up on its own; this cast is free
 
-Gold means you saved up for it, cyan means it is free. When a spell has its own
-proc state, its resource state stops lighting on procs, so the two never say the
-same thing at once.
+Gold means you saved up for it, cyan means it is free. A lit proc outranks the
+resource: while the free cast is up, the gold marker stands down, so the button
+never shows two marks saying "press me".
+
+**Procs are found from the buff, not the alert API.** Only some procs light
+Blizzard's spell alert; plenty are a plain buff and light nothing — Starweaver's
+Warp says "your next Starfall costs no Astral Power" and never touches the
+overlay API, so the proc state stayed dark. Which buff belongs to which spell is
+not something to hardcode: it differs per class and moves with patches. The game
+already says it, in the buff's own description, so the tracked player buffs are
+searched for one that names the spell. One match is taken and announced in chat;
+anything ambiguous is left for you to point by hand through the **free while:**
+row, which lists every buff the Cooldown Manager tracks. A proc pointed at a
+buff also gets a real countdown on the icon.
 
 Run `/cg preset` again to pick up proc states for your spenders, or click the
 fourth pip on any spell in the options window.

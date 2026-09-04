@@ -226,18 +226,29 @@ local function RefreshDetails()
         UI.countRow:Hide()
     end
 
-    -- Which aura this state watches (aura states only). A proc watches no
-    -- aura -- the game announces it directly -- so the row stays hidden there.
-    if not rule or rule.kind ~= "aura" or rule.proc then
+    -- Which aura this state watches (aura states only). For a proc the same
+    -- row picks the buff that makes the cast free -- plenty of procs are a
+    -- plain buff and never touch the game's spell-alert API.
+    if not rule or rule.kind ~= "aura" then
         UI.auraRow:Hide()
         UI.auraList:Hide()
     else
         UI.auraRow:Show()
         local named = rule.auraID and ns.SpellName(rule.auraID) or rule.auraName
-        local watching = named or L("its own aura", "своя аура")
-        UI.auraRow.label:SetText(L("watching: ", "следит за: ") .. "|cffffd100" .. watching .. "|r")
-        UI.auraRow.hint:SetText(named and ""
-            or L("click to pick another spell's aura", "нажми, чтобы выбрать чужую ауру"))
+        if rule.proc then
+            local watching = named or L("the game's own proc alert",
+                                        "штатная подсветка прока")
+            UI.auraRow.label:SetText(L("free while: ", "бесплатен, пока: ")
+                .. "|cffffd100" .. watching .. "|r")
+            UI.auraRow.hint:SetText(named and ""
+                or L("click to pick the buff", "нажми, чтобы выбрать бафф"))
+        else
+            local watching = named or L("its own aura", "своя аура")
+            UI.auraRow.label:SetText(L("watching: ", "следит за: ")
+                .. "|cffffd100" .. watching .. "|r")
+            UI.auraRow.hint:SetText(named and ""
+                or L("click to pick another spell's aura", "нажми, чтобы выбрать чужую ауру"))
+        end
     end
 
     -- Slot strip: bright = editing, lit = configured, dim = empty.
@@ -454,7 +465,7 @@ local function Build()
     UI.auraList:SetFrameStrata("FULLSCREEN_DIALOG")
     UI.auraList:Hide()
     UI.auraList.entries = {}
-    for i = 1, 12 do
+    for i = 1, 16 do
         local e = CreateFrame("Button", nil, UI.auraList)
         e:SetSize(370, 18)
         e:SetPoint("TOPLEFT", 4, -2 - (i - 1) * 18)
@@ -470,6 +481,9 @@ local function Build()
             if rule then
                 rule.auraID = self.spellID
                 rule.auraName = nil
+                -- A proc pointed at a buff has a real duration to show; the
+                -- spell-alert fallback has none, so the timer goes with it.
+                if rule.proc then rule.timer = self.spellID and true or false end
                 CG:Rebuild()
             end
             UI.auraList:Hide()
@@ -482,12 +496,42 @@ local function Build()
         if UI.auraList:IsShown() then UI.auraList:Hide() return end
         if not selSpell then return end
 
-        local seen, list = {}, { { id = nil, name = L("its own aura", "своя аура") } }
-        seen[selSpell] = true
-        for _, r in ipairs(CG:GetRules()) do
-            if r.spell and not seen[r.spell] then
-                seen[r.spell] = true
-                list[#list + 1] = { id = r.spell, name = ns.SpellName(r.spell) }
+        local rule = CurrentRule()
+        local list
+        if rule and rule.proc then
+            -- Candidates are the player buffs the Cooldown Manager tracks:
+            -- Blizzard's own list of what matters for the spec, so there is
+            -- nothing hardcoded and it follows talent and patch changes.
+            -- Deduped by name -- one buff is registered under its own id, its
+            -- override and every linked id, all with the same name.
+            list = { { id = nil, name = L("the game's own proc alert",
+                                          "штатная подсветка прока") } }
+            local names, rest = {}, {}
+            for id in pairs(ns.cdmAuraSpells or {}) do
+                local nm = ns.SpellName(id)
+                if nm and not nm:find("^spell:") and not names[nm] then
+                    local harmful = false
+                    if C_Spell and C_Spell.IsSpellHarmful then
+                        local okH, v = pcall(C_Spell.IsSpellHarmful, id)
+                        if okH and v then harmful = true end
+                    end
+                    if not harmful then
+                        names[nm] = true
+                        rest[#rest + 1] = { id = id, name = nm }
+                    end
+                end
+            end
+            table.sort(rest, function(a, b) return a.name < b.name end)
+            for _, item in ipairs(rest) do list[#list + 1] = item end
+        else
+            local seen
+            seen, list = {}, { { id = nil, name = L("its own aura", "своя аура") } }
+            seen[selSpell] = true
+            for _, r in ipairs(CG:GetRules()) do
+                if r.spell and not seen[r.spell] then
+                    seen[r.spell] = true
+                    list[#list + 1] = { id = r.spell, name = ns.SpellName(r.spell) }
+                end
             end
         end
 
@@ -501,7 +545,7 @@ local function Build()
                 e:Hide()
             end
         end
-        UI.auraList:SetHeight(math.min(#list, 12) * 18 + 6)
+        UI.auraList:SetHeight(math.min(#list, 16) * 18 + 6)
         UI.auraList:Show()
     end)
 
