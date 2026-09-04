@@ -200,13 +200,21 @@ function ns.StateLabel(state)
 end
 
 local STATE_DEFAULTS = {
-    active  = { style = "solid",  r = 0, g = 1, b = 0      },
-    missing = { style = "solid",  r = 1, g = 0, b = 0      },
+    active  = { style = "pixel",  r = 0, g = 1, b = 0      },
+    missing = { style = "fill",   r = 1, g = 0, b = 0      },
     proc    = { style = "modern", r = 1, g = 0.85, b = 0.1 },
     -- "ready" is the slot name the options window uses for the resource /
     -- proc state; same look as a proc.
     ready   = { style = "modern", r = 1, g = 0.85, b = 0.1 },
 }
+
+-- Each marker carries the opacity that suits it -- a wash at a frame's full
+-- opacity would hide the icon it marks.
+local function StyleAlpha(styleKey)
+    local entry = ns.StyleByKey(styleKey)
+    return entry and entry.defAlpha or 1
+end
+ns.StyleAlpha = StyleAlpha
 ns.STATE_DEFAULTS = STATE_DEFAULTS
 
 function ns.ApplyState(rule, state)
@@ -248,12 +256,11 @@ local function AddAuraRule(spellToken, helpful, state)
         unit     = helpful and "player" or "target",
         missing  = false,
         timer    = true,
-        -- Deliberately not the finisher look: an aura that is up is a steady
-        -- state, not a proc. Green tinted border, the way AdiButtonAuras marks
-        -- an active effect; the animated proc glow stays meaningful for procs.
-        style    = "solid",
+        -- An aura that is up is a steady state, not a proc, so it gets the
+        -- marching border and the animated proc glow stays meaningful.
+        style    = STATE_DEFAULTS.active.style,
         swipe    = false,
-        alpha    = 1,
+        alpha    = StyleAlpha(STATE_DEFAULTS.active.style),
         thick    = 3,
         warn     = 4,
         r = 0, g = 1, b = 0,
@@ -343,7 +350,7 @@ function ns.AddSlotRule(spellID, slot)
             timer   = true,
             style   = d.style,
             swipe   = false,
-            alpha   = 1, thick = 3, warn = 4,
+            alpha   = StyleAlpha(d.style), thick = 3, warn = 4,
             r = d.r, g = d.g, b = d.b,
             wr = 1, wg = 0, wb = 0,
             center = false, enabled = true,
@@ -439,9 +446,9 @@ local function BuildPreset(quiet, intro)
             unit     = entry.harmful and "target" or "player",
             missing  = false,
             timer    = true,
-            style    = "solid",
+            style    = STATE_DEFAULTS.active.style,
             swipe    = false,
-            alpha    = 1,
+            alpha    = StyleAlpha(STATE_DEFAULTS.active.style),
             thick    = 3,
             warn     = 4,
             r = 0, g = 1, b = 0,

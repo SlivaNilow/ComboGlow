@@ -75,7 +75,7 @@ ns.AutoPowerType = AutoPowerType
 --[[-------------------------------------------------------------------------
     Saved variables
 ---------------------------------------------------------------------------]]
-local DB_VERSION = 6
+local DB_VERSION = 7
 
 local DEFAULTS = {
     version    = DB_VERSION,
@@ -794,6 +794,24 @@ function CG:Initialize()
     -- v6: the extra brightness steps of the soft border were indistinguishable
     -- from each other (the vertex colour clamps), and the light wash from the
     -- normal one. Everyone lands back on the single version.
+    -- v7: new per-state defaults -- marching border while the aura is up, a
+    -- colour wash while it is gone. Only rewrites what the old default
+    -- produced (the plain frame in that state's own colour), so a marker
+    -- picked by hand survives.
+    if hadDB and fromVersion < 7 then
+        for _, rules in pairs(self.db.specs) do
+            for _, r in ipairs(rules) do
+                if r.kind == "aura" and r.style == "solid" and not r.proc then
+                    if r.missing and r.r == 1 and r.g == 0 and r.b == 0 then
+                        r.style, r.alpha = "fill", 0.30
+                    elseif not r.missing and r.r == 0 and r.g == 1 and r.b == 0 then
+                        r.style, r.alpha = "pixel", 1
+                    end
+                end
+            end
+        end
+    end
+
     if hadDB and fromVersion < 6 then
         for _, rules in pairs(self.db.specs) do
             for _, r in ipairs(rules) do

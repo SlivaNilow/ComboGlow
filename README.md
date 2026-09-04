@@ -14,8 +14,8 @@ Highlights an action bar button on three states per spell:
 
 | State | Lights up when | Default look |
 |-------|----------------|--------------|
-| **up** | your aura is on the unit | green frame |
-| **gone** | the aura is missing | red frame |
+| **up** | your aura is on the unit | green marching dashes |
+| **gone** | the aura is missing | red colour wash |
 | **ready / proc** | the resource threshold is met **or** the spell procced | gold glow |
 
 Works for combo points, holy power, chi, soul shards, arcane charges, essence
@@ -225,8 +225,8 @@ in any amount you like:
 
 | Состояние | Когда горит | Вид по умолчанию |
 |-----------|-------------|------------------|
-| **висит** | твоя аура на цели | зелёная рамка |
-| **нет** | ауры нет | красная рамка |
+| **висит** | твоя аура на цели | зелёный бегущий пунктир |
+| **нет** | ауры нет | красная заливка |
 | **готово / прок** | набран ресурс **или** заклинание прокнуло | золотое свечение |
 
 Работает с комбо-очками, святой силой, ци, осколками души, чародейскими
