@@ -5,13 +5,6 @@
   <!-- Overlay attached to an action button. All artwork lives inside "Art" so
        the secret-value gate can reparent it into a clipping frame. -->
   <Frame name="ComboGlowOverlayTemplate" mixin="ComboGlowOverlayMixin" hidden="true" virtual="true">
-    <Layers>
-      <Layer level="OVERLAY">
-        <FontString parentKey="TimerText" inherits="NumberFontNormal" hidden="true">
-          <Anchors><Anchor point="CENTER"/></Anchors>
-        </FontString>
-      </Layer>
-    </Layers>
     <Frames>
       <Cooldown parentKey="CD" inherits="CooldownFrameTemplate" hidden="true">
         <Anchors><Anchor point="CENTER"/></Anchors>
@@ -34,6 +27,12 @@
               <TexCoords left="0.00781250" right="0.50781250" top="0.27734375" bottom="0.52734375"/>
               <Anchors><Anchor point="CENTER"/></Anchors>
             </Texture>
+            <!-- Inside Art, and last in the layer: a child frame draws over
+                 its parent's regions, so a countdown living on the frame
+                 itself sat underneath the icon on the reminder strip. -->
+            <FontString parentKey="TimerText" inherits="NumberFontNormal" hidden="true">
+              <Anchors><Anchor point="CENTER"/></Anchors>
+            </FontString>
           </Layer>
         </Layers>
         <Animations>
@@ -57,13 +56,6 @@
   <!-- Center-of-screen icon. Same Art layout (plus the spell icon itself) so
        the shared start/stop code in Glow.lua works on both. -->
   <Frame name="ComboGlowCenterIconTemplate" mixin="ComboGlowCenterIconMixin" hidden="true" virtual="true">
-    <Layers>
-      <Layer level="OVERLAY">
-        <FontString parentKey="TimerText" inherits="NumberFontNormal" hidden="true">
-          <Anchors><Anchor point="CENTER"/></Anchors>
-        </FontString>
-      </Layer>
-    </Layers>
     <Frames>
       <Cooldown parentKey="CD" inherits="CooldownFrameTemplate" hidden="true">
         <Anchors><Anchor point="CENTER"/></Anchors>
@@ -91,6 +83,12 @@
               <TexCoords left="0.00781250" right="0.50781250" top="0.27734375" bottom="0.52734375"/>
               <Anchors><Anchor point="CENTER"/></Anchors>
             </Texture>
+            <!-- Inside Art, and last in the layer: a child frame draws over
+                 its parent's regions, so a countdown living on the frame
+                 itself sat underneath the icon on the reminder strip. -->
+            <FontString parentKey="TimerText" inherits="NumberFontNormal" hidden="true">
+              <Anchors><Anchor point="CENTER"/></Anchors>
+            </FontString>
           </Layer>
         </Layers>
         <Animations>

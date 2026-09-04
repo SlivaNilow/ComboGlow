@@ -350,6 +350,11 @@ end
 -- The aura timer widgets live on the host frame itself (never inside Art), so
 -- the power gate's clipping does not touch them.
 function ns.SetupTimer(self, w, h)
+    -- The countdown lives inside Art (see Glow.xml); everything else refers to
+    -- it as frame.TimerText, so it is aliased once here.
+    if self.Art and self.Art.TimerText then
+        self.TimerText = self.Art.TimerText
+    end
     if self.CD then
         -- Pinned to the icon rect explicitly. The overlay is deliberately
         -- larger than the button (the proc art needs the room), and a sweep
@@ -370,7 +375,7 @@ function ns.SetupTimer(self, w, h)
     end
     if self.TimerText then
         self.TimerText:ClearAllPoints()
-        self.TimerText:SetPoint("CENTER", self, "CENTER", 0, -h * 0.34)
+        self.TimerText:SetPoint("CENTER", self.Art or self, "CENTER", 0, -h * 0.34)
         local font = self.TimerText:GetFont()
         if font then
             -- Always outlined: it sits on top of a spell icon, which can be
@@ -476,7 +481,7 @@ function ComboGlowCenterIconMixin:Setup(size, iconID)
             self.TimerText:SetFont(font, math.max(12, math.floor(size * 0.46)), "OUTLINE")
         end
         self.TimerText:ClearAllPoints()
-        self.TimerText:SetPoint("CENTER", self, "CENTER", 0, -size * 0.30)
+        self.TimerText:SetPoint("CENTER", self.Art or self, "CENTER", 0, -size * 0.30)
     end
 end
 
