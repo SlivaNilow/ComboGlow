@@ -662,10 +662,14 @@ function ns.ApplyAuraRule(frame, rule)
 
     local glow
     if rule.missing then
-        -- "Unknown" counts as present so restricted content cannot spam a
-        -- permanent false alarm, and a cast we just made silences it without
-        -- waiting for confirmation.
-        glow = (found == false) and not optActive
+        -- Only claim "it is missing" on positive evidence. The API mostly
+        -- answers "nothing here" rather than erroring when it simply will not
+        -- tell us, so `found == false` alone is not proof of absence -- and
+        -- for a dot, which can never be read, it was permanently true, leaving
+        -- the red mark burning on top of the green one for the whole fight.
+        -- Reads must have worked for this rule at least once; otherwise the
+        -- mirror above owns this state, or nothing does.
+        glow = (found == false) and not optActive and readsWork[rule] == true
         if glow and rule.unit ~= "player"
            and not UnitCanAttack("player", rule.unit or "target") then
             glow = false   -- do not nag about something you cannot hit

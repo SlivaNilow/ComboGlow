@@ -75,7 +75,7 @@ ns.AutoPowerType = AutoPowerType
 --[[-------------------------------------------------------------------------
     Saved variables
 ---------------------------------------------------------------------------]]
-local DB_VERSION = 8
+local DB_VERSION = 9
 
 local DEFAULTS = {
     version    = DB_VERSION,
@@ -91,7 +91,7 @@ local DEFAULTS = {
         size    = 44,
         spacing = 8,
         point   = "auto",  -- sit above the class resource bar
-        gap     = 10,
+        gap     = 16,
         x       = 0,
         y       = -170,
         locked  = true,
@@ -572,7 +572,10 @@ function CG:Rebuild()
                 local ic = self.centerPool:Acquire()
                 ic:SetParent(a)
                 ic:Setup(size, ns.SpellIcon(rule.spell))
-                ic:SetStyle(rule.style, rule.r, rule.g, rule.b, rule.alpha, rule.thick)
+                -- Always the plain frame here, whatever the button uses. On a
+                -- reminder the icon appearing IS the message, and a 30% wash
+                -- or a thin dashed line reads as nothing at this size.
+                ic:SetStyle("solid", rule.r, rule.g, rule.b, 1, 3)
                 ic:ClearAllPoints()
                 local x = (i - 1) * (size + spacing) - totalW / 2 + size / 2
                 ic:SetPoint("CENTER", a, "CENTER", x, 0)
@@ -837,6 +840,16 @@ function CG:Initialize()
     -- colour wash while it is gone. Only rewrites what the old default
     -- produced (the plain frame in that state's own colour), so a marker
     -- picked by hand survives.
+    -- v9: the strip's meaning changed from "mirror this to the middle of the
+    -- screen" to "remind me this is missing", so flags set under the old
+    -- meaning would populate it with things that are not reminders.
+    if hadDB and fromVersion < 9 then
+        for _, rules in pairs(self.db.specs) do
+            for _, r in ipairs(rules) do r.center = nil end
+        end
+        self.db.center.gap = 16
+    end
+
     -- v8: the strip used to sit in the middle of the screen, which is where
     -- the character model is. Moved above the class resource bar, where the
     -- eye already is. Only the untouched default is relocated.
