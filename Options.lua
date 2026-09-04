@@ -234,15 +234,26 @@ local function RefreshDetails()
         UI.auraList:Hide()
     else
         UI.auraRow:Show()
-        local named = rule.auraID and ns.SpellName(rule.auraID) or rule.auraName
         if rule.proc then
+            local named = ns.ProcAuraText(rule)
             local watching = named or L("the game's own proc alert",
                                         "штатная подсветка прока")
             UI.auraRow.label:SetText(L("free while: ", "бесплатен, пока: ")
                 .. "|cffffd100" .. watching .. "|r")
-            UI.auraRow.hint:SetText(named and ""
-                or L("click to pick the buff", "нажми, чтобы выбрать бафф"))
+            local warn
+            if not named then
+                warn = L("click to pick the buffs", "нажми, чтобы выбрать баффы")
+            elseif not ns.ProcAurasFit(rule) then
+                -- Pointed only at buffs that say nothing about this spell.
+                -- Almost always a near-identical name picked out of the list.
+                warn = "|cffff6060" .. L("does not name this spell",
+                                         "не называет это заклинание") .. "|r"
+            else
+                warn = ""
+            end
+            UI.auraRow.hint:SetText(warn)
         else
+            local named = rule.auraID and ns.SpellName(rule.auraID) or rule.auraName
             local watching = named or L("its own aura", "своя аура")
             UI.auraRow.label:SetText(L("watching: ", "следит за: ")
                 .. "|cffffd100" .. watching .. "|r")
@@ -465,6 +476,7 @@ local function Build()
     UI.auraList:SetFrameStrata("FULLSCREEN_DIALOG")
     UI.auraList:Hide()
     UI.auraList.entries = {}
+    local PopulateAuraList   -- assigned below; the entries call back into it
     for i = 1, 16 do
         local e = CreateFrame("Button", nil, UI.auraList)
         e:SetSize(370, 18)
@@ -478,27 +490,57 @@ local function Build()
         e.label:SetPoint("LEFT", 4, 0)
         e:SetScript("OnClick", function(self)
             local rule = CurrentRule()
-            if rule then
-                rule.auraID = self.spellID
-                rule.auraName = nil
-                -- A proc pointed at a buff has a real duration to show; the
-                -- spell-alert fallback has none, so the timer goes with it.
-                if rule.proc then rule.timer = self.spellID and true or false end
-                CG:Rebuild()
+            if not rule then
+                UI.auraList:Hide()
+                Refresh()
+                return
             end
+
+            -- A proc can have several buffs behind it, so this list toggles
+            -- rather than picks: one buff frees one spell, another frees two,
+            -- and a state has to be able to watch all of them. It stays open.
+            if rule.proc then
+                if not self.spellID then
+                    rule.auraIDs, rule.timer = nil, false
+                else
+                    local ids = rule.auraIDs
+                    if type(ids) ~= "table" then ids = {} end
+                    local at
+                    for k, id in ipairs(ids) do
+                        if id == self.spellID then at = k break end
+                    end
+                    if at then table.remove(ids, at) else ids[#ids + 1] = self.spellID end
+                    table.sort(ids)
+                    rule.auraIDs = (#ids > 0) and ids or nil
+                    -- A proc pointed at a buff has a real duration to show;
+                    -- the spell-alert fallback has none, so the timer follows.
+                    rule.timer = rule.auraIDs ~= nil
+                end
+                CG:Rebuild()
+                Refresh()
+                PopulateAuraList()
+                return
+            end
+
+            rule.auraID = self.spellID
+            rule.auraName = nil
+            CG:Rebuild()
             UI.auraList:Hide()
             Refresh()
         end)
         UI.auraList.entries[i] = e
     end
 
-    UI.auraRow:SetScript("OnClick", function()
-        if UI.auraList:IsShown() then UI.auraList:Hide() return end
-        if not selSpell then return end
+    PopulateAuraList = function()
+        if not selSpell then UI.auraList:Hide() return end
 
         local rule = CurrentRule()
         local list
         if rule and rule.proc then
+            local chosen = {}
+            if type(rule.auraIDs) == "table" then
+                for _, id in ipairs(rule.auraIDs) do chosen[id] = true end
+            end
             -- Candidates are the player buffs the Cooldown Manager tracks:
             -- Blizzard's own list of what matters for the spec, so there is
             -- nothing hardcoded and it follows talent and patch changes.
@@ -517,11 +559,26 @@ local function Build()
                     end
                     if not harmful then
                         names[nm] = true
-                        rest[#rest + 1] = { id = id, name = nm }
+                        -- Marked and sorted first when the buff's description
+                        -- names THIS spell. Two buffs a word apart can make
+                        -- two different spells free, and picking by name alone
+                        -- is a coin flip.
+                        local mine = ns.AuraMentions(id, selSpell)
+                        local box = chosen[id] and "|cff0cd29f[x]|r "
+                                                or "|cff606060[ ]|r "
+                        local body = mine and (nm .. "  |cff0cd29f" ..
+                                     L("<- this spell", "<- это заклинание") .. "|r")
+                                  or ("|cff909090" .. nm .. "|r")
+                        rest[#rest + 1] = {
+                            id = id, mine = mine, sort = nm, name = box .. body,
+                        }
                     end
                 end
             end
-            table.sort(rest, function(a, b) return a.name < b.name end)
+            table.sort(rest, function(a, b)
+                if a.mine ~= b.mine then return a.mine and true or false end
+                return a.sort < b.sort
+            end)
             for _, item in ipairs(rest) do list[#list + 1] = item end
         else
             local seen
@@ -547,6 +604,11 @@ local function Build()
         end
         UI.auraList:SetHeight(math.min(#list, 16) * 18 + 6)
         UI.auraList:Show()
+    end
+
+    UI.auraRow:SetScript("OnClick", function()
+        if UI.auraList:IsShown() then UI.auraList:Hide() return end
+        PopulateAuraList()
     end)
 
     -- Resource threshold ----------------------------------------------------

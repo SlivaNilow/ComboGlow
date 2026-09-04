@@ -55,6 +55,40 @@ local function FilterFor(rule)
     return "HARMFUL|PLAYER"
 end
 
+-- The auras a rule may be satisfied by, in order. Usually one. A proc can have
+-- several buffs behind it -- Touch the Cosmos frees whichever of Starsurge and
+-- Starfall you press, while each also has a buff of its own -- so the first one
+-- that is up wins. Reused between calls; QueryAura is never re-entrant.
+local idBuf = {}
+local function AuraCandidates(rule)
+    wipe(idBuf)
+    local seen
+    if type(rule.auraIDs) == "table" then
+        for _, id in ipairs(rule.auraIDs) do
+            if type(id) == "number" then
+                seen = seen or {}
+                if not seen[id] then
+                    seen[id] = true
+                    idBuf[#idBuf + 1] = id
+                end
+            end
+        end
+    end
+    if rule.auraID and not (seen and seen[rule.auraID]) then
+        idBuf[#idBuf + 1] = rule.auraID
+    end
+    if #idBuf == 0 and rule.spell then idBuf[#idBuf + 1] = rule.spell end
+    return idBuf
+end
+
+-- True when the rule names its aura(s) explicitly, rather than falling back to
+-- the spell's own. The name-based lookup below only makes sense in the latter.
+local function HasExplicitAura(rule)
+    return rule.auraID ~= nil
+        or (type(rule.auraIDs) == "table" and #rule.auraIDs > 0)
+end
+ns.HasExplicitAura = HasExplicitAura
+
 -- Returns: found (true / false / nil = could not tell), remaining, total, durObj
 function ns.QueryAura(rule)
     local unit = rule.unit or "target"
@@ -62,24 +96,25 @@ function ns.QueryAura(rule)
     if not UA then return nil end
 
     local aura, ok
-    local id = rule.auraID or rule.spell
+    local ids = AuraCandidates(rule)
 
-    -- Your own buff on yourself is the one case Blizzard kept readable for a
-    -- set of whitelisted spells, and it has its own entry point.
-    if unit == "player" and UA.GetPlayerAuraBySpellID and id then
-        local okP, res = pcall(UA.GetPlayerAuraBySpellID, id)
-        if okP and type(res) == "table" then aura, ok = res, true end
-    end
-
-    -- By id: survives a debuff whose NAME differs from the spell casting it.
-    if not aura and UA.GetUnitAuraBySpellID and id then
-        ok, aura = pcall(UA.GetUnitAuraBySpellID, unit, id)
-        if not ok then aura = nil end
-        if type(aura) ~= "table" then aura = nil end
+    for _, id in ipairs(ids) do
+        -- Your own buff on yourself is the one case Blizzard kept readable for
+        -- a set of whitelisted spells, and it has its own entry point.
+        if unit == "player" and UA.GetPlayerAuraBySpellID then
+            local okP, res = pcall(UA.GetPlayerAuraBySpellID, id)
+            if okP and type(res) == "table" then aura = res end
+        end
+        -- By id: survives a debuff whose NAME differs from the spell casting it.
+        if not aura and UA.GetUnitAuraBySpellID then
+            local ok2, res = pcall(UA.GetUnitAuraBySpellID, unit, id)
+            if ok2 and type(res) == "table" then aura = res end
+        end
+        if aura then break end
     end
 
     -- By name with the PLAYER filter: catches cast id ~= aura id, same name.
-    if not aura and not rule.auraID and UA.GetAuraDataBySpellName then
+    if not aura and not HasExplicitAura(rule) and UA.GetAuraDataBySpellName then
         local name = rule.auraName
         if not name then
             local info = ns.SpellInfo(rule.spell)
@@ -271,7 +306,11 @@ function ns.ReadsWork(rule) return readsWork[rule] and true or false end
     Manager, which the direct path does not.
 ---------------------------------------------------------------------------]]
 function ns.FindMirror(rule)
-    local id = rule.auraID or rule.spell
+    -- With several auras behind one rule the mirror can only follow one of
+    -- them; the first is the one the scan picked.
+    local id = rule.auraID
+    if not id and type(rule.auraIDs) == "table" then id = rule.auraIDs[1] end
+    id = id or rule.spell
     -- Buff viewers first: only there does IsActive() mean "the aura is up".
     local aura = ns.cdmAuraFrames
     if aura then
@@ -606,7 +645,7 @@ end
 function ns.ApplyAuraRule(frame, rule)
     -- A proc pointed at a buff is just an aura rule: "this buff is on me".
     -- Only an unpointed one falls back to the game's own spell alert.
-    if rule.proc and not rule.auraID then
+    if rule.proc and not HasExplicitAura(rule) then
         ClearTimer(frame)
         frame.pandemicOn = nil
         ns.ResetMirror(frame)

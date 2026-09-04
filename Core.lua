@@ -118,7 +118,7 @@ ns.AutoPowerType = AutoPowerType
 --[[-------------------------------------------------------------------------
     Saved variables
 ---------------------------------------------------------------------------]]
-local DB_VERSION = 9
+local DB_VERSION = 10
 
 local DEFAULTS = {
     version    = DB_VERSION,
@@ -502,6 +502,9 @@ local function RuleFingerprint(rule)
         tostring(rule.min), tostring(rule.max), tostring(rule.atMax),
         tostring(rule.orProc), tostring(rule.swipe), tostring(rule.auraID),
         tostring(rule.combat), tostring(rule.style2),
+        -- Sorted at the source, so the same set of buffs always reads the same
+        -- and picking one in the options window does force a rebuild.
+        type(rule.auraIDs) == "table" and table.concat(rule.auraIDs, "+") or "",
     }, ",")
 end
 
@@ -1096,6 +1099,19 @@ function CG:Initialize()
                 if r.style == "swipe" or r.style == "ring" then
                     r.style = "solid"
                     r.swipe = nil
+                end
+            end
+        end
+    end
+    -- v10: a proc state watched exactly one buff. It can have several -- one
+    -- buff frees one spell, another frees two -- so the single id becomes a
+    -- list. auraID keeps its old meaning for every other kind of rule.
+    if hadDB and fromVersion < 10 then
+        for _, rules in pairs(self.db.specs) do
+            for _, r in ipairs(rules) do
+                if r.kind == "aura" and r.proc and r.auraID then
+                    r.auraIDs = { r.auraID }
+                    r.auraID = nil
                 end
             end
         end

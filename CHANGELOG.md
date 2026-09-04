@@ -19,13 +19,24 @@ never shows two marks saying "press me".
 **Procs are found from the buff, not the alert API.** Only some procs light
 Blizzard's spell alert; plenty are a plain buff and light nothing — Starweaver's
 Warp says "your next Starfall costs no Astral Power" and never touches the
-overlay API, so the proc state stayed dark. Which buff belongs to which spell is
-not something to hardcode: it differs per class and moves with patches. The game
-already says it, in the buff's own description, so the tracked player buffs are
-searched for one that names the spell. One match is taken and announced in chat;
-anything ambiguous is left for you to point by hand through the **free while:**
-row, which lists every buff the Cooldown Manager tracks. A proc pointed at a
-buff also gets a real countdown on the icon.
+overlay API, so the proc state stayed dark.
+
+Which buff belongs to which spell is not something to hardcode: it differs per
+class, per talent build, and moves with patches. The game already says it, in
+the buff's own description, and Blizzard regenerates that description every
+patch — so the buffs the Cooldown Manager tracks are searched for ones that name
+the spell. **All** matches count, not one: Starweaver's Warp frees the next
+Starfall, Starweaver's Haze frees the next Starsurge, and Touch the Cosmos frees
+whichever of the two you press, so one spell can have several buffs behind it
+and each state watches the lot.
+
+Rescanning tops existing states up rather than only filling empty ones, so a
+talent that adds a proc is picked up, and a buff that no longer exists is
+dropped instead of leaving the state quietly dark. The **free while:** row lists
+every tracked player buff with checkboxes, marks the ones whose description
+names the selected spell, and warns when none of the chosen ones do — two buffs
+a word apart can free two different spells. A proc pointed at a buff also gets a
+real countdown on the icon.
 
 Run `/cg preset` again to pick up proc states for your spenders, or click the
 fourth pip on any spell in the options window.
