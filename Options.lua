@@ -202,10 +202,11 @@ local function RefreshDetails()
         UI.auraList:Hide()
     else
         UI.auraRow:Show()
-        local watching = rule.auraID and ns.SpellName(rule.auraID)
-            or rule.auraName
-            or L("its own aura", "своя аура")
+        local named = rule.auraID and ns.SpellName(rule.auraID) or rule.auraName
+        local watching = named or L("its own aura", "своя аура")
         UI.auraRow.label:SetText(L("watching: ", "следит за: ") .. "|cffffd100" .. watching .. "|r")
+        UI.auraRow.hint:SetText(named and ""
+            or L("click to pick another spell's aura", "нажми, чтобы выбрать чужую ауру"))
     end
 
     -- Slot strip: bright = editing, lit = configured, dim = empty.
@@ -378,15 +379,37 @@ local function Build()
     -- everything, and every class has a pair like it. The button then has no
     -- aura of its own, so the state has to be pointed at the other spell's.
     UI.auraRow = CreateFrame("Button", nil, UI)
-    UI.auraRow:SetSize(378, 18)
+    UI.auraRow:SetSize(378, 20)
     UI.auraRow:SetPoint("TOPLEFT", 264, -104)
     local arBg = UI.auraRow:CreateTexture(nil, "BACKGROUND")
     arBg:SetAllPoints(UI.auraRow)
-    arBg:SetColorTexture(1, 1, 1, 0.05)
+    arBg:SetColorTexture(1, 1, 1, 0.10)
+
+    -- It reads as a caption unless it is framed and carries an arrow, and a
+    -- control nobody recognises as a control may as well not exist.
+    for _, p in ipairs({ { "TOPLEFT", "TOPRIGHT", 0, 0, nil, 1 },
+                         { "BOTTOMLEFT", "BOTTOMRIGHT", 0, 0, nil, 1 },
+                         { "TOPLEFT", "BOTTOMLEFT", 0, 0, 1, nil },
+                         { "TOPRIGHT", "BOTTOMRIGHT", 0, 0, 1, nil } }) do
+        local edge = UI.auraRow:CreateTexture(nil, "BORDER")
+        edge:SetColorTexture(1, 1, 1, 0.18)
+        edge:SetPoint(p[1])
+        edge:SetPoint(p[2])
+        if p[5] then edge:SetWidth(p[5]) end
+        if p[6] then edge:SetHeight(p[6]) end
+    end
+
     UI.auraRow.label = Label(UI.auraRow, "", 11, 0.75, 0.75, 0.75)
-    UI.auraRow.label:SetPoint("LEFT", 4, 0)
-    UI.auraRow:SetScript("OnEnter", function() arBg:SetColorTexture(0.05, 0.82, 0.62, 0.25) end)
-    UI.auraRow:SetScript("OnLeave", function() arBg:SetColorTexture(1, 1, 1, 0.05) end)
+    UI.auraRow.label:SetPoint("LEFT", 6, 0)
+
+    UI.auraRow.arrow = Label(UI.auraRow, "▼", 10, 0.6, 0.6, 0.6)
+    UI.auraRow.arrow:SetPoint("RIGHT", -6, 0)
+
+    UI.auraRow.hint = Label(UI.auraRow, "", 10, 0.5, 0.5, 0.5)
+    UI.auraRow.hint:SetPoint("RIGHT", UI.auraRow.arrow, "LEFT", -6, 0)
+
+    UI.auraRow:SetScript("OnEnter", function() arBg:SetColorTexture(0.05, 0.82, 0.62, 0.30) end)
+    UI.auraRow:SetScript("OnLeave", function() arBg:SetColorTexture(1, 1, 1, 0.10) end)
 
     UI.auraList = Panel(UI, 0.08, 0.08, 0.09, 0.98)
     UI.auraList:SetSize(378, 10)
@@ -520,16 +543,17 @@ local function Build()
         { key = "orProc", auraOnly = false, label = L("also on proc", "также по проку"),
           get = function(r) return r.kind ~= "aura" and r.orProc ~= false end,
           set = function(r) if r.kind ~= "aura" then r.orProc = not (r.orProc ~= false) end end },
-        { key = "center", auraOnly = false, label = L("centre icon", "иконка в центре"),
+        { key = "center", auraOnly = false,
+          label = L("copy to screen centre", "дублировать в центр экрана"),
           get = function(r) return r.center end,
           set = function(r) r.center = not r.center end },
     }
 
     for i, def in ipairs(defs) do
         local t = CreateFrame("Button", nil, UI)
-        t:SetSize(126, 18)
-        t:SetPoint("TOPLEFT", 264 + ((i - 1) % 3) * 132,
-                   -130 - 2 * TILE_PAD_Y - 10 - math.floor((i - 1) / 3) * 22)
+        t:SetSize(170, 18)
+        t:SetPoint("TOPLEFT", 264 + ((i - 1) % 2) * 190,
+                   -130 - 2 * TILE_PAD_Y - 10 - math.floor((i - 1) / 2) * 22)
         t.auraOnly = def.auraOnly
         t.get = def.get
 
