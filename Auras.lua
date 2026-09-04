@@ -584,7 +584,23 @@ ns.IsProcced = IsProcced
 
 -- Which spells currently have their "proc" state lit. Written by the aura
 -- pass, read by the power pass so a free cast can outrank a full bar.
+--
+-- Only PLAIN evidence is ever recorded here. The mirror resolves visibility
+-- engine-side and ApplyAuraRule returns true for it whether the aura is up or
+-- not; taking that as "the proc is on" would silence the resource marker for
+-- the rest of the session. Unknown means "do not suppress" -- both markers is
+-- a worse display than one, but a marker that never comes back is a bug.
 ns.procActive = {}
+ns.procDirty = false
+
+local function SetProcActive(spellID, on)
+    if not spellID then return end
+    local v = (on and true) or nil
+    if ns.procActive[spellID] ~= v then
+        ns.procActive[spellID] = v
+        ns.procDirty = true
+    end
+end
 
 -- Applies one aura rule to one overlay/icon. Returns true if it is showing.
 function ns.ApplyAuraRule(frame, rule)
@@ -594,7 +610,9 @@ function ns.ApplyAuraRule(frame, rule)
         ClearTimer(frame)
         frame.pandemicOn = nil
         ns.ResetMirror(frame)
-        if IsProcced(rule.auraID or rule.spell) then
+        local procced = IsProcced(rule.spell)
+        SetProcActive(rule.spell, procced)
+        if procced then
             if not frame:IsShown() then frame:Show() end
             frame.needSafeStyle = false
             frame:StartArt()
@@ -648,6 +666,8 @@ function ns.ApplyAuraRule(frame, rule)
     if found ~= true and ns.mirrorEnabled then
         local itemFrame, isAuraEntry = ns.FindMirror(rule)
         if itemFrame and isAuraEntry and ApplyMirror(frame, rule, itemFrame) then
+            -- The engine owns this one now; we cannot say whether it is on.
+            if rule.proc then SetProcActive(rule.spell, nil) end
             return true
         end
     end
@@ -657,6 +677,7 @@ function ns.ApplyAuraRule(frame, rule)
     end
 
     local present = (found == true) or optActive
+    if rule.proc then SetProcActive(rule.spell, found == true) end
 
     -- The timer is independent of the glow. While the aura is up you want to
     -- see the time left even in "glow when missing" mode -- there the icon

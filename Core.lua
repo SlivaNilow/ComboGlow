@@ -538,8 +538,11 @@ function CG:Rebuild()
                 table.insert(wanted[id], rule)
                 any = true
                 -- Aura rules also react to the cast itself, so the display
-                -- does not have to wait for the aura event.
-                if rule.kind == "aura" then
+                -- does not have to wait for the aura event. Not proc rules:
+                -- casting the spell SPENDS the proc, so the optimistic guess
+                -- would light the free-cast marker the instant it stopped
+                -- being true.
+                if rule.kind == "aura" and not rule.proc then
                     castMap[id] = castMap[id] or {}
                     table.insert(castMap[id], rule)
                 end
@@ -884,23 +887,19 @@ function CG:UpdateAuras()
         return
     end
     -- A proc outranks the resource: a free cast is the better news, so while
-    -- the proc marker is lit the "ready" one stands down. The power pass reads
-    -- these flags, and a flip re-runs it -- an aura event does not reach the
-    -- power frames on its own, so without this the resource marker would stay
-    -- lit until the next power tick.
-    local procChanged = false
+    -- the proc marker is lit the "ready" one stands down. ApplyAuraRule keeps
+    -- ns.procActive, which the power pass reads -- and a flip re-runs that
+    -- pass, because an aura event does not reach the power frames on its own
+    -- and the resource marker would otherwise stay lit until the next power
+    -- tick.
+    ns.procDirty = false
     for _, frame in ipairs(self.auraFrames) do
-        local rule = frame.rule
-        local on = ns.ApplyAuraRule(frame, rule)
-        if rule and rule.proc and rule.spell then
-            local now = (on and true) or nil
-            if ns.procActive[rule.spell] ~= now then
-                ns.procActive[rule.spell] = now
-                procChanged = true
-            end
-        end
+        ns.ApplyAuraRule(frame, frame.rule)
     end
-    if procChanged then self:UpdatePower() end
+    if ns.procDirty then
+        ns.procDirty = false
+        self:UpdatePower()
+    end
 end
 
 function CG:QueueAuraUpdate()

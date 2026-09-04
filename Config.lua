@@ -545,15 +545,17 @@ local function BuildPreset(quiet, intro)
 
     -- Tracked per STATE, not per spell: re-scanning should top up a state
     -- that is missing rather than skip a spell that already has one.
-    local havePower, haveUp, haveGone, haveBurst = {}, {}, {}, {}
+    local havePower, haveUp, haveGone, haveBurst, haveProc = {}, {}, {}, {}, {}
     for _, r in ipairs(rules) do
         if r.kind == "cd" then
             haveBurst[r.spell] = true
         elseif r.kind ~= "aura" then
             havePower[r.spell] = true
+        elseif r.proc then
+            haveProc[r.spell] = true
         elseif r.missing then
             haveGone[r.spell] = true
-        elseif not r.proc then
+        else
             haveUp[r.spell] = true
         end
     end
@@ -561,7 +563,7 @@ local function BuildPreset(quiet, intro)
     local canCost = C_Spell and C_Spell.GetSpellPowerCost
 
     -- Collect first, so nothing is printed for an empty scan.
-    local seen, spenders, auras, bursts = {}, {}, {}, {}
+    local seen, spenders, procs, auras, bursts = {}, {}, {}, {}, {}
     ns.ForEachActionButton(function(_, spellID)
         if not spellID or seen[spellID] then return end
         seen[spellID] = true
@@ -569,13 +571,22 @@ local function BuildPreset(quiet, intro)
         -- holds the spell that applies it.
         local lname = (ns.SpellName(spellID) or ""):lower()
 
-        -- Spends the class resource -> a count rule.
-        if pt and canCost and not havePower[spellID] then
+        -- Spends the class resource -> a count rule, and a proc state for the
+        -- times it costs nothing. The two are collected separately: a spell
+        -- that already has its count rule from an earlier scan still needs its
+        -- proc state, and gating both on havePower would skip it forever.
+        if pt and canCost and not (havePower[spellID] and haveProc[spellID]) then
             local ok, costs = pcall(canCost, spellID)
             if ok and type(costs) == "table" then
                 for _, c in ipairs(costs) do
                     if c.type == pt then
-                        spenders[#spenders + 1] = { spell = spellID, cost = tonumber(c.cost) or 0 }
+                        if not havePower[spellID] then
+                            spenders[#spenders + 1] =
+                                { spell = spellID, cost = tonumber(c.cost) or 0 }
+                        end
+                        if not haveProc[spellID] then
+                            procs[#procs + 1] = spellID
+                        end
                         break
                     end
                 end
@@ -621,7 +632,7 @@ local function BuildPreset(quiet, intro)
         end
     end)
 
-    local total = #spenders + #auras + #bursts
+    local total = #spenders + #procs + #auras + #bursts
     if total == 0 then
         if not quiet then
             Say(L("nothing to set up from your bars - use /cg add or /cg dot",
@@ -645,16 +656,19 @@ local function BuildPreset(quiet, intro)
         }
         rules[#rules + 1] = rule
         Say(L("+ %s at %s", "+ %s при %s"), ns.SpellName(entry.spell), RangeText(rule))
+    end
 
-        -- The same spell, free: a spender that procs costs nothing this once,
-        -- and that is a different decision from having saved up for it. Its
-        -- own rule, its own marker. A spender that never procs simply keeps a
-        -- state that never lights.
+    -- The same spells, free. A spender that procs costs nothing this once, and
+    -- that is a different decision from having saved up for it: its own rule,
+    -- its own marker. Its own pass too, so a spell whose count rule already
+    -- exists from an earlier scan still gets this state. A spender that never
+    -- procs simply keeps a state that never lights.
+    for _, spellID in ipairs(procs) do
         local p = STATE_DEFAULTS.proc
-        local buff = ns.GuessProcAura(entry.spell)
+        local buff = ns.GuessProcAura(spellID)
         rules[#rules + 1] = {
             kind    = "aura",
-            spell   = entry.spell,
+            spell   = spellID,
             proc    = true,
             auraID  = buff,
             unit    = "player",
@@ -669,8 +683,11 @@ local function BuildPreset(quiet, intro)
             enabled = true,
         }
         if buff then
-            Say(L("  free while %s is up", "  бесплатен, пока висит «%s»"),
-                ns.SpellName(buff))
+            Say(L("+ %s is free while %s is up",
+                  "+ «%s» бесплатен, пока висит «%s»"),
+                ns.SpellName(spellID), ns.SpellName(buff))
+        else
+            Say(L("+ %s on proc", "+ «%s» по проку"), ns.SpellName(spellID))
         end
     end
 
@@ -714,9 +731,7 @@ local function BuildPreset(quiet, intro)
     end
 
     CG:Rebuild()
-    -- Each spender got two rules, resource and proc, so the count is not the
-    -- number of spells scanned.
-    local added = #spenders * 2 + #auras + #bursts
+    local added = #spenders + #procs + #auras + #bursts
     Say(L("%d rules added. /cg list to review, /cg del <#> to drop one.",
           "добавлено правил: %d. /cg list — посмотреть, /cg del <№> — удалить."), added)
     return added
@@ -748,6 +763,7 @@ local function PrintHelp()
         { "/cg poll <ms>",             L("how often aura state is re-read (0 = events only)", "как часто перечитывать ауры (0 = только по событиям)") },
         { "/cg mirror on|off",         L("fallback: take aura state from the Cooldown Manager", "запасной путь: брать состояние ауры у Cooldown Manager") },
         { "/cg auracheck",             L("report what the aura API answers here, with measured lag", "показать ответ aura API и замеренную задержку") },
+        { "/cg procs",                 L("what each proc state watches, and whether it is lit", "за чем следит каждое прок-состояние и горит ли оно") },
         { "/cg del <#>",               L("remove rule", "удалить правило") },
         { "/cg toggle <#>",            L("enable / disable rule", "включить / выключить правило") },
         { "/cg style <#> <name>",      L("glow style (see /cg styles)", "стиль подсветки (список: /cg styles)") },
@@ -1028,6 +1044,43 @@ local function Handler(msg)
 
     elseif cmd == "auracheck" then
         ns.AuraCheck(CG:GetRules(), Say)
+
+    elseif cmd == "procs" then
+        -- What each proc state is actually watching, and whether it reads.
+        -- "spell alert" means no buff was matched, so it depends on
+        -- IsSpellOverlayed -- which plenty of procs never touch.
+        ns.RebuildCDMMap()
+        local n = 0
+        for i, r in ipairs(CG:GetRules()) do
+            if r.kind == "aura" and r.proc then
+                n = n + 1
+                local src
+                if r.auraID then
+                    src = ("%s (%d)"):format(ns.SpellName(r.auraID), r.auraID)
+                else
+                    src = L("spell alert", "штатная подсветка")
+                end
+                local lit = ns.procActive[r.spell] and L("YES", "ДА")
+                                                   or L("no / unknown", "нет / неизвестно")
+                Say("#%d %s -> %s | %s: %s", i, ns.SpellName(r.spell), src,
+                    L("lit now", "горит сейчас"), lit)
+                if not r.auraID then
+                    local guess = ns.GuessProcAura(r.spell)
+                    if guess then
+                        Say(L("   could watch %s (%d) - pick it in /cg",
+                              "   можно следить за «%s» (%d) — выбери в /cg"),
+                            ns.SpellName(guess), guess)
+                    else
+                        Say(L("   no tracked buff names this spell",
+                              "   ни один отслеживаемый бафф не называет это заклинание"))
+                    end
+                end
+            end
+        end
+        if n == 0 then
+            Say(L("no proc states configured - /cg preset adds them",
+                  "прок-состояний нет — /cg preset их создаст"))
+        end
 
     elseif cmd == "cdtest" then
         -- Decides in one look whether the sweep problem is the widget or the
