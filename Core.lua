@@ -625,9 +625,17 @@ function CG:Rebuild()
 
     local centerRules = {}
     if self.db.center.enabled then
-        -- One slot per spell, not per rule. Named apart from the outer
-        -- "watched" (action slots) it would otherwise shadow.
-        local onStrip = {}
+        -- One slot per STATE, not per spell. It used to be one per spell, to
+        -- avoid the same icon appearing twice -- but the second state was
+        -- dropped silently, and whichever rule happened to come first won.
+        -- Starsurge's resource state took the slot and its proc, ticked and
+        -- reported as on, never appeared; Starfall's proc did, purely because
+        -- nothing else of its spell had asked.
+        --
+        -- Two slots for one spell is not the problem it looked like: they are
+        -- different colours, they are mutually exclusive in practice (a proc
+        -- stands the resource marker down), and a reserved dark slot is what
+        -- every state on this strip already is until it lights.
         for _, rule in ipairs(rules) do
             -- Auto-added: "gone" states that watch their OWN aura, bursts
             -- whose cooldown is up, and procs.
@@ -641,10 +649,7 @@ function CG:Rebuild()
             -- A burst coming up and a free cast appearing are the same kind of
             -- nudge as a dot falling off: something changed that you did not
             -- press a button to cause, and the strip is where those go.
-            local autoWanted = not onStrip[rule.spell] and ns.AutoStrip(rule)
-            if not rule.stripOff and (rule.center or autoWanted)
-               and rule.enabled ~= false then
-                onStrip[rule.spell] = true
+            if ns.OnStrip(rule) and rule.enabled ~= false then
                 centerRules[#centerRules + 1] = rule
                 sigParts[#sigParts + 1] = "c" .. RuleFingerprint(rule)
             end
