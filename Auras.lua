@@ -609,6 +609,28 @@ local function MirrorDuration(itemFrame, rule)
     return nil, tried and "GetAuraDuration returned nothing" or "no auraDataUnit"
 end
 
+-- Plain seconds left, off the Cooldown Manager's own cooldown widget.
+--
+-- The duration object is the better answer and is asked first everywhere this
+-- is used, because it keeps working when the number is secret. But most target
+-- debuffs do not have one: the instance id belongs to a unit we may not read,
+-- so GetAuraDuration comes back empty and only the widget knows. It was told
+-- the numbers by the game, so where they arrive plain they are exact.
+--
+-- nil means "no idea", never "none left" -- an expired sweep reads the same as
+-- an absent one, and the caller must not treat those alike.
+local function MirrorRemaining(itemFrame)
+    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
+    if not (cd and cd.GetCooldownTimes) then return nil end
+    local ok, startMS, durMS = pcall(cd.GetCooldownTimes, cd)
+    if not ok then return nil end
+    if type(startMS) ~= "number" or type(durMS) ~= "number" then return nil end
+    if IsSecret(startMS) or IsSecret(durMS) or durMS <= 0 then return nil end
+    local left = (startMS + durMS) / 1000 - GetTime()
+    if left <= 0 then return nil end
+    return left
+end
+
 -- The sweep is asked for either by the toggle or by picking a time-shaped
 -- marker, where the duration IS the marker.
 function ns.WantsSweep(rule)
@@ -825,15 +847,31 @@ local function ApplyMirror(frame, rule, itemFrame)
     -- A strip icon that is asking "is it about to fall off" answers that
     -- instead: the curve already means "up AND running out", because a
     -- duration object only exists while the aura is up.
-    -- Counting it gone early, when there is a duration to measure. When there
-    -- is not, the presence gate below still lights it once the aura actually
-    -- goes -- the old behaviour, and a fine thing to fall back to.
+    -- Counting it gone early, when there is a duration to measure. Two
+    -- sources, and neither is a fallback for the other's answer -- only for
+    -- its absence. The curve resolves it engine-side where a duration object
+    -- exists; where one does not, which is the ordinary case for a debuff on
+    -- the target, the widget's plain numbers are compared here. With neither,
+    -- the presence gate below still lights the marker once the aura actually
+    -- goes: the old behaviour, and a fine thing to land on.
+    local soon = ns.SoonSeconds(rule)
     if ns.ApplySoon(frame, rule, durObj) then
         frame._mirroring = true
         if not frame:IsShown() then frame:Show() end
         frame.needSafeStyle = false
         frame:StartArt()
         return true
+    elseif soon then
+        local left = MirrorRemaining(itemFrame)
+        if left and left <= soon then
+            -- Read, not resolved: the strip may pack this one for real.
+            frame._mirroring = nil
+            frame:SetAlpha(1)
+            if not frame:IsShown() then frame:Show() end
+            frame.needSafeStyle = false
+            frame:StartArt()
+            return true
+        end
     end
     local applied = pcall(frame.SetAlphaFromBoolean, frame, flag, shown, hidden)
     frame._mirroring = applied or nil
@@ -1282,8 +1320,10 @@ function ns.AuraCheck(rules, say)
                     tostring(isAuraEntry and usable or false))
                 local dUnit = type(mf.auraDataUnit) ~= "nil"
                 local dIID  = type(mf.auraInstanceID) ~= "nil"
-                say("     aura link: auraDataUnit=%s auraInstanceID=%s | %s",
+                local left = MirrorRemaining(mf)
+                say("     aura link: auraDataUnit=%s auraInstanceID=%s widgetLeft=%s | %s",
                     tostring(dUnit), tostring(dIID),
+                    left and ("%.1fs"):format(left) or "-",
                     ns.DebugWarnColor(nil, rule, mf))
             else
                 blind[#blind + 1] = name
