@@ -1249,16 +1249,28 @@ function CG:PackStrip()
     for _, ic in ipairs(icons) do
         if ic.rule and ic._mirroring then
             local keep = true
-            if trustShown then
-                local mf, isAura = ns.FindMirror(ic.rule)
-                if mf and isAura and mf.IsShown then
-                    local up = mf:IsShown()
-                    -- A "gone" state is lit by absence, so the two read the
-                    -- entry in opposite directions.
-                    keep = ic.rule.missing and (not up) or (not ic.rule.missing and up)
+            -- A state counted gone EARLY breaks the inference below: it is lit
+            -- while the entry still says the aura is up, so reading the entry
+            -- would pack away a slot that is visibly occupied and the next
+            -- icon would be laid on top of it. Whether the curve has fired is
+            -- not knowable from here -- that is the point of the curve -- so
+            -- the slot is simply kept. Wrong in the harmless direction: a gap
+            -- rather than a collision.
+            if ns.SoonSeconds and ns.SoonSeconds(ic.rule) then
+                Take(ic)
+            else
+                if trustShown then
+                    local mf, isAura = ns.FindMirror(ic.rule)
+                    if mf and isAura and mf.IsShown then
+                        local up = mf:IsShown()
+                        -- A "gone" state is lit by absence, so the two read
+                        -- the entry in opposite directions.
+                        keep = ic.rule.missing and (not up)
+                            or (not ic.rule.missing and up)
+                    end
                 end
+                if keep then Take(ic) end
             end
-            if keep then Take(ic) end
         end
     end
     sig = sig .. tostring(trustShown)
