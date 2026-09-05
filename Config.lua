@@ -1226,6 +1226,22 @@ local function Handler(msg)
             if r.missing then return L("gone", "нет") end
             return L("up", "висит")
         end
+        -- Printed FIRST: it is the line that separates "the state never goes
+        -- true" from "the rule was never given a slot", and those need
+        -- completely different fixes.
+        local strip = {}
+        for ic in CG.centerPool:EnumerateActive() do
+            local r = ic.rule
+            if r then
+                strip[#strip + 1] = ("%s (%s)"):format(ns.SpellName(r.spell), StateWord(r))
+            end
+        end
+        if #strip > 0 then
+            Say(L("strip slots: %s", "места на полосе: %s"), table.concat(strip, ", "))
+        else
+            Say(L("strip: no slots at all", "полоса: мест нет вообще"))
+        end
+
         local n = 0
         local function report(frame)
             local r = frame.rule
@@ -1243,22 +1259,6 @@ local function Handler(msg)
         if n == 0 then
             Say(L("nothing of ours is lit - any glow you see is not this addon",
                   "у нас сейчас не горит ничего — то, что видно, рисует не этот аддон"))
-        end
-
-        -- What the strip is HOLDING, lit or not. "It never appears" and "it
-        -- has no slot there at all" look identical from outside and need
-        -- completely different fixes.
-        local strip = {}
-        for ic in CG.centerPool:EnumerateActive() do
-            local r = ic.rule
-            if r then
-                strip[#strip + 1] = ("%s (%s)"):format(ns.SpellName(r.spell), StateWord(r))
-            end
-        end
-        if #strip > 0 then
-            Say(L("strip slots: %s", "места на полосе: %s"), table.concat(strip, ", "))
-        else
-            Say(L("strip: no slots at all", "полоса: мест нет вообще"))
         end
 
     elseif cmd == "procs" then
