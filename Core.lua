@@ -1250,8 +1250,25 @@ function CG:PackStrip()
         live[#live + 1] = ic
         sig = sig .. tostring(ic)
     end
+
+    -- Shown is not the same as visible. A marker can be left standing with its
+    -- alpha at zero, and then it holds a slot in the row while showing
+    -- nothing -- which is a gap with an icon's name on it.
+    --
+    -- Only a PLAIN zero counts. An engine-resolved alpha comes back secret and
+    -- must not be inspected, and the answer there is the same as before: keep
+    -- the slot, because we cannot prove it is dark.
+    local function PlainlyDark(ic)
+        local ok, a = pcall(ic.GetAlpha, ic)
+        if not ok or type(a) ~= "number" then return false end
+        if ns.IsSecret and ns.IsSecret(a) then return false end
+        return a < 0.05
+    end
+
     for _, ic in ipairs(icons) do
-        if ic.rule and not ic._mirroring and ic:IsShown() then Take(ic) end
+        if ic.rule and not ic._mirroring and ic:IsShown() and not PlainlyDark(ic) then
+            Take(ic)
+        end
     end
     for _, ic in ipairs(icons) do
         if ic.rule and ic._mirroring then
@@ -1266,7 +1283,7 @@ function CG:PackStrip()
                         or (not ic.rule.missing and up)
                 end
             end
-            if keep then Take(ic) end
+            if keep and not PlainlyDark(ic) then Take(ic) end
         end
     end
     sig = sig .. tostring(trustShown)
