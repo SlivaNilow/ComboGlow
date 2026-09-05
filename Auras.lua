@@ -232,7 +232,7 @@ local function FindStackFS(itemFrame)
         return cached
     end
     local found
-    for _, key in ipairs({ "Applications", "Count", "ChargeCount" }) do
+    for _, key in ipairs({ "Applications", "Count", "ChargeCount", "Stacks" }) do
         local sub = itemFrame[key]
         if type(sub) == "table" then
             if sub.GetObjectType and sub:GetObjectType() == "FontString" then
@@ -243,6 +243,17 @@ local function FindStackFS(itemFrame)
             end
         end
         if found then break end
+    end
+    -- Nothing under a name we know: take the frame's FIRST font string. The
+    -- countdown lookup takes the second, and on these item frames the count is
+    -- the other one.
+    if not found and itemFrame.GetRegions then
+        for _, rgn in pairs({ itemFrame:GetRegions() }) do
+            if rgn and rgn.GetObjectType and rgn:GetObjectType() == "FontString" then
+                found = rgn
+                break
+            end
+        end
     end
     stackFS[itemFrame] = found or false
     return found
@@ -851,9 +862,20 @@ function ns.ApplyAuraRule(frame, rule)
 
     local present = (found == true) or optActive
     if rule.proc then SetProcActive(rule.spell, found == true) end
-    -- Only a confirmed read carries a count; an optimistic guess after a cast
-    -- knows the aura is probably up but not how many of it there are.
-    if found == true then ShowStacks(frame, rule, apps) else ClearStacks(frame) end
+    -- The count has its own source. A read can hand back the aura and still
+    -- withhold "applications" -- the field is secret often enough -- and the
+    -- Cooldown Manager draws the number regardless, so its text is copied when
+    -- ours came back empty. Presence and count are answered separately.
+    if found ~= true then
+        ClearStacks(frame)
+    elseif type(apps) == "number" then
+        ShowStacks(frame, rule, apps)
+    else
+        local mf, isAuraEntry = ns.FindMirror(rule)
+        if not (mf and isAuraEntry and MirrorStackText(frame, rule, mf)) then
+            ClearStacks(frame)
+        end
+    end
 
     -- The timer is independent of the glow. While the aura is up you want to
     -- see the time left even in "glow when missing" mode -- there the icon
