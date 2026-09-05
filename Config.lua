@@ -692,10 +692,14 @@ local function BuildPreset(quiet, intro)
             if not haveUp[spellID] then
                 auras[#auras + 1] = { spell = spellID, harmful = harmful, slot = "active" }
             end
-            -- Harmful ones also get the "gone" state, which is what fills the
-            -- reminder strip. Not for your own buffs: a personal cooldown is
-            -- missing most of the time and nagging about it is noise.
-            if harmful and not haveGone[spellID] then
+            -- Everything tracked gets a "gone" state, buffs included. It used
+            -- to be debuffs only, on the grounds that a personal cooldown is
+            -- missing most of the time and nagging about it is noise -- but
+            -- that is an argument about the reminder STRIP, not about the
+            -- button, and it was costing people the state entirely. The strip
+            -- still takes only the harmful ones by itself (see ns.AutoStrip);
+            -- a buff joins it if you tick the box.
+            if not haveGone[spellID] then
                 auras[#auras + 1] = { spell = spellID, harmful = harmful, slot = "missing" }
             end
         end
