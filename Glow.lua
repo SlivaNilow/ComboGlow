@@ -396,13 +396,29 @@ function ns.SetupTimer(self, w, h)
         self.TimerText:SetTextColor(1, 1, 1)
     end
     if self.StackText then
-        -- Top left, clear of the countdown at the bottom and of the charge
-        -- count the game itself draws in the bottom right.
+        -- Top left by default: the middle belongs to the cooldown sweep and
+        -- the countdown, and the bottom right to the charge count the game
+        -- draws itself. Adjustable, because on a 22px bar icon and a 52px
+        -- strip icon the same corner does not suit both.
+        local db = ns.CG and ns.CG.db
+        local pos = (db and db.stackPos) or "topleft"
+        local scale = ((db and db.stackScale) or 100) / 100
+        local A = self.Art or self
         self.StackText:ClearAllPoints()
-        self.StackText:SetPoint("TOPLEFT", self.Art or self, "CENTER", -w * 0.48, h * 0.48)
+        if pos == "center" then
+            self.StackText:SetPoint("CENTER", A, "CENTER", 0, 0)
+        elseif pos == "topright" then
+            self.StackText:SetPoint("TOPRIGHT", A, "CENTER", w * 0.48, h * 0.48)
+        elseif pos == "bottomleft" then
+            self.StackText:SetPoint("BOTTOMLEFT", A, "CENTER", -w * 0.48, -h * 0.48)
+        elseif pos == "bottomright" then
+            self.StackText:SetPoint("BOTTOMRIGHT", A, "CENTER", w * 0.48, -h * 0.48)
+        else
+            self.StackText:SetPoint("TOPLEFT", A, "CENTER", -w * 0.48, h * 0.48)
+        end
         local font = self.StackText:GetFont()
         if font then
-            self.StackText:SetFont(font, math.max(10, math.floor(h * 0.34)), "OUTLINE")
+            self.StackText:SetFont(font, math.max(8, math.floor(h * 0.34 * scale)), "OUTLINE")
         end
         self.StackText:SetTextColor(1, 0.9, 0.4)
     end

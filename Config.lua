@@ -934,6 +934,8 @@ local function PrintHelp()
         { "/cg mirror on|off",         L("fallback: take aura state from the Cooldown Manager", "запасной путь: брать состояние ауры у Cooldown Manager") },
         { "/cg blizzglow on|off",      L("the game's own gold proc glow (off by default)", "штатное золотое свечение прока (по умолчанию выключено)") },
         { "/cg procstrip on|off",      L("show procs in the reminder strip (on by default)", "показывать проки в полосе напоминаний (по умолчанию вкл)") },
+        { "/cg stackpos <where>",      L("where the stack count sits on the marker", "где на отметке стоит счётчик стаков") },
+        { "/cg stacksize <50-200>",    L("stack count size, in percent", "размер счётчика стаков, в процентах") },
         { "/cg auracheck",             L("report what the aura API answers here, with measured lag", "показать ответ aura API и замеренную задержку") },
         { "/cg procs",                 L("what each proc state watches, and whether it is lit", "за чем следит каждое прок-состояние и горит ли оно") },
         { "/cg why",                   L("what OURS is lit right now, and which rule did it", "что горит именно у нас прямо сейчас и от какого правила") },
@@ -1416,6 +1418,35 @@ local function Handler(msg)
         CG:UpdateAuras()
         Say(L("Cooldown Manager fallback: %s", "запасной путь через Cooldown Manager: %s"),
             CG.db.mirror and L("on", "вкл") or L("off", "выкл"))
+
+    elseif cmd == "stackpos" then
+        local where = rest:lower()
+        local valid = {
+            topleft = true, topright = true, center = true,
+            bottomleft = true, bottomright = true,
+        }
+        if not valid[where] then
+            Say(L("usage: /cg stackpos topleft|topright|center|bottomleft|bottomright",
+                  "формат: /cg stackpos topleft|topright|center|bottomleft|bottomright"))
+        else
+            CG.db.stackPos = where
+            -- The position is applied when a frame is attached, so the layout
+            -- has to be rebuilt rather than merely refreshed.
+            CG.lastSig = nil
+            CG:Rebuild()
+            Say(L("stack count: %s", "счётчик стаков: %s"), where)
+        end
+
+    elseif cmd == "stacksize" then
+        local n = tonumber(rest)
+        if not n then
+            Say(L("usage: /cg stacksize <50-200>", "формат: /cg stacksize <50-200>"))
+        else
+            CG.db.stackScale = math.max(50, math.min(200, n))
+            CG.lastSig = nil
+            CG:Rebuild()
+            Say(L("stack count size: %d%%", "размер счётчика: %d%%"), CG.db.stackScale)
+        end
 
     elseif cmd == "procstrip" then
         CG.db.center.autoProc = OnOff(rest:lower(), CG.db.center.autoProc ~= false)

@@ -129,6 +129,8 @@ local DEFAULTS = {
     auraPoll   = 0.2,    -- re-read aura state every N seconds (0 = events only)
     mirror     = true,   -- fall back to Cooldown Manager state when reads fail
     blizzGlow  = false,  -- let the game draw its own gold proc glow as well
+    stackPos   = "topleft",  -- where the aura stack count sits on the marker
+    stackScale = 100,        -- its size, as a percentage of the default
     presetDone = {},     -- [specID] = the default rules were offered once
     center = {
         enabled = true,
