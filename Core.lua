@@ -118,7 +118,7 @@ ns.AutoPowerType = AutoPowerType
 --[[-------------------------------------------------------------------------
     Saved variables
 ---------------------------------------------------------------------------]]
-local DB_VERSION = 12
+local DB_VERSION = 13
 
 local DEFAULTS = {
     version    = DB_VERSION,
@@ -1179,7 +1179,7 @@ function CG:Initialize()
     --
     -- v11 did this for "shine" alone, which was the wrong culprit: shine takes
     -- a colour perfectly well. The gold ones are the ones flagged fixedColor.
-    if hadDB and fromVersion < 12 then
+    if hadDB and fromVersion < 13 then
         for _, rules in pairs(self.db.specs) do
             for _, r in ipairs(rules) do
                 if r.kind == "aura" and r.proc then

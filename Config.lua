@@ -711,9 +711,14 @@ local function BuildPreset(quiet, intro)
         local spend = SpendsResource(r.spell)
         if not (spend and spend > 0) then spend = knownCost[r.spell] end
         if not (spend and spend > 0) then spend = r.baseCost end
+        -- A proc drawn with Blizzard's gold artwork is the same mark as
+        -- "ready", whatever colour is stored. Fixed here as well as in the
+        -- database migration, so a scan repairs it whenever it is noticed.
+        local st = ns.StyleByKey(r.style)
+        local goldStyle = st and st.fixedColor and true or false
         if spend and spend > 0 then
-            if (r.baseCost or 0) < spend or r.auraIDs then
-                heals[#heals + 1] = { rule = r, cost = spend }
+            if (r.baseCost or 0) < spend or r.auraIDs or goldStyle then
+                heals[#heals + 1] = { rule = r, cost = spend, restyle = goldStyle }
             end
         else
             -- What the descriptions say right now, plus anything picked by
@@ -814,6 +819,15 @@ local function BuildPreset(quiet, intro)
         if h.cost then
             h.rule.baseCost = h.cost
             h.rule.auraIDs, h.rule.timer = nil, false
+            if h.restyle then
+                local p = STATE_DEFAULTS.proc
+                h.rule.style = p.style
+                h.rule.alpha = StyleAlpha(p.style)
+                h.rule.r, h.rule.g, h.rule.b = p.r, p.g, p.b
+                Say(L("~ %s: proc marker was gold, same as ready - recoloured",
+                      "~ «%s»: отметка прока была золотой, как «готово» — перекрасил"),
+                    ns.SpellName(h.rule.spell))
+            end
             Say(L("~ %s now lights when it costs nothing",
                   "~ «%s» теперь горит, когда бесплатен"),
                 ns.SpellName(h.rule.spell))

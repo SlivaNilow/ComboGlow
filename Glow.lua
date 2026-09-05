@@ -32,7 +32,10 @@ ns.STYLES = {
     { key = "ring",    euiIndex = nil, fallback = "none",                       hidden = true, short = "Sweep+edge", label = "Sweep with edge"    },
     { key = "pixel",   euiIndex = 1,   fallback = "border",                     short = "Pixel",      label = "Pixel Glow"         },
     { key = "button",  euiIndex = 2,   fallback = "border",                     hidden = true, short = "Button",     label = "Action Button Glow" },
-    { key = "shine",   euiIndex = 3,   fallback = "border",                     short = "Shine",      label = "Auto-Cast Shine"    },
+    -- Also fixedColor, by observation: a proc set to cyan came out the same
+    -- gold as "ready". The sparkle textures behind it are Blizzard's autocast
+    -- art and the colour handed to the engine does not reach them.
+    { key = "shine",   euiIndex = 3,   fallback = "border", fixedColor = true,  short = "Shine",      label = "Auto-Cast Shine"    },
     -- fixedColor: Blizzard's own proc artwork. It is a gold animation with no
     -- colour input -- ours is accepted and ignored, by the engine and by the
     -- texture we fall back to alike. Worth saying out loud: two states set to
