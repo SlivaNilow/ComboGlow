@@ -1397,16 +1397,6 @@ local function Handler(msg)
         end
         if #strip > 0 then
             Say(L("strip slots: %s", "места на полосе: %s"), table.concat(strip, ", "))
-            -- The one flag that decides whether a slot can be given up. With
-            -- it false every mirrored icon keeps its place whether it is lit
-            -- or not, which is every gap in the row.
-            local hidden = 0
-            for _, mf in pairs(ns.cdmAuraFrames or {}) do
-                if mf.IsShown and not mf:IsShown() then hidden = hidden + 1 end
-            end
-            Say(L("hide-when-inactive believed: %s (%d entries hidden right now)",
-                  "верим «скрывать неактивные»: %s (сейчас скрыто записей: %d)"),
-                tostring(CG._trustShown or false), hidden)
         else
             Say(L("strip: no slots at all", "полоса: мест нет вообще"))
         end

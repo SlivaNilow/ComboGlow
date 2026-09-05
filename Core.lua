@@ -1227,20 +1227,13 @@ function CG:PackStrip()
     -- off nothing is ever hidden, nothing is inferred, and the layout falls
     -- back to reserving a slot. Conservative in the only direction that
     -- matters -- it never packs away an icon that might be lit.
-    -- Remembered once seen, not re-derived every pass. The setting cannot
-    -- change mid-session, but the EVIDENCE for it comes and goes: the moment
-    -- every tracked aura happens to be active, nothing is hidden, the flag
-    -- flips back to false and the gaps reappear -- during a fight, which is
-    -- when the row is being looked at. Seeing it once is enough.
-    if not self._trustShown then
-        for _, f in pairs(ns.cdmAuraFrames or {}) do
-            if f.IsShown and not f:IsShown() then
-                self._trustShown = true
-                break
-            end
+    local trustShown = false
+    for _, f in pairs(ns.cdmAuraFrames or {}) do
+        if f.IsShown and not f:IsShown() then
+            trustShown = true
+            break
         end
     end
-    local trustShown = self._trustShown or false
 
     -- Two passes, and the order matters. What we can read packs first;
     -- anything still unknowable goes last, so a gap that cannot be closed
@@ -1250,25 +1243,8 @@ function CG:PackStrip()
         live[#live + 1] = ic
         sig = sig .. tostring(ic)
     end
-
-    -- Shown is not the same as visible. A marker can be left standing with its
-    -- alpha at zero, and then it holds a slot in the row while showing
-    -- nothing -- which is a gap with an icon's name on it.
-    --
-    -- Only a PLAIN zero counts. An engine-resolved alpha comes back secret and
-    -- must not be inspected, and the answer there is the same as before: keep
-    -- the slot, because we cannot prove it is dark.
-    local function PlainlyDark(ic)
-        local ok, a = pcall(ic.GetAlpha, ic)
-        if not ok or type(a) ~= "number" then return false end
-        if ns.IsSecret and ns.IsSecret(a) then return false end
-        return a < 0.05
-    end
-
     for _, ic in ipairs(icons) do
-        if ic.rule and not ic._mirroring and ic:IsShown() and not PlainlyDark(ic) then
-            Take(ic)
-        end
+        if ic.rule and not ic._mirroring and ic:IsShown() then Take(ic) end
     end
     for _, ic in ipairs(icons) do
         if ic.rule and ic._mirroring then
@@ -1283,7 +1259,7 @@ function CG:PackStrip()
                         or (not ic.rule.missing and up)
                 end
             end
-            if keep and not PlainlyDark(ic) then Take(ic) end
+            if keep then Take(ic) end
         end
     end
     sig = sig .. tostring(trustShown)
