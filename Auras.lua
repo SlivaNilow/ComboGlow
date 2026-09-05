@@ -733,6 +733,41 @@ local durationHooked
 local armedBy = setmetatable({}, { __mode = "k" })
 local caughtArgs = setmetatable({}, { __mode = "k" })
 
+--[[-------------------------------------------------------------------------
+    Pass-through arming
+
+    A secret survives being handed from one API to another and does not
+    survive being kept. Stored in a table it comes back as something
+    SetCooldown will not take -- "bad argument #2" -- so the copy we were
+    holding was never going to work, whatever we did with it afterwards.
+
+    So nothing is held. A widget of ours registers as a mirror of one of the
+    game's, and when the game arms that one the same arguments are passed
+    straight on, inside the hook, while they are still live arguments and not
+    yet anybody's variable.
+
+    From then on our widget is running the real duration -- and a formatter on
+    it can be asked "is this nearly over" and will draw the answer, which is
+    the only way anyone gets to know in combat.
+---------------------------------------------------------------------------]]
+local forwardTo = setmetatable({}, { __mode = "k" })
+
+function ns.ForwardCooldown(sourceCD, targetCD)
+    if not (sourceCD and targetCD) then return false end
+    local set = forwardTo[sourceCD]
+    if not set then
+        set = setmetatable({}, { __mode = "k" })
+        forwardTo[sourceCD] = set
+    end
+    set[targetCD] = true
+    return true
+end
+
+function ns.StopForwarding(sourceCD, targetCD)
+    local set = forwardTo[sourceCD]
+    if set then set[targetCD] = nil end
+end
+
 -- The arguments the game armed this widget with, to be passed straight on to
 -- one of ours. Never read, only forwarded.
 function ns.CaughtArgs(itemFrame)
@@ -758,6 +793,12 @@ local function HookCooldownDurations()
     hooksecurefunc(proto, "SetCooldownFromDurationObject", function(cd, durObj)
         caughtDuration[cd] = durObj
         armedBy[cd] = "DurationObject"
+        local set = forwardTo[cd]
+        if set then
+            for target in pairs(set) do
+                pcall(target.SetCooldownFromDurationObject, target, durObj)
+            end
+        end
     end)
     for _, m in ipairs(STALE_ON) do
         if proto[m] then
@@ -765,6 +806,17 @@ local function HookCooldownDurations()
                 caughtDuration[cd] = nil
                 armedBy[cd] = m .. "(" .. type(a)
                     .. (IsSecret(a) and "!" or "") .. ")"
+                -- Straight on, while they are still arguments.
+                local set = forwardTo[cd]
+                if set then
+                    for target in pairs(set) do
+                        if m == "Clear" then
+                            pcall(target.Clear, target)
+                        elseif target[m] then
+                            pcall(target[m], target, a, b)
+                        end
+                    end
+                end
                 -- Kept, never inspected. A secret can still be handed to
                 -- another setter, which is enough to arm a widget of ours
                 -- with exactly what the game armed this one with.
@@ -1395,12 +1447,13 @@ function ns.FormatterTest(mf, say, seconds, live)
     end
     local args
     if live then
-        args = mf and ns.CaughtArgs(mf)
-        if not args or args.m ~= "SetCooldown" then
-            say(ns.L("no captured SetCooldown for that entry - hit something first",
-                     "по этой записи не пойман SetCooldown — ударь по цели"))
+        local src = mf and (mf.Cooldown or mf.cooldown)
+        if not src then
+            say(ns.L("that entry has no cooldown widget",
+                     "у этой записи нет виджета кулдауна"))
             return
         end
+        args = false
     else
         args = { a = GetTime(), b = 20 }
     end
@@ -1441,7 +1494,15 @@ function ns.FormatterTest(mf, say, seconds, live)
     -- Arm first, format second. Cooldown-text addons hook SetCooldown, so a
     -- formatter set before it is replaced by theirs a moment later; set after,
     -- ours is the one that stands.
-    local armed, armErr = pcall(fmtTest.cd.SetCooldown, fmtTest.cd, args.a, args.b)
+    local armed, armErr = true, nil
+    if args then
+        armed, armErr = pcall(fmtTest.cd.SetCooldown, fmtTest.cd, args.a, args.b)
+    else
+        -- Live: subscribe and wait. There is nothing to arm from here -- the
+        -- arming happens in the hook, next time the game re-arms the entry,
+        -- which for a dot is the next time you apply it.
+        ns.ForwardCooldown(mf.Cooldown or mf.cooldown, fmtTest.cd)
+    end
     fmtTest.cd:SetCountdownFormatter(formatter)
 
     -- Did the widget actually take them? Reading its own times back answers
@@ -1499,6 +1560,11 @@ function ns.FormatterTest(mf, say, seconds, live)
         end)
     end
 
+    if not args then
+        say(ns.L("forwarding armed: recast the spell, the box follows the real aura",
+                 "переадресация включена: перекастуй заклинание, рамка пойдёт "
+                 .. "за настоящей аурой"))
+    end
     say(ns.L("it must read 'over' now and 'UNDER' in the last %d seconds",
              "должно показывать 'over', а в последние %d с — 'UNDER'"), n)
 end
