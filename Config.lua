@@ -887,6 +887,7 @@ local function PrintHelp()
         { "/cg swipe <#> on|off",      L("also draw a cooldown sweep for the remaining time", "рисовать ещё и развёртку кулдауна по остатку времени") },
         { "/cg poll <ms>",             L("how often aura state is re-read (0 = events only)", "как часто перечитывать ауры (0 = только по событиям)") },
         { "/cg mirror on|off",         L("fallback: take aura state from the Cooldown Manager", "запасной путь: брать состояние ауры у Cooldown Manager") },
+        { "/cg blizzglow on|off",      L("the game's own gold proc glow (off by default)", "штатное золотое свечение прока (по умолчанию выключено)") },
         { "/cg auracheck",             L("report what the aura API answers here, with measured lag", "показать ответ aura API и замеренную задержку") },
         { "/cg procs",                 L("what each proc state watches, and whether it is lit", "за чем следит каждое прок-состояние и горит ли оно") },
         { "/cg del <#>",               L("remove rule", "удалить правило") },
@@ -1249,6 +1250,15 @@ local function Handler(msg)
         CG:UpdateAuras()
         Say(L("Cooldown Manager fallback: %s", "запасной путь через Cooldown Manager: %s"),
             CG.db.mirror and L("on", "вкл") or L("off", "выкл"))
+
+    elseif cmd == "blizzglow" then
+        CG.db.blizzGlow = OnOff(rest:lower(), CG.db.blizzGlow ~= false)
+        CG:HideBlizzGlow()
+        Say(L("Blizzard's own proc glow: %s", "штатное свечение прока: %s"),
+            CG.db.blizzGlow and L("on", "вкл") or L("off", "выкл"))
+        if CG.db.blizzGlow then
+            Say(L("it comes back on the next proc", "вернётся со следующим проком"))
+        end
 
     elseif cmd == "poll" then
         local ms = tonumber(rest)

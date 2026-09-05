@@ -128,6 +128,7 @@ local DEFAULTS = {
     cdm        = false,  -- also glow Cooldown Manager icons
     auraPoll   = 0.2,    -- re-read aura state every N seconds (0 = events only)
     mirror     = true,   -- fall back to Cooldown Manager state when reads fail
+    blizzGlow  = false,  -- let the game draw its own gold proc glow as well
     presetDone = {},     -- [specID] = the default rules were offered once
     center = {
         enabled = true,
@@ -628,6 +629,7 @@ function CG:Rebuild()
         -- Same buttons, same rules, same look. Rebuilding here is what made a
         -- marker blink off every time an action slot twitched -- which, with
         -- assisted combat on the bars, is every cast.
+        self:HideBlizzGlow()
         self:UpdateNow()
         return
     end
@@ -706,6 +708,8 @@ function CG:Rebuild()
         end
     end
 
+    -- Anything the game lit before we got here.
+    self:HideBlizzGlow()
     self:UpdateNow()
 end
 
@@ -738,6 +742,48 @@ function CG:GetMaxPower(pt)
         return m
     end
     return self.maxCache[pt]
+end
+
+--[[-------------------------------------------------------------------------
+    Blizzard's own proc glow
+
+    Suppressed by default. This addon exists to make button marking mean
+    something specific -- which state, in which colour, chosen per spell -- and
+    the game's own glow works against that: it is gold, it cannot be coloured,
+    it is the same gold as "ready", and it says only "something happened" with
+    no way to tell what. Two glows on one button, one of them unreadable, is
+    worse than one. "/cg blizzglow on" puts it back.
+
+    Done by hiding the alert the moment the game says it appeared, NOT by
+    replacing ActionButtonSpellAlertManager.ShowAlert or the old global helper.
+    Those are called from the secure action-button path, and a Lua closure in
+    the middle of it spreads taint -- which surfaces as blocked actions in
+    combat, long after the change that caused it. A hide is just a frame call.
+
+    Every way a button might carry the alert is tried, because there is no one
+    supported way and third-party bars roll their own.
+---------------------------------------------------------------------------]]
+local function HideAlertOn(button)
+    if not button then return end
+    if button.HideSpellActivationAlert then
+        pcall(button.HideSpellActivationAlert, button)
+    end
+    local mgr = _G.ActionButtonSpellAlertManager
+    if mgr and mgr.HideAlert then pcall(mgr.HideAlert, mgr, button) end
+    for _, key in ipairs({ "SpellActivationAlert", "overlay", "Overlay" }) do
+        local a = button[key]
+        if type(a) == "table" and a.Hide then pcall(a.Hide, a) end
+    end
+end
+
+-- spellID limits the sweep to the buttons that spell sits on; without one
+-- every button is checked, which is for a rebuild, not for every proc.
+function CG:HideBlizzGlow(spellID)
+    if self.db.blizzGlow ~= false then return end
+    local ids = spellID and SpellVariants(spellID) or nil
+    ForEachActionButton(function(b, sid)
+        if not ids or (sid and ids[sid]) then HideAlertOn(b) end
+    end)
 end
 
 local function Silence(frame)
@@ -1293,6 +1339,10 @@ CG:SetScript("OnEvent", function(self, event, ...)
         or event == "UPDATE_MOUSEOVER_UNIT"
         or event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW"
         or event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" then
+        if event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
+            -- Same frame the game raised it in, so it never gets drawn.
+            self:HideBlizzGlow(...)
+        end
         self:UpdateAuras()
         self:UpdatePower()
     elseif event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" then

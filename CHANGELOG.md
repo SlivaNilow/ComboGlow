@@ -41,6 +41,19 @@ real countdown on the icon.
 Run `/cg preset` again to pick up proc states for your spenders, or click the
 fourth pip on any spell in the options window.
 
+**Blizzard's own proc glow is suppressed.** The whole point of this addon is
+that a mark on a button means something specific — which state, in which
+colour, chosen per spell. The game's own glow works against that: it is gold,
+it cannot be coloured, it is the same gold as **ready**, and all it says is
+"something happened". Two glows on one button, one of them unreadable, is worse
+than one. `/cg blizzglow on` brings it back.
+
+It is suppressed by hiding the alert in the same frame the game raises it, not
+by replacing `ActionButtonSpellAlertManager.ShowAlert`. That function is called
+from the secure action-button path, and a Lua closure in the middle of it
+spreads taint — which surfaces as blocked actions in combat, long after the
+change that caused it.
+
 **Two markers on one state.** Shift-click (or right-click) a marker in the
 gallery to layer a second one on top of the first — a pixel outline plus a proc
 glow reads as one distinct mark. Click it again to remove it.
