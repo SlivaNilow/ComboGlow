@@ -9,3 +9,6 @@ Thumbs.db
 # Working notes and the local release helper: mine, not the addon's.
 PUBLISHING.md
 release.ps1
+
+# Built release archives.
+ComboGlow-*.zip
