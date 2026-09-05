@@ -48,11 +48,15 @@ Bursts coming off cooldown and procs go there too -- both are things that
 happen to you rather than because you pressed something, which is what the
 strip is for. `/cg procstrip off` drops the procs.
 
-> **Only one spec is actually verified.** Everything here was built and used on
-> a **Feral druid** with the EllesmereUI suite, ruRU client, 12.1. Holy paladin
-> is partly checked. Other specs and other action bar addons (Blizzard's own,
-> Dominos, anything on LibActionButton-1.0) are supported in code but have not
-> been confirmed in play -- expect rough edges and please report them.
+> **One spec is actually tested. One.** Everything here was built and played on
+> a **Feral druid**, with the EllesmereUI suite, ruRU client, 12.1. Balance,
+> Guardian, Holy paladin and both death knight trees were poked at long enough
+> to fix what fell over -- that is not the same as tested. Every other spec, and
+> every other action bar addon (Blizzard's own, Dominos, anything on
+> LibActionButton-1.0), is supported in code and unproven in play.
+>
+> So: expect rough edges, and please report them. A bug report with the output
+> of `/cg why`, `/cg list` or `/cg auracheck` in it is worth ten without.
 
 It is a standalone folder: EllesmereUI updates cannot overwrite it, but when
 that suite is loaded ComboGlow borrows its glow engine (`EllesmereUI.Glows`)
@@ -342,11 +346,15 @@ in any amount you like:
 случается само, а не потому что ты что-то нажал, — для этого полоса и нужна.
 `/cg procstrip off` убирает проки.
 
-> **По-настоящему проверена одна специализация.** Всё писалось и обкатывалось
-> на **друиде-феральном** с сюитой EllesmereUI, клиент ruRU, 12.1. Пал-хил
-> проверен частично. Остальные спеки и другие аддоны панелей (стандартные
-> Blizzard, Dominos, всё на LibActionButton-1.0) в коде поддержаны, но вживую
-> не подтверждены — жди шероховатостей и присылай их.
+> **По-настоящему протестирована одна специализация. Одна.** Всё писалось и
+> игралось на **друиде-ферале**, сюита EllesmereUI, клиент ruRU, 12.1. Баланс,
+> страж, пал-хил и обе ветки ДК потыканы ровно настолько, чтобы починить то,
+> что отвалилось, — это не то же самое, что протестировано. Все прочие спеки и
+> любые другие аддоны панелей (стандартные Blizzard, Dominos, всё на
+> LibActionButton-1.0) в коде поддержаны и вживую не проверены.
+>
+> Так что жди шероховатостей и присылай их. Баг-репорт с выводом `/cg why`,
+> `/cg list` или `/cg auracheck` стоит десяти без него.
 
 Отдельная папка: обновления EllesmereUI её не затирают, но если сюита
 загружена, ComboGlow берёт её движок подсветки (`EllesmereUI.Glows`), поэтому
@@ -624,10 +632,14 @@ MIT, см. [LICENSE](LICENSE).
 爆发技冷却结束和触发也会出现在这里：两者都是自己发生的，而不是你按了什么，
 这正是提醒条的用途。`/cg procstrip off` 可以去掉触发。
 
-> **只有一个专精真正验证过。** 全部内容是在 **野性德鲁伊** 上写成和使用的，
-> 配合 EllesmereUI 套件，ruRU 客户端，12.1。神圣圣骑士只部分验证。其他专精和
-> 其他动作条插件（暴雪原生、Dominos、任何基于 LibActionButton-1.0 的）代码里
-> 支持，但没有实测 —— 请预期粗糙之处，并把问题反馈回来。
+> **只有一个专精真正测试过。就一个。** 全部内容是在 **野性德鲁伊** 上写成并实际
+> 游玩的，配合 EllesmereUI 套件，ruRU 客户端，12.1。平衡、守护、神圣圣骑士和
+> 死亡骑士的两个专精只是被戳过，刚好够修掉当场坏掉的东西 —— 那和测试过不是一
+> 回事。其他所有专精，以及其他动作条插件（暴雪原生、Dominos、任何基于
+> LibActionButton-1.0 的），代码里支持，实战未验证。
+>
+> 所以：请预期粗糙之处，并把问题反馈回来。附上 `/cg why`、`/cg list` 或
+> `/cg auracheck` 输出的报告，抵得上十份没有的。
 >
 > 插件内的界面目前只有英文和俄文。中文界面还没做 —— 如果有需要请提 issue。
 

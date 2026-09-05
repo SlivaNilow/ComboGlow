@@ -1,5 +1,73 @@
 # Changelog
 
+## 1.2.0
+
+**The reminder strip closes its gaps.** It reserved a slot for every state
+whether or not it could ever light, because a state resolved engine-side is one
+we cannot read — and reading the Cooldown Manager entry's state was filed as
+impossible. It is not: `IsActive()` is the secret one, `IsShown()` is plain. It
+only means "inactive" when the player has **hide when inactive** on for that
+viewer, and there is no way to ask which setting they chose — so it is
+inferred. If any tracked entry is hidden right now the setting is on and the
+flag can be believed; with it off nothing is ever hidden, nothing is inferred,
+and the layout falls back to reserving a slot. Wrong only in the harmless
+direction: it never packs away an icon that might be lit.
+
+Turn **hide when inactive** on in the Cooldown Manager and the strip closes up.
+
+The row is also ordered by what an icon means rather than by the order its rule
+was created in — a free cast, what is up, what has fallen off, and last the
+buttons that are simply ready. `/cg rows on` gives each kind its own row, so a
+dot appearing does not shift the bursts. `/cg pack off` keeps the old fixed
+slots.
+
+**The Cooldown Manager can be hidden without being switched off.** Everything
+the aura states know comes from it, so it has to keep running: this sets alpha
+and never calls `Hide()`. Blizzard puts the alpha back when it rebuilds a
+viewer, so its `Layout` is hooked and the reapply deferred a frame — otherwise
+Layout is still running and undoes it. It is never hidden while Edit Mode is
+open, which is where the Cooldown Manager is configured.
+
+**A minimap button**, and a **Cooldown Manager settings** button in the options
+window — that is where half the setup happens, and finding it was most of the
+chore. The readme now gives the order to do it in: put what you want marked
+into the Cooldown Manager first, then scan the bars, because the scan can only
+pick up auras it already tracks.
+
+**A state can watch several auras.** One cast can land two debuffs — Vampiric
+Touch applies Shadow Word: Pain with the talent — so the **watching:** row is a
+checklist, and an ordinary state is "up" only when all of its auras are. A proc
+reads its list the other way: any one of its buffs will do. The list offers
+everything the Cooldown Manager tracks, not just spells that already have
+rules; a state is pointed elsewhere precisely when its own aura is invisible.
+
+**The gallery starts with a "none" tile** that turns a state off without
+deleting it, replacing both the "state on" checkbox and the "delete state"
+button. Deleting a state you may want back was never the right answer to "do
+not light this one".
+
+**Aura stack counts** on the marker, read from the aura where that is possible
+and copied as text from the Cooldown Manager where it is not — the count lives
+on the entry's children, which is where the countdown comes from too.
+`/cg stackpos` and `/cg stacksize` place and size them.
+
+**Runes no longer produce resource rules.** They refill by themselves and
+continuously, so "you have two runes" is true most of the time and a Frost
+death knight lit up nearly every button. Their cost is still read for the proc
+state, where zero means a genuinely free cast.
+
+**The Cooldown Manager dependency is stated up front**, in capitals, at the top
+of every language's getting-started section, with the setup steps in the order
+they have to happen. The options window names a state whose spell is missing
+from it, and says how many auras are tracked for this specialization at all — a
+spec where that is zero looks exactly like a broken addon otherwise.
+
+`/cg auracheck` reports the aura's secrecy level per spell rather than a
+blanket yes/no, `/cg why` lists what of ours is lit and what the strip is
+holding, and `/cg procs`, `/cg stacks`, `/cg cdmdump` and `/cg secretapi` answer
+the questions that came up while building this, so the next one does not need a
+screenshot.
+
 ## 1.1.0
 
 **Ready and proc are now separate states.** They used to share one marker,
@@ -49,39 +117,6 @@ by replacing `ActionButtonSpellAlertManager.ShowAlert`. That function is called
 from the secure action-button path, and a Lua closure in the middle of it
 spreads taint — which surfaces as blocked actions in combat, long after the
 change that caused it.
-
-**A minimap button**, and a **Cooldown Manager settings** button in the options
-window -- that is where half the setup happens, and finding it was most of the
-chore. The readme now gives the order to do it in: put what you want marked
-into the Cooldown Manager first, then scan the bars, because the scan can only
-pick up auras it already tracks.
-
-**A state can watch several auras.** One cast can land two debuffs -- Vampiric
-Touch applies Shadow Word: Pain with the talent -- so the **watching:** row is a
-checklist, and an ordinary state is "up" only when all of its auras are. A proc
-reads its list the other way: any one of its buffs will do.
-
-**The gallery starts with a "none" tile** that turns a state off without
-deleting it, replacing both the "state on" checkbox and the "delete state"
-button. Deleting a state you may want back was never the right answer to "do
-not light this one".
-
-**Runes no longer produce resource rules.** They refill by themselves and
-continuously, so "you have two runes" is true most of the time and a Frost
-death knight lit up nearly every button. Their cost is still read for the proc
-state, where zero means a genuinely free cast.
-
-**The Cooldown Manager dependency is stated up front**, in capitals, at the top
-of every language's getting-started section. The aura states are not "any
-spell": they read Blizzard's Cooldown Manager and cover exactly what it is set
-to track, per specialization. The options window now names a state whose spell
-is missing from it, and `/cg hidecdm` makes the Cooldown Manager invisible while
-it keeps running -- alpha, never Hide(), because a hidden frame is not
-guaranteed to keep updating and the mirror would go with it.
-
-**Aura stack counts** on the marker, read from the aura where that is possible
-and copied as text from the Cooldown Manager where it is not. `/cg stackpos`
-and `/cg stacksize` place and size them.
 
 **Procs join the reminder strip**, alongside missing dots and bursts coming off
 cooldown. All three are things that happen to you rather than because you
