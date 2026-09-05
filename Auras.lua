@@ -721,11 +721,18 @@ local function SoonCurve(n)
     return curve
 end
 
+-- Is this frame here ONLY to warn that an aura is running out? A strip icon
+-- for an "up" state is: on the bar the same state means "it is up", and only
+-- the strip copy was given the narrower job.
+function ns.SoonWanted(frame, rule)
+    if not frame.isStrip or rule.missing or rule.proc then return false end
+    return ns.SoonSeconds(rule) ~= nil
+end
+
 -- Returns true when it took over the frame's alpha.
 function ns.ApplySoon(frame, rule, durObj, remaining)
-    if not frame.isStrip or rule.missing or rule.proc then return false end
+    if not ns.SoonWanted(frame, rule) then return false end
     local n = ns.SoonSeconds(rule)
-    if not n then return false end
 
     -- Readable case: a plain number, a plain comparison.
     if type(remaining) == "number" and not IsSecret(remaining) then
@@ -825,8 +832,20 @@ local function ApplyMirror(frame, rule, itemFrame)
     -- A strip icon that is asking "is it about to fall off" answers that
     -- instead: the curve already means "up AND running out", because a
     -- duration object only exists while the aura is up.
-    if ns.ApplySoon(frame, rule, durObj) then
-        frame._mirroring = true
+    if ns.SoonWanted(frame, rule) then
+        if ns.ApplySoon(frame, rule, durObj) then
+            frame._mirroring = true
+            if not frame:IsShown() then frame:Show() end
+            frame.needSafeStyle = false
+            frame:StartArt()
+            return true
+        end
+        -- No duration to measure against, so the warning cannot be given. An
+        -- icon that cannot do its one job is worse than no icon: left visible
+        -- it just sits there permanently, which is what it did.
+        ns.ClearTimer(frame)
+        frame:StopArt()
+        frame:Hide()
         return true
     end
     local applied = pcall(frame.SetAlphaFromBoolean, frame, flag, shown, hidden)
@@ -1067,8 +1086,11 @@ function ns.ApplyAuraRule(frame, rule)
     -- The timer is independent of the glow. While the aura is up you want to
     -- see the time left even in "glow when missing" mode -- there the icon
     -- carries a quiet countdown and only lights up once it runs out.
-    if not ns.ApplySoon(frame, rule, durObj, remaining) and frame.isStrip then
-        frame:SetAlpha(1)
+    if ns.SoonWanted(frame, rule) and not ns.ApplySoon(frame, rule, durObj, remaining) then
+        ns.ClearTimer(frame)
+        frame:StopArt()
+        frame:Hide()
+        return false
     end
 
     if present and rule.timer ~= false then
