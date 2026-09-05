@@ -677,6 +677,73 @@ local function WarnCurve(rule)
     return curve
 end
 
+--[[-------------------------------------------------------------------------
+    "About to fall off"
+
+    The reminder strip shows a dot that is GONE. By then you are already late.
+    This adds the other half: the icon appears while the aura is still up but
+    has less than N seconds left, so the reminder arrives in time to act on.
+
+    The remaining time is usually unreadable -- for a target debuff it always
+    is -- so the threshold is never compared in Lua. It is expressed as a curve
+    and handed to the duration object, which evaluates it engine-side and hands
+    back a colour; its alpha is the answer. Exactly the trick the warning
+    colour already uses, asked a different question.
+
+    Only strip icons are driven this way. On the bar the marker means "this is
+    up", and turning that off for the first part of its life would be a
+    different feature, and a worse one.
+---------------------------------------------------------------------------]]
+local soonCurves = setmetatable({}, { __mode = "k" })
+
+function ns.SoonSeconds(rule)
+    local db = ns.CG and ns.CG.db
+    if not db or not db.center or db.center.soonOn == false then return nil end
+    if rule.soon == false then return nil end
+    local n = tonumber(rule.soon) or tonumber(db.center.soon) or 5
+    if n <= 0 then return nil end
+    return n
+end
+
+local function SoonCurve(n)
+    local cached = soonCurves[n]
+    if cached then return cached end
+    if not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then return nil end
+    local curve = C_CurveUtil.CreateColorCurve()
+    if curve.SetType and Enum and Enum.LuaCurveType then
+        curve:SetType(Enum.LuaCurveType.Step)
+    end
+    -- Alpha carries the answer: opaque below the threshold, clear above it.
+    curve:AddPoint(0, CreateColor(1, 1, 1, 1))
+    curve:AddPoint(n, CreateColor(1, 1, 1, 0))
+    soonCurves[n] = curve
+    return curve
+end
+
+-- Returns true when it took over the frame's alpha.
+function ns.ApplySoon(frame, rule, durObj, remaining)
+    if not frame.isStrip or rule.missing or rule.proc then return false end
+    local n = ns.SoonSeconds(rule)
+    if not n then return false end
+
+    -- Readable case: a plain number, a plain comparison.
+    if type(remaining) == "number" and not IsSecret(remaining) then
+        frame:SetAlpha(remaining <= n and 1 or 0)
+        return true
+    end
+
+    if not (durObj and durObj.EvaluateRemainingDuration) then return false end
+    local curve = SoonCurve(n)
+    if not curve then return false end
+    local ok, col = pcall(durObj.EvaluateRemainingDuration, durObj, curve)
+    if not ok or type(col) ~= "table" or not col.GetRGBA then return false end
+    local ok2, _, _, _, a = pcall(col.GetRGBA, col)
+    if not ok2 then return false end
+    -- a may be secret. It is only ever handed to a setter, never looked at.
+    if not pcall(frame.SetAlpha, frame, a) then return false end
+    return true
+end
+
 -- Returns applied, why
 local function ApplyWarnColor(frame, rule, durObj)
     if not rule.warn or rule.warn <= 0 then return false, "warn off" end
@@ -754,6 +821,13 @@ local function ApplyMirror(frame, rule, itemFrame)
 
     local shown, hidden = 1, 0
     if rule.missing then shown, hidden = 0, 1 end
+    -- A strip icon that is asking "is it about to fall off" answers that
+    -- instead: the curve already means "up AND running out", because a
+    -- duration object only exists while the aura is up.
+    if ns.ApplySoon(frame, rule, durObj) then
+        frame._mirroring = true
+        return true
+    end
     local applied = pcall(frame.SetAlphaFromBoolean, frame, flag, shown, hidden)
     frame._mirroring = applied or nil
     if not applied then
@@ -992,6 +1066,10 @@ function ns.ApplyAuraRule(frame, rule)
     -- The timer is independent of the glow. While the aura is up you want to
     -- see the time left even in "glow when missing" mode -- there the icon
     -- carries a quiet countdown and only lights up once it runs out.
+    if not ns.ApplySoon(frame, rule, durObj, remaining) and frame.isStrip then
+        frame:SetAlpha(1)
+    end
+
     if present and rule.timer ~= false then
         if found == true then
             frame._optStamp = nil

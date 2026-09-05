@@ -149,6 +149,10 @@ local DEFAULTS = {
         -- So is a free cast appearing: it happens to you rather than because
         -- you pressed something, which is exactly what the strip is for.
         autoProc = true,
+        -- Show a state on the strip while its aura is still up but about to
+        -- run out. "Gone" is already too late to act on.
+        soonOn = true,
+        soon = 5,
         -- Close the gap where a state we can read is not lit. Mirrored ones
         -- keep their place either way -- their state is not ours to know.
         pack = true,
@@ -983,6 +987,12 @@ function ns.AutoStrip(rule)
     if rule.kind == "aura" and rule.proc then return c.autoProc ~= false end
     if c.autoMissing == false then return false end
     if rule.kind == "cd" then return true end
+    -- An "up" state joins the strip when it is there to warn that the aura is
+    -- about to run out; without that it is just a second icon saying what the
+    -- button already says.
+    if rule.kind == "aura" and not rule.missing and not rule.proc then
+        return c.soonOn ~= false and ns.SoonSeconds and ns.SoonSeconds(rule) ~= nil
+    end
     -- Debuffs only. A personal cooldown is missing most of the time, so a
     -- buff's "gone" state on the strip would be a permanent icon that means
     -- nothing -- on the button it costs nothing, here it costs the strip.

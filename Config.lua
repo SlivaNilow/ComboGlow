@@ -958,6 +958,7 @@ local function PrintHelp()
         { "/cg minimap on|off",        L("the minimap button", "кнопка у миникарты") },
         { "/cg pack on|off",           L("close gaps in the reminder strip", "закрывать дырки в полосе напоминаний") },
         { "/cg rows on|off",           L("one strip row per kind, procs on top", "полоса строками по типу, проки сверху") },
+        { "/cg soon <sec|off>",        L("warn on the strip with this long left (5s by default)", "предупреждать на полосе за столько секунд (по умолчанию 5)") },
         { "/cg stackpos <where>",      L("where the stack count sits on the marker", "где на отметке стоит счётчик стаков") },
         { "/cg stacksize <50-200>",    L("stack count size, in percent", "размер счётчика стаков, в процентах") },
         { "/cg auracheck",             L("report what the aura API answers here, with measured lag", "показать ответ aura API и замеренную задержку") },
@@ -1502,6 +1503,26 @@ local function Handler(msg)
         CG:UpdateAuras()
         Say(L("Cooldown Manager fallback: %s", "запасной путь через Cooldown Manager: %s"),
             CG.db.mirror and L("on", "вкл") or L("off", "выкл"))
+
+    elseif cmd == "soon" then
+        local n = tonumber(rest)
+        if rest == "" or rest == nil then
+            Say(L("usage: /cg soon <seconds|off>", "формат: /cg soon <секунды|off>"))
+        elseif rest:lower() == "off" then
+            CG.db.center.soonOn = false
+            CG.lastSig = nil
+            CG:Rebuild()
+            Say(L("about-to-expire warning: off", "предупреждение об истечении: выкл"))
+        elseif n then
+            CG.db.center.soon = math.max(1, math.min(60, n))
+            CG.db.center.soonOn = true
+            CG.lastSig = nil
+            CG:Rebuild()
+            Say(L("warn above the resource with %ds left",
+                  "предупреждать над ресурсом за %d с"), CG.db.center.soon)
+        else
+            Say(L("usage: /cg soon <seconds|off>", "формат: /cg soon <секунды|off>"))
+        end
 
     elseif cmd == "rows" then
         CG.db.center.rows = OnOff(rest:lower(), CG.db.center.rows)
