@@ -769,6 +769,68 @@ local forwardTo = setmetatable({}, { __mode = "k" })
 -- pcall ate it.
 ns.forwardStats = { subscribed = 0, armings = 0, fired = 0, lastErr = nil }
 
+-- How many times the game has armed each widget. Re-arming is when other
+-- cooldown-text addons re-apply their own formatter, so it is also when ours
+-- has to be put back.
+local armCount = setmetatable({}, { __mode = "k" })
+
+--[[-------------------------------------------------------------------------
+    Asking the engine to mark the last seconds, on its own widget
+
+    We may not arm a cooldown of ours with a secret time -- that is refused
+    outright. But nothing stops us formatting a cooldown the engine armed
+    ITSELF, and a numeric rule formatter is a set of thresholds the engine
+    evaluates against its own secret remaining time, drawing whichever format
+    string matches. The colour lives inside the string.
+
+    So the answer arrives as text, on the Cooldown Manager's own entry -- and
+    that text is already copied onto our marker every poll. The digits go the
+    warning colour for the last N seconds, exactly on time, in combat, and
+    through any extension, because the engine is reading the real clock and we
+    never see a number at any point.
+
+    This is tullaCTC's trick used on somebody else's widget, which is also
+    where tullaCTC uses it. Both of us setting a formatter on the same cooldown
+    means last writer wins, so ours goes back after every re-arming -- and only
+    on entries we actually track.
+---------------------------------------------------------------------------]]
+local entryFmtStamp = setmetatable({}, { __mode = "k" })
+
+local function Hex(r, g, b)
+    return ("|cff%02x%02x%02x"):format(
+        math.floor((r or 1) * 255 + 0.5),
+        math.floor((g or 0) * 255 + 0.5),
+        math.floor((b or 0) * 255 + 0.5))
+end
+
+function ns.ApplyEntryFormatter(itemFrame, rule)
+    if ns.entryFormat == false then return false end
+    local n = ns.SoonSeconds(rule)
+    if not n then return false end
+    if not (C_StringUtil and C_StringUtil.CreateNumericRuleFormatter
+            and Enum and Enum.NumericRuleFormatRounding) then return false end
+    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
+    if not (cd and cd.SetCountdownFormatter) then return false end
+
+    local colour = Hex(rule.wr or 1, rule.wg or 0.2, rule.wb or 0.2)
+    local stamp = ("%s|%s|%s"):format(n, armCount[cd] or 0, colour)
+    if entryFmtStamp[cd] == stamp then return true end
+
+    local rounding = Enum.NumericRuleFormatRounding.Nearest
+    local formatter = C_StringUtil.CreateNumericRuleFormatter()
+    local ok = pcall(formatter.SetBreakpoints, formatter, {
+        -- Below the threshold: the warning colour. Above it: as before.
+        { threshold = 0, format = colour .. "%d|r", step = 1, rounding = rounding },
+        { threshold = n, format = "%d", step = 1, rounding = rounding },
+        { threshold = 60, format = "%dm", step = 1, rounding = rounding,
+          components = { { div = 60, rounding = rounding, step = 1 } } },
+    })
+    if not ok then return false end
+    if not pcall(cd.SetCountdownFormatter, cd, formatter) then return false end
+    entryFmtStamp[cd] = stamp
+    return true
+end
+
 function ns.ForwardCooldown(sourceCD, targetCD)
     if not sourceCD then return false end
     if not targetCD then return true end
@@ -827,7 +889,10 @@ local function HookCooldownDurations()
                     .. (IsSecret(a) and "!" or "") .. ")"
                 -- Straight on, while they are still arguments.
                 local st = ns.forwardStats
-                if m == "SetCooldown" then st.armings = st.armings + 1 end
+                if m == "SetCooldown" then
+                    st.armings = st.armings + 1
+                    armCount[cd] = (armCount[cd] or 0) + 1
+                end
                 local set = forwardTo[cd]
                 if set then
                     for target in pairs(set) do
@@ -1921,6 +1986,8 @@ local function ApplyMirror(frame, rule, itemFrame)
     -- A time-shaped marker with no time to draw would leave the button blank,
     -- so it degrades to the plain frame instead of disappearing.
     frame.sweepFailed = (wantsSweep and not swept) or nil
+    -- Ask the engine to mark the last seconds in the text we are about to copy.
+    ns.ApplyEntryFormatter(itemFrame, rule)
     if not MirrorTimerText(frame, rule, itemFrame, soon ~= nil) then
         frame.TimerText:SetText("")
         frame.TimerText:Hide()

@@ -1255,6 +1255,14 @@ local function Handler(msg)
     elseif cmd == "auracheck" then
         ns.AuraCheck(CG:GetRules(), Say)
 
+    elseif cmd == "entryfmt" then
+        -- Kill switch: we and other cooldown-text addons set formatters on
+        -- the same widgets, and last writer wins.
+        ns.entryFormat = not (rest and rest:lower():find("off"))
+        Say(ns.entryFormat and L("entry formatter on", "форматтер записи включён")
+            or L("entry formatter off - /reload to restore",
+                 "форматтер записи выключен — /reload вернёт как было"))
+
     elseif cmd == "fmttest" then
         -- Proves or kills the formatter route: the engine draws an answer
         -- about a value we are not allowed to read.
