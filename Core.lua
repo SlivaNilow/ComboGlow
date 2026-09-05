@@ -259,6 +259,10 @@ local CDM_ALL_VIEWERS = {
     the viewers are rebuilt, on a spec change among other things.
 ---------------------------------------------------------------------------]]
 local cdmHooked, cdmPending, cdmDirtyAt = {}, false, 0
+-- The alpha each viewer had before we first touched it. Unhiding put it back
+-- to 1 flat, which would overwrite whatever the player had set -- another
+-- addon dimming the Cooldown Manager, or their own choice.
+local cdmAlpha = setmetatable({}, { __mode = "k" })
 
 local function ScheduleCDMVisibility()
     -- Next frame, not now: Blizzard's Layout is still running and would put
@@ -295,7 +299,11 @@ function ns.ApplyCDMVisibility()
     for _, name in ipairs(CDM_ALL_VIEWERS) do
         local f = _G[name]
         if f and f.SetAlpha then
-            pcall(f.SetAlpha, f, hide and 0 or 1)
+            if cdmAlpha[f] == nil and f.GetAlpha then
+                local okA, a = pcall(f.GetAlpha, f)
+                cdmAlpha[f] = (okA and a) or 1
+            end
+            pcall(f.SetAlpha, f, hide and 0 or (cdmAlpha[f] or 1))
 
             if not cdmHooked[f] then
                 cdmHooked[f] = true
