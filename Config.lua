@@ -599,11 +599,18 @@ local function BuildPreset(quiet, intro)
     -- Tracked per STATE, not per spell: re-scanning should top up a state
     -- that is missing rather than skip a spell that already has one.
     local havePower, haveUp, haveGone, haveBurst, haveProc = {}, {}, {}, {}, {}
+    -- What a spell costs when nothing is helping, remembered from the count
+    -- rule an earlier scan made. GetSpellPowerCost reports the cost RIGHT NOW,
+    -- so scanning while a proc is up reads zero and the spell stops looking
+    -- like a spender at all -- which, at a training dummy with procs landing
+    -- constantly, is most of the time.
+    local knownCost = {}
     for _, r in ipairs(rules) do
         if r.kind == "cd" then
             haveBurst[r.spell] = true
         elseif r.kind ~= "aura" then
             havePower[r.spell] = true
+            if (r.min or 0) > 0 and not r.atMax then knownCost[r.spell] = r.min end
         elseif r.proc then
             haveProc[r.spell] = true
         elseif r.missing then
@@ -633,13 +640,18 @@ local function BuildPreset(quiet, intro)
             if ok and type(costs) == "table" then
                 for _, c in ipairs(costs) do
                     if c.type == pt then
+                        -- Zero here usually means a proc is up right now, not
+                        -- that the spell is free: prefer what an earlier scan
+                        -- recorded when it was not.
+                        local cost = tonumber(c.cost) or 0
+                        if cost == 0 and (knownCost[spellID] or 0) > 0 then
+                            cost = knownCost[spellID]
+                        end
                         if not havePower[spellID] then
-                            spenders[#spenders + 1] =
-                                { spell = spellID, cost = tonumber(c.cost) or 0 }
+                            spenders[#spenders + 1] = { spell = spellID, cost = cost }
                         end
                         if not haveProc[spellID] then
-                            procs[#procs + 1] =
-                                { spell = spellID, cost = tonumber(c.cost) or 0 }
+                            procs[#procs + 1] = { spell = spellID, cost = cost }
                         end
                         break
                     end
@@ -697,6 +709,8 @@ local function BuildPreset(quiet, intro)
         -- dropped -- a description says which spells a buff is ABOUT, not
         -- which it makes free, and half the Balance tree names Starsurge.
         local spend = SpendsResource(r.spell)
+        if not (spend and spend > 0) then spend = knownCost[r.spell] end
+        if not (spend and spend > 0) then spend = r.baseCost end
         if spend and spend > 0 then
             if (r.baseCost or 0) < spend or r.auraIDs then
                 heals[#heals + 1] = { rule = r, cost = spend }

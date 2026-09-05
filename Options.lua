@@ -375,6 +375,10 @@ local function Build()
 
         row:SetScript("OnClick", function(self)
             selSpell = self.spell
+            -- The aura list belongs to the state that was open. Leaving it up
+            -- would show the previous spell's candidates, and clicking one
+            -- would apply it to this one.
+            UI.auraList:Hide()
             Refresh()
         end)
         UI.rows[i] = row
@@ -431,6 +435,7 @@ local function Build()
         -- the button below.
         b:SetScript("OnClick", function(self)
             selSlot = self.slot
+            UI.auraList:Hide()
             if selSpell and not ns.FindSlotRule(selSpell, selSlot) then
                 ns.AddSlotRule(selSpell, selSlot)
             end
