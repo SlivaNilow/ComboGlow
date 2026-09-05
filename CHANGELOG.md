@@ -59,6 +59,22 @@ cooldown. All three are things that happen to you rather than because you
 pressed something, which is what the strip is for. `/cg procstrip off` drops
 just the procs.
 
+The strip also gives a slot per **state** now, not per spell. It used to allow
+one per spell, and the second was dropped without a word — a spell's proc could
+be enabled, reported as enabled, and never appear, purely because its resource
+state came first in the list.
+
+**The strip checkbox tells the truth.** It read only the manual flag, so a dot
+the strip had picked up on its own showed an empty box next to an icon that was
+plainly there. It reads the actual state now, and it is named after the state
+being edited: *on the strip while up / while gone / while ready / on a proc* —
+"show above the resource" left out the half that matters.
+
+**Buffs get a "gone" state too.** Only debuffs did, so for a buff the state did
+not exist until you clicked the tab, which looked like a display bug rather than
+an absent rule. The strip still takes only the debuffs by itself; a buff joins
+it if you tick the box.
+
 **Two diagnostics**, because guessing whose glow is whose from a screenshot is
 not a debugging method. `/cg why` lists every marker of ours that is lit right
 now with its rule, state, style and colour — a glowing button missing from that
