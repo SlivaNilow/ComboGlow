@@ -713,6 +713,27 @@ function CG:Rebuild()
             end
         end
         sigParts[#sigParts + 1] = "sz" .. tostring(self.db.center.size)
+
+        -- Grouped by what an icon MEANS, not by the order its rule happened to
+        -- be created in: what is up, then what is missing, then a free cast,
+        -- then what is ready. A row sorted by meaning is readable at a glance,
+        -- and the gaps left by states we cannot read cluster in one place
+        -- instead of scattering between the icons that are lit.
+        local function StripRank(rule)
+            if rule.kind == "aura" and rule.proc then return 3 end
+            if rule.kind == "aura" and rule.missing then return 2 end
+            if rule.kind == "aura" then return 1 end
+            return 4
+        end
+        -- table.sort is not stable, so the position it came in at is the
+        -- tiebreak; without it the row reshuffles between rebuilds.
+        local came = {}
+        for i, r in ipairs(centerRules) do came[r] = i end
+        table.sort(centerRules, function(a, b)
+            local ra, rb = StripRank(a), StripRank(b)
+            if ra ~= rb then return ra < rb end
+            return came[a] < came[b]
+        end)
     end
 
     local sig = table.concat(sigParts, "|")
