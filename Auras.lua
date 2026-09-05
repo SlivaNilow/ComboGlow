@@ -519,6 +519,15 @@ end
 -- When the player's own cast says this aura should run out, per spell.
 local estExpiry = {}
 
+-- For the report: what the estimate believes, and what it was built from.
+function ns.EstimateState(rule)
+    if not rule or not rule.spell then return "-", "-" end
+    local est = estExpiry[rule.spell]
+    local total = ns.KnownTotalFor(rule)
+    return est and ("%.1fs"):format(est - GetTime()) or "no cast seen",
+           total and ("%.0fs"):format(total) or "|cffff4040length unknown|r"
+end
+
 -- True when the estimate puts this aura inside its last `soon` seconds.
 --
 -- An estimate, and called one. In combat nothing will tell us the time: the
@@ -1156,10 +1165,12 @@ function ns.SoonReport(mf, rule)
     -- rather than buried in the long one.
     local _, durWhy = ns.MirrorDurationFor(mf, rule)
 
+    local est, learned = ns.EstimateState(rule)
+
     local n = ns.SoonSeconds(rule)
-    return ("early-gone: soon=%s |cffffd100dur=%s|r caught=%s armed=%s made=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
+    return ("early-gone: soon=%s |cffffd100dur=%s est=%s of %s|r caught=%s armed=%s made=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
         n and ("%ds"):format(n) or "off",
-        tostring(durWhy),
+        tostring(durWhy), est, learned,
         ns.CaughtDuration(mf) and "|cff40ff40yes|r" or "|cffff4040no|r",
         ns.ArmedBy(mf),
         (function()
