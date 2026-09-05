@@ -1458,6 +1458,23 @@ function ns.FormatterTest(mf, say, seconds, live)
              or ns.L("plain 20s control", "контроль, обычные 20 с"),
         tostring(cvar), tostring(fs ~= nil),
         tostring(fs and (fs:GetFont()) or "-"))
+    -- Read the box back instead of asking what is on screen. On the control
+    -- run nothing is secret, so the text the engine put there can simply be
+    -- looked at -- and "nothing rendered" then means nothing rendered, rather
+    -- than meaning somebody glanced at the wrong moment.
+    if fs and C_Timer and C_Timer.After then
+        C_Timer.After(0.6, function()
+            local ok, txt = pcall(fs.GetText, fs)
+            local shown = fs:IsShown() and fs:GetParent():IsShown()
+            say(ns.L("box after 0.6s: text=%s shown=%s alpha=%.2f",
+                     "рамка через 0.6 с: текст=%s показан=%s альфа=%.2f"),
+                (not ok) and "err"
+                    or (txt == nil and "nil"
+                        or (IsSecret(txt) and "secret" or ("%q"):format(tostring(txt)))),
+                tostring(shown), fs:GetAlpha())
+        end)
+    end
+
     say(ns.L("it must read 'over' now and 'UNDER' in the last %d seconds",
              "должно показывать 'over', а в последние %d с — 'UNDER'"), n)
 end
