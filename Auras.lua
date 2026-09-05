@@ -1179,6 +1179,24 @@ function ns.SoonTest(rules, say)
                     name, remaining, tostring(why),
                     remaining - 1, AlphaAt(durObj, remaining - 1),
                     remaining + 1, AlphaAt(durObj, remaining + 1))
+                -- What the widget was actually armed with. Out of combat
+                -- these are plain, and an object built from the wrong numbers
+                -- is indistinguishable from a good one until they are seen.
+                local args = ns.CaughtArgs(mf)
+                if args then
+                    local function show(v)
+                        if v == nil then return "nil" end
+                        if IsSecret(v) then return "secret" end
+                        if type(v) == "number" then return ("%.2f"):format(v) end
+                        return tostring(v)
+                    end
+                    say("   armed %s(%s, %s) | now=%.2f -> implies %s left",
+                        tostring(args.m), show(args.a), show(args.b), GetTime(),
+                        (type(args.a) == "number" and type(args.b) == "number"
+                         and not IsSecret(args.a) and not IsSecret(args.b))
+                            and ("%.1f"):format(args.a + args.b - GetTime())
+                            or "?")
+                end
             end
         end
     end
