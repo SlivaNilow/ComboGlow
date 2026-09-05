@@ -1116,6 +1116,74 @@ function ns.DurationFactory(say, mf)
     say("  " .. attempt("(a)", args.a))
 end
 
+-- Does the duration object we are about to trust actually tell the truth?
+--
+-- Run this OUT OF COMBAT, where the aura is readable and nothing is secret:
+-- the real remaining time can be read, the object can be evaluated, and the
+-- answer comes back plain. A curve is asked twice, on either side of that
+-- known time -- "under remaining-1?" must be no, "under remaining+1?" must be
+-- yes -- which catches an object that is right in kind and wrong in value.
+--
+-- In combat every answer here is secret and the test says nothing. That is not
+-- a limitation of the test; it is the reason the test has to exist.
+function ns.SoonTest(rules, say)
+    local inCombat = InCombatLockdown and InCombatLockdown()
+    say(ns.L("--- duration truth test (%s) ---", "--- проверка объекта (%s) ---"),
+        inCombat and ns.L("IN COMBAT - answers will be secret",
+                          "В БОЮ — ответы будут секретными")
+                  or ns.L("out of combat", "вне боя"))
+    say("shape=%s", tostring(ns.CalibrateDuration()))
+
+    local function AlphaAt(durObj, t)
+        if not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then
+            return "no curve api"
+        end
+        local curve = C_CurveUtil.CreateColorCurve()
+        if curve.SetType and Enum and Enum.LuaCurveType then
+            curve:SetType(Enum.LuaCurveType.Step)
+        end
+        curve:AddPoint(0, CreateColor(1, 1, 1, 1))
+        curve:AddPoint(t, CreateColor(1, 1, 1, 0))
+        local ok, col = pcall(durObj.EvaluateRemainingDuration, durObj, curve)
+        if not ok then return "eval err" end
+        if not HasMethod(col, "GetRGBA") then return "no colour" end
+        local ok2, _, _, _, a = pcall(col.GetRGBA, col)
+        if not ok2 then return "no rgba" end
+        if IsSecret(a) then return "secret" end
+        if type(a) ~= "number" then return type(a) end
+        return a > 0.5 and "UNDER" or "over"
+    end
+
+    for _, rule in ipairs(rules) do
+        if rule.enabled ~= false and rule.kind == "aura" and not rule.proc
+           and not rule.missing then
+            local name = ns.SpellName and ns.SpellName(rule.spell) or rule.spell
+            local found, remaining = ns.QueryAura(rule)
+            local mf, isAura = ns.FindMirror(rule)
+            local durObj, why
+            if mf and isAura then
+                durObj, why = ns.MirrorDurationFor(mf, rule)
+            else
+                why = "no mirror"
+            end
+            if not durObj then
+                say("%s: |cffff4040no duration|r (%s)", name, tostring(why))
+            elseif type(remaining) ~= "number" or IsSecret(remaining) then
+                say("%s: duration %s, but remaining is %s - cannot check here",
+                    name, tostring(why),
+                    found == true and "secret" or "unreadable")
+            else
+                -- Just inside and just outside the real remaining time.
+                say("%s: remaining=%.1f via %s | at %.1f -> %s (want over) | "
+                    .. "at %.1f -> %s (want UNDER)",
+                    name, remaining, tostring(why),
+                    remaining - 1, AlphaAt(durObj, remaining - 1),
+                    remaining + 1, AlphaAt(durObj, remaining + 1))
+            end
+        end
+    end
+end
+
 -- Deliberately terse. This is the one report that has to be read off the
 -- screen mid-fight, so it prints a line per aura rule and nothing else.
 function ns.SoonProbe(rules, say)
@@ -1173,6 +1241,11 @@ function ns.SoonProbe(rules, say)
         end
     end
     if n == 0 then say(ns.L("no aura rules on this spec", "нет правил-аур на этом спеке")) end
+end
+
+-- MirrorDuration, for the diagnostics: same source, same order, same answer.
+function ns.MirrorDurationFor(itemFrame, rule)
+    return MirrorDuration(itemFrame, rule)
 end
 
 -- The sweep is asked for either by the toggle or by picking a time-shaped

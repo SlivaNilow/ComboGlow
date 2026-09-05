@@ -1255,6 +1255,12 @@ local function Handler(msg)
     elseif cmd == "auracheck" then
         ns.AuraCheck(CG:GetRules(), Say)
 
+    elseif cmd == "soontest" then
+        -- Run OUT OF COMBAT: it checks the duration object against a
+        -- remaining time that can still be read.
+        ns.RebuildCDMMap()
+        ns.SoonTest(CG:GetRules(), Say)
+
     elseif cmd == "mkdur" then
         -- What the duration factory wants, asked rather than guessed. The
         -- plain-number control separates a wrong signature from a rejected
