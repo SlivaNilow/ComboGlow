@@ -1419,10 +1419,16 @@ local function Handler(msg)
     elseif cmd == "center" or cmd == "centre" then
         local rule = GetRule(rest)
         if rule then
-            rule.center = not rule.center
+            -- Toggles what the strip actually does with this rule, automatic
+            -- entries included, so it agrees with the options window.
+            if ns.OnStrip(rule) then
+                rule.center, rule.stripOff = nil, true
+            else
+                rule.center, rule.stripOff = true, nil
+            end
             CG:Rebuild()
             Say(L("in the reminder strip: %s", "в полосе напоминаний: %s"),
-                rule.center and L("on", "вкл") or L("off", "выкл"))
+                ns.OnStrip(rule) and L("on", "вкл") or L("off", "выкл"))
         end
 
     elseif cmd == "power" then

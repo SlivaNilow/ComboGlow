@@ -797,10 +797,19 @@ local function Build()
           hide = function(r) return r.kind == "aura" or ns.procOwned[r.spell] end,
           get = function(r) return r.orProc ~= false end,
           set = function(r) r.orProc = not (r.orProc ~= false) end },
+        -- Reads the state the strip is actually in, automatic entries
+        -- included. Reading rule.center alone left the box empty next to an
+        -- icon that was plainly on the strip.
         { key = "center", auraOnly = false,
           label = L("show above the resource", "показывать над ресурсом"),
-          get = function(r) return r.center end,
-          set = function(r) r.center = not r.center end },
+          get = function(r) return ns.OnStrip(r) end,
+          set = function(r)
+              if ns.OnStrip(r) then
+                  r.center, r.stripOff = nil, true
+              else
+                  r.center, r.stripOff = true, nil
+              end
+          end },
     }
 
     for i, def in ipairs(defs) do

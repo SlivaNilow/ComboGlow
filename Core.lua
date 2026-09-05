@@ -505,7 +505,7 @@ local function RuleFingerprint(rule)
         tostring(rule.timer), tostring(rule.center), tostring(rule.unit),
         tostring(rule.min), tostring(rule.max), tostring(rule.atMax),
         tostring(rule.orProc), tostring(rule.swipe), tostring(rule.auraID),
-        tostring(rule.combat), tostring(rule.style2),
+        tostring(rule.combat), tostring(rule.style2), tostring(rule.stripOff),
         -- Sorted at the source, so the same set of buffs always reads the same
         -- and picking one in the options window does force a rebuild.
         type(rule.auraIDs) == "table" and table.concat(rule.auraIDs, "+") or "",
@@ -627,8 +627,6 @@ function CG:Rebuild()
 
     local centerRules = {}
     if self.db.center.enabled then
-        local auto = self.db.center.autoMissing ~= false
-        local autoProc = self.db.center.autoProc ~= false
         -- One slot per spell, not per rule. Named apart from the outer
         -- "watched" (action slots) it would otherwise shadow.
         local onStrip = {}
@@ -645,12 +643,9 @@ function CG:Rebuild()
             -- A burst coming up and a free cast appearing are the same kind of
             -- nudge as a dot falling off: something changed that you did not
             -- press a button to cause, and the strip is where those go.
-            local isProc = rule.kind == "aura" and rule.proc
-            local autoWanted = not onStrip[rule.spell]
-                and (((rule.kind == "aura" and rule.missing and not rule.auraID)
-                      or rule.kind == "cd") and auto
-                     or (isProc and autoProc))
-            if (rule.center or autoWanted) and rule.enabled ~= false then
+            local autoWanted = not onStrip[rule.spell] and ns.AutoStrip(rule)
+            if not rule.stripOff and (rule.center or autoWanted)
+               and rule.enabled ~= false then
                 onStrip[rule.spell] = true
                 centerRules[#centerRules + 1] = rule
                 sigParts[#sigParts + 1] = "c" .. RuleFingerprint(rule)
@@ -829,6 +824,35 @@ function CG:HideBlizzGlow(spellID)
     ForEachActionButton(function(b, sid)
         if not ids or (sid and ids[sid]) then HideAlertOn(b) end
     end)
+end
+
+--[[-------------------------------------------------------------------------
+    Who belongs in the reminder strip
+
+    Split out because the options window has to answer the same question. Its
+    checkbox used to read rule.center alone, so a dot that the strip had picked
+    up on its own showed an EMPTY box next to an icon that was plainly there --
+    the control disagreed with the display, and the display was right.
+
+    center = true forces a rule in, stripOff = true forces it out, and neither
+    means "decide by its nature". A plain false is left meaning "decide": rules
+    have been created with center = false since the first version and it never
+    meant "keep this out".
+---------------------------------------------------------------------------]]
+function ns.AutoStrip(rule)
+    local c = CG.db and CG.db.center
+    if not c or not c.enabled then return false end
+    if rule.enabled == false then return false end
+    if rule.kind == "aura" and rule.proc then return c.autoProc ~= false end
+    if c.autoMissing == false then return false end
+    if rule.kind == "cd" then return true end
+    return (rule.kind == "aura" and rule.missing and not rule.auraID) and true or false
+end
+
+function ns.OnStrip(rule)
+    if rule.stripOff then return false end
+    if rule.center then return true end
+    return ns.AutoStrip(rule)
 end
 
 local function Silence(frame)
