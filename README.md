@@ -177,6 +177,12 @@ duration is secret: it is baked into a step colour curve the engine evaluates.
 
 ## Commands
 
+**If `/cg` does nothing, yours is `/cgl`.** Another addon can claim `/cg`
+first -- CityGuide does -- and ComboGlow steps aside rather than fight for it,
+falling back to `/cgl`, then `/cglow`. `/comboglow` always works, and every
+command below takes whichever prefix you have. The one it settled on is printed
+when you log in.
+
 | Command | What it does |
 |---------|--------------|
 | `/cg` | open the options window |
@@ -189,7 +195,9 @@ duration is secret: it is baked into a step colour curve the engine evaluates.
 | `/cg missing <#>` | flip a rule to "glow while gone" |
 | `/cg unit <#> <unit>` | player, target, focus, mouseover, pet |
 | `/cg aura <#> <name\|id>` | watch a different aura than the spell itself |
-| `/cg warn <#> <seconds>` | turn red this long before it ends |
+| `/cg warn <#> <seconds>` | marker turns red this long before it ends |
+| `/cg soon <#> <seconds>` | countdown turns the warning colour this early |
+| `/cg entryfmt on/off` | that colouring, off if another addon fights it |
 | `/cg style <#\|all> <key>` | marker |
 | `/cg color <#> r g b` | colour, 0–255 |
 | `/cg alpha <#\|all> <0-100>` \| `/cg thick <#\|all> <1-10>` | brightness, frame thickness |
@@ -475,6 +483,11 @@ Cooldown Manager»** делает его невидимым, не выключа
 
 ## Команды
 
+**Если `/cg` не отвечает — у тебя `/cgl`.** Префикс может занять другой аддон
+(CityGuide, например), и ComboGlow не отбирает его, а уступает: сначала `/cgl`,
+затем `/cglow`. `/comboglow` работает всегда, и любая команда ниже принимает
+тот префикс, который достался. Какой именно — печатается при входе в игру.
+
 | Команда | Что делает |
 |---------|-----------|
 | `/cg` | открыть окно настроек |
@@ -487,7 +500,9 @@ Cooldown Manager»** делает его невидимым, не выключа
 | `/cg missing <№>` | перевернуть: светиться когда ауры нет |
 | `/cg unit <№> <юнит>` | player, target, focus, mouseover, pet |
 | `/cg aura <№> <имя\|id>` | следить за другой аурой, а не за самим заклинанием |
-| `/cg warn <№> <секунд>` | краснеть за столько до конца |
+| `/cg warn <№> <секунд>` | отметка краснеет за столько до конца |
+| `/cg soon <№> <секунд>` | отсчёт краснеет за столько до конца |
+| `/cg entryfmt on/off` | это окрашивание; off, если мешает другой аддон |
 | `/cg style <№\|all> <ключ>` | отметка |
 | `/cg color <№> r g b` | цвет, 0–255 |
 | `/cg alpha <№\|all> <0-100>` \| `/cg thick <№\|all> <1-10>` | яркость, толщина рамки |
