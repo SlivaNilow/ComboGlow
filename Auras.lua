@@ -696,12 +696,12 @@ end
 ---------------------------------------------------------------------------]]
 local soonCurves = setmetatable({}, { __mode = "k" })
 
--- Zero is off. One number instead of a number and a switch that can disagree
--- with it -- there is no useful reading of "warn me zero seconds before".
+-- Per state, and zero is off. One number rather than a number and a switch
+-- that can disagree with it: there is no useful reading of "warn me zero
+-- seconds before". Unset means off too -- a state that has never been asked
+-- for a warning should not start giving one.
 function ns.SoonSeconds(rule)
-    local db = ns.CG and ns.CG.db
-    if not db or not db.center then return nil end
-    local n = tonumber(rule.soon) or tonumber(db.center.soon) or 0
+    local n = tonumber(rule.soon) or 0
     if n <= 0 then return nil end
     return n
 end

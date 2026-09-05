@@ -158,10 +158,6 @@ local function RefreshRows(list)
         UI.source:SetText(L("Cooldown Manager: %d auras, %d cooldowns",
                             "Cooldown Manager: аур %d, кулдаунов %d"):format(nAura, nEss))
     end
-    local soon = tonumber(CG.db.center.soon) or 0
-    UI.soonRow.label:SetText(soon > 0
-        and L("warn above the resource: %ds left", "предупреждать над ресурсом: за %d с"):format(soon)
-        or L("warn above the resource: off", "предупреждать над ресурсом: выкл"))
     UI.hideCDM.text:SetText(CG.db.hideCDM
         and L("show the Cooldown Manager", "показать Cooldown Manager")
         or L("hide the Cooldown Manager", "скрыть Cooldown Manager"))
@@ -273,6 +269,19 @@ local function RefreshDetails()
             .. "|cffffd100" .. what .. "|r")
     else
         UI.countRow:Hide()
+    end
+
+    -- Warning before this aura runs out: strip only, and only for a state that
+    -- means "it is up". Zero is off.
+    if rule and rule.kind == "aura" and not rule.proc and not rule.missing then
+        UI.soonRow:Show()
+        local n = tonumber(rule.soon) or 0
+        UI.soonRow.label:SetText(n > 0
+            and L("warn above the resource: %ds left",
+                  "предупреждать над ресурсом: за %d с"):format(n)
+            or L("warn above the resource: off", "над ресурсом не показывать"))
+    else
+        UI.soonRow:Hide()
     end
 
     -- Which aura this state watches (aura states only). For a proc the same
@@ -974,29 +983,38 @@ local function Build()
     -- Above the status line, clear of the buttons along the bottom.
     UI.hideCDM:SetPoint("BOTTOMLEFT", 14, 62)
 
-    -- Seconds of warning before an aura runs out. Zero is off: there is no
-    -- useful reading of "warn me zero seconds before", so it does the job a
-    -- checkbox would have done and cannot disagree with the number beside it.
+    -- Per state, not one number for everything: how much warning a dot needs
+    -- depends on the dot. Sits at -128, under the "watching" row, on the line
+    -- the gallery starts below.
     UI.soonRow = CreateFrame("Frame", nil, UI)
-    UI.soonRow:SetSize(236, 20)
-    UI.soonRow:SetPoint("BOTTOMLEFT", 12, 88)
-
-    UI.soonRow.label = Label(UI.soonRow, "", 11, 0.75, 0.75, 0.75)
-    UI.soonRow.label:SetPoint("LEFT", 2, 0)
+    UI.soonRow:SetSize(378, 20)
+    UI.soonRow:SetPoint("TOPLEFT", 264, -128)
+    local srBg = UI.soonRow:CreateTexture(nil, "BACKGROUND")
+    srBg:SetAllPoints(UI.soonRow)
+    srBg:SetColorTexture(1, 1, 1, 0.06)
 
     local function StepSoon(delta)
-        local c = CG.db.center
+        local rule = CurrentRule()
+        if not rule then return end
         if IsShiftKeyDown() then delta = delta * 5 end
-        c.soon = math.max(0, math.min(60, (tonumber(c.soon) or 0) + delta))
+        rule.soon = math.max(0, math.min(60, (tonumber(rule.soon) or 0) + delta))
         CG.lastSig = nil
         CG:Rebuild()
         Refresh()
     end
 
     UI.soonRow.plus = TextButton(UI.soonRow, "+", 22, 16, function() StepSoon(1) end)
-    UI.soonRow.plus:SetPoint("RIGHT", UI.soonRow, "RIGHT", -2, 0)
+    UI.soonRow.plus:SetPoint("RIGHT", UI.soonRow, "RIGHT", -6, 0)
     UI.soonRow.minus = TextButton(UI.soonRow, "-", 22, 16, function() StepSoon(-1) end)
     UI.soonRow.minus:SetPoint("RIGHT", UI.soonRow.plus, "LEFT", -4, 0)
+
+    -- Bounded by the buttons. Every text in this window that was free to grow
+    -- towards another one has ended up drawn on top of it.
+    UI.soonRow.label = Label(UI.soonRow, "", 11, 0.75, 0.75, 0.75)
+    UI.soonRow.label:SetPoint("LEFT", 6, 0)
+    UI.soonRow.label:SetPoint("RIGHT", UI.soonRow.minus, "LEFT", -8, 0)
+    UI.soonRow.label:SetJustifyH("LEFT")
+    UI.soonRow.label:SetWordWrap(false)
 
     UI.openCDM = TextButton(UI, L("Cooldown Manager settings", "Настройки Cooldown Manager"),
                             190, 22, function()

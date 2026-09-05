@@ -149,10 +149,6 @@ local DEFAULTS = {
         -- So is a free cast appearing: it happens to you rather than because
         -- you pressed something, which is exactly what the strip is for.
         autoProc = true,
-        -- Seconds of warning before an aura runs out: a state joins the strip
-        -- while it is still up but nearly gone, because "gone" is already too
-        -- late to act on. Zero is off.
-        soon = 5,
         -- Close the gap where a state we can read is not lit. Mirrored ones
         -- keep their place either way -- their state is not ours to know.
         pack = true,
@@ -627,6 +623,7 @@ local function RuleFingerprint(rule)
         tostring(rule.min), tostring(rule.max), tostring(rule.atMax),
         tostring(rule.orProc), tostring(rule.swipe), tostring(rule.auraID),
         tostring(rule.combat), tostring(rule.style2), tostring(rule.stripOff),
+        tostring(rule.soon),
         -- Sorted at the source, so the same set of buffs always reads the same
         -- and picking one in the options window does force a rebuild.
         type(rule.auraIDs) == "table" and table.concat(rule.auraIDs, "+") or "",
