@@ -149,6 +149,9 @@ local DEFAULTS = {
         -- So is a free cast appearing: it happens to you rather than because
         -- you pressed something, which is exactly what the strip is for.
         autoProc = true,
+        -- Close the gap where a state we can read is not lit. Mirrored ones
+        -- keep their place either way -- their state is not ours to know.
+        pack = true,
     },
     specs = {},
 }
@@ -252,11 +255,41 @@ local CDM_ALL_VIEWERS = {
     Re-applied on every map rebuild: Blizzard's own code sets these back when
     the viewers are rebuilt, on a spec change among other things.
 ---------------------------------------------------------------------------]]
+local cdmHooked, cdmTicker = {}, nil
+
 function ns.ApplyCDMVisibility()
     local hide = CG.db and CG.db.hideCDM
     for _, name in ipairs(CDM_ALL_VIEWERS) do
         local f = _G[name]
-        if f and f.SetAlpha then pcall(f.SetAlpha, f, hide and 0 or 1) end
+        if f and f.SetAlpha then
+            pcall(f.SetAlpha, f, hide and 0 or 1)
+            -- Blizzard puts the alpha back on its own schedule -- a viewer
+            -- being shown again is one of the moments, and rebuilding the map
+            -- does not happen at all of them. Cheap to catch here.
+            if not cdmHooked[f] and f.HookScript then
+                cdmHooked[f] = true
+                pcall(f.HookScript, f, "OnShow", ns.ApplyCDMVisibility)
+            end
+        end
+    end
+
+    -- And a slow sweep for the moments neither of those covers. Four frames
+    -- once a second, and only while it is meant to be hidden: the alternative
+    -- is hunting for every event Blizzard restores it on, which is a list that
+    -- changes with the patch.
+    if hide and not cdmTicker then
+        cdmTicker = C_Timer.NewTicker(1, function()
+            if not (CG.db and CG.db.hideCDM) then return end
+            for _, name in ipairs(CDM_ALL_VIEWERS) do
+                local f = _G[name]
+                if f and f.GetAlpha and f:GetAlpha() > 0 then
+                    pcall(f.SetAlpha, f, 0)
+                end
+            end
+        end)
+    elseif not hide and cdmTicker then
+        cdmTicker:Cancel()
+        cdmTicker = nil
     end
 end
 
@@ -541,6 +574,7 @@ function CG:Teardown()
     self.centerPool:ReleaseAll()
     ns.UntrackAuraFrames()
     wipe(ns.procActive)
+    self._packSig = nil
     wipe(self.powerFrames)
     wipe(self.auraFrames)
     wipe(self.watchedSlots)
@@ -748,10 +782,12 @@ function CG:Rebuild()
             local totalW = n * size + (n - 1) * spacing
             a:SetSize(totalW, size)
             self:PositionAnchor()
+            wipe(self.centerIcons)
             for i, rule in ipairs(centerRules) do
                 local ic = self.centerPool:Acquire()
                 ic.secondary = nil
                 ic.isStrip = true
+                self.centerIcons[#self.centerIcons + 1] = ic
                 ic:SetParent(a)
                 ic:Setup(size, ns.SpellIcon(rule.spell))
                 -- Always the plain frame here, whatever the button uses. On a
@@ -1051,6 +1087,7 @@ function CG:UpdateAuras()
         ns.procDirty = false
         self:UpdatePower()
     end
+    self:PackStrip()
 end
 
 function CG:QueueAuraUpdate()
@@ -1080,6 +1117,52 @@ function CG:UpdateNow()
 
     self:UpdatePower()
     self:UpdateAuras()
+    self:PackStrip()
+end
+
+--[[-------------------------------------------------------------------------
+    Closing the gaps in the strip
+
+    Slots used to be fixed, because in restricted content the state is resolved
+    engine-side and we genuinely cannot know which icons are lit -- so a state
+    driven by the mirror keeps its place regardless. Everything else we DO know
+    about: a proc that has not procced, a burst on cooldown, a dot that reads.
+    Those close up, which is most of the gaps in practice.
+
+    "/cg pack off" for anyone who would rather the icons never move.
+---------------------------------------------------------------------------]]
+function CG:PackStrip()
+    local icons = self.centerIcons
+    if not icons or #icons == 0 then return end
+    local c = self.db.center
+    if not c.enabled or c.pack == false then return end
+
+    local size = c.size or 52
+    local spacing = c.spacing or 10
+    -- Repositioning runs on every update pass, so the set is fingerprinted and
+    -- the work skipped unless it actually changed.
+    local live, sig = {}, ""
+    for _, ic in ipairs(icons) do
+        -- A mirrored icon counts as present whatever its alpha: its state is
+        -- the engine's to know, not ours.
+        if ic._mirroring or ic:IsShown() then
+            live[#live + 1] = ic
+            sig = sig .. tostring(ic)
+        end
+    end
+    if sig == self._packSig then return end
+    self._packSig = sig
+
+    local n = #live
+    local totalW = size
+    if n > 0 then totalW = n * size + (n - 1) * spacing end
+    local a = anchor
+    if a then a:SetSize(totalW, size) end
+    for i, ic in ipairs(live) do
+        local x = (i - 1) * (size + spacing) - totalW * 0.5 + size * 0.5
+        ic:ClearAllPoints()
+        ic:SetPoint("CENTER", a or ic:GetParent(), "CENTER", x, 0)
+    end
 end
 
 function CG:Test(seconds)
@@ -1294,6 +1377,7 @@ function CG:Initialize()
     self.centerPool = CreateFramePool("Frame", UIParent, "ComboGlowCenterIconTemplate")
     self.powerFrames = {}
     self.auraFrames  = {}
+    self.centerIcons = {}
     self.watchedSlots = {}
     self.wantedSpells = {}
 

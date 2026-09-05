@@ -956,6 +956,7 @@ local function PrintHelp()
         { "/cg procstrip on|off",      L("show procs in the reminder strip (on by default)", "показывать проки в полосе напоминаний (по умолчанию вкл)") },
         { "/cg hidecdm on|off",        L("hide the Cooldown Manager without stopping it", "скрыть Cooldown Manager, не выключая его") },
         { "/cg minimap on|off",        L("the minimap button", "кнопка у миникарты") },
+        { "/cg pack on|off",           L("close gaps in the reminder strip", "закрывать дырки в полосе напоминаний") },
         { "/cg stackpos <where>",      L("where the stack count sits on the marker", "где на отметке стоит счётчик стаков") },
         { "/cg stacksize <50-200>",    L("stack count size, in percent", "размер счётчика стаков, в процентах") },
         { "/cg auracheck",             L("report what the aura API answers here, with measured lag", "показать ответ aura API и замеренную задержку") },
@@ -1472,6 +1473,13 @@ local function Handler(msg)
         CG:UpdateAuras()
         Say(L("Cooldown Manager fallback: %s", "запасной путь через Cooldown Manager: %s"),
             CG.db.mirror and L("on", "вкл") or L("off", "выкл"))
+
+    elseif cmd == "pack" then
+        CG.db.center.pack = OnOff(rest:lower(), CG.db.center.pack ~= false)
+        CG.lastSig = nil
+        CG:Rebuild()
+        Say(L("close gaps in the strip: %s", "закрывать дырки в полосе: %s"),
+            CG.db.center.pack and L("on", "вкл") or L("off", "выкл"))
 
     elseif cmd == "minimap" then
         -- The command talks about showing it; the flag stores the opposite.
