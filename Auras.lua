@@ -938,7 +938,7 @@ function ns.AuraCheck(rules, say)
     say("ShouldAurasBeSecret: %s | target: %s", restricted,
         UnitExists("target") and (UnitName("target") or "?") or "none")
 
-    local n = 0
+    local n, blind = 0, {}
     for i, rule in ipairs(rules) do
         if rule.kind == "aura" then
             n = n + 1
@@ -972,6 +972,7 @@ function ns.AuraCheck(rules, say)
                     tostring(dUnit), tostring(dIID),
                     ns.DebugWarnColor(nil, rule, mf))
             else
+                blind[#blind + 1] = name
                 say("     cdm mirror: |cffff4040none|r%s", ns.L(
                     " - track this spell in the Cooldown Manager to enable the fallback",
                     " — добавь заклинание в Cooldown Manager, чтобы заработал запасной путь"))
@@ -979,4 +980,17 @@ function ns.AuraCheck(rules, say)
         end
     end
     if n == 0 then say("no aura rules on this spec") end
+
+    -- The single most useful line in this report. A target debuff cannot be
+    -- read directly in 12.1, so a spell the Cooldown Manager does not track is
+    -- one nothing can see -- and its tracked list is configured per
+    -- SPECIALIZATION, which is why the same character can work as one spec and
+    -- be blind as another.
+    if #blind > 0 then
+        say(ns.L("|cffff4040%d of %d have no fallback:|r %s",
+                 "|cffff4040без запасного пути: %d из %d|r — %s"),
+            #blind, n, table.concat(blind, ", "))
+        say(ns.L("add them under Options - Cooldown Manager for THIS spec",
+                 "добавь их в Настройки — Cooldown Manager для ЭТОЙ специализации"))
+    end
 end
