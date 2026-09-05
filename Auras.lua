@@ -98,19 +98,42 @@ function ns.QueryAura(rule)
     local aura, ok
     local ids = AuraCandidates(rule)
 
-    for _, id in ipairs(ids) do
+    local function Lookup(id)
         -- Your own buff on yourself is the one case Blizzard kept readable for
         -- a set of whitelisted spells, and it has its own entry point.
         if unit == "player" and UA.GetPlayerAuraBySpellID then
             local okP, res = pcall(UA.GetPlayerAuraBySpellID, id)
-            if okP and type(res) == "table" then aura = res end
+            if okP and type(res) == "table" then return res end
         end
         -- By id: survives a debuff whose NAME differs from the spell casting it.
-        if not aura and UA.GetUnitAuraBySpellID then
+        if UA.GetUnitAuraBySpellID then
             local ok2, res = pcall(UA.GetUnitAuraBySpellID, unit, id)
-            if ok2 and type(res) == "table" then aura = res end
+            if ok2 and type(res) == "table" then return res end
         end
-        if aura then break end
+        return nil
+    end
+
+    -- With more than one aura behind a rule the two kinds of state want
+    -- opposite answers. A proc is free if ANY of its buffs is up: Touch the
+    -- Cosmos and Starweaver's Warp do the same job and either will do. An
+    -- ordinary state watches what one spell APPLIES, and a spell that lands
+    -- two debuffs needs both -- either one missing is a reason to recast, so
+    -- "up" has to mean all of them.
+    --
+    -- The countdown comes from the first, not the soonest to expire: auras
+    -- applied by the same cast share a duration, and picking the minimum would
+    -- mean reading every one of them for a difference that is not there.
+    if rule.proc or #ids < 2 then
+        for _, id in ipairs(ids) do
+            aura = Lookup(id)
+            if aura then break end
+        end
+    else
+        for _, id in ipairs(ids) do
+            local a = Lookup(id)
+            if not a then return false end
+            aura = aura or a
+        end
     end
 
     -- By name with the PLAYER filter: catches cast id ~= aura id, same name.

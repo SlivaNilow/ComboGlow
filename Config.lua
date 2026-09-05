@@ -447,12 +447,16 @@ function ns.GuessProcAuras(spellID)
     return found
 end
 
--- The buffs a proc state watches, as one readable line.
+-- The auras a state watches, as one readable line. auraID is the single-id
+-- form rules were created with before the list existed; it still resolves.
 function ns.ProcAuraText(rule)
-    local ids = rule and rule.auraIDs
-    if type(ids) ~= "table" or #ids == 0 then return nil end
+    if not rule then return nil end
     local parts = {}
-    for _, id in ipairs(ids) do parts[#parts + 1] = ns.SpellName(id) end
+    if type(rule.auraIDs) == "table" then
+        for _, id in ipairs(rule.auraIDs) do parts[#parts + 1] = ns.SpellName(id) end
+    end
+    if rule.auraID then parts[#parts + 1] = ns.SpellName(rule.auraID) end
+    if #parts == 0 then return nil end
     return table.concat(parts, " / ")
 end
 

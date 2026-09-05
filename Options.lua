@@ -304,12 +304,12 @@ local function RefreshDetails()
                 .. "|cffffd100" .. watching .. "|r")
             UI.auraRow.hint:SetText(warn)
         else
-            local named = rule.auraID and ns.SpellName(rule.auraID) or rule.auraName
+            local named = ns.ProcAuraText(rule) or rule.auraName
             local watching = named or L("its own aura", "своя аура")
             UI.auraRow.label:SetText(L("watching: ", "следит за: ")
                 .. "|cffffd100" .. watching .. "|r")
             UI.auraRow.hint:SetText(named and ""
-                or L("click to pick another spell's aura", "нажми, чтобы выбрать чужую ауру"))
+                or L("click to pick auras", "нажми, чтобы выбрать ауры"))
         end
     end
 
@@ -586,37 +586,41 @@ local function Build()
                 return
             end
 
-            -- A proc can have several buffs behind it, so this list toggles
-            -- rather than picks: one buff frees one spell, another frees two,
-            -- and a state has to be able to watch all of them. It stays open.
-            if rule.proc then
-                if not self.spellID then
-                    rule.auraIDs, rule.timer = nil, false
-                else
-                    local ids = rule.auraIDs
-                    if type(ids) ~= "table" then ids = {} end
-                    local at
-                    for k, id in ipairs(ids) do
-                        if id == self.spellID then at = k break end
+            -- The list toggles rather than picks, for both kinds of state. A
+            -- proc can have several buffs behind it, and an ordinary state can
+            -- watch several auras from one cast -- Vampiric Touch applies
+            -- Shadow Word: Pain as well, and both have to be up. It stays open.
+            if not self.spellID then
+                rule.auraIDs, rule.auraID, rule.auraName = nil, nil, nil
+                if rule.proc then rule.timer = false end
+            else
+                local ids = rule.auraIDs
+                if type(ids) ~= "table" then ids = {} end
+                -- Fold in the single-id form rules were created with before
+                -- the list existed, so the first toggle does not drop it.
+                if rule.auraID then
+                    local dup = false
+                    for _, id in ipairs(ids) do
+                        if id == rule.auraID then dup = true break end
                     end
-                    if at then table.remove(ids, at) else ids[#ids + 1] = self.spellID end
-                    table.sort(ids)
-                    rule.auraIDs = (#ids > 0) and ids or nil
-                    -- A proc pointed at a buff has a real duration to show;
-                    -- the spell-alert fallback has none, so the timer follows.
-                    rule.timer = rule.auraIDs ~= nil
+                    if not dup then ids[#ids + 1] = rule.auraID end
+                    rule.auraID = nil
                 end
-                CG:Rebuild()
-                Refresh()
-                PopulateAuraList()
-                return
+                local at
+                for k, id in ipairs(ids) do
+                    if id == self.spellID then at = k break end
+                end
+                if at then table.remove(ids, at) else ids[#ids + 1] = self.spellID end
+                table.sort(ids)
+                rule.auraIDs = (#ids > 0) and ids or nil
+                rule.auraName = nil
+                -- A proc pointed at a buff has a real duration to show; the
+                -- spell-alert fallback has none, so the timer follows.
+                if rule.proc then rule.timer = rule.auraIDs ~= nil end
             end
-
-            rule.auraID = self.spellID
-            rule.auraName = nil
             CG:Rebuild()
-            UI.auraList:Hide()
             Refresh()
+            PopulateAuraList()
         end)
         UI.auraList.entries[i] = e
     end
@@ -678,6 +682,11 @@ local function Build()
             -- its own aura is invisible, and the useful targets are the ones
             -- the Cooldown Manager tracks -- listing only configured spells
             -- offered the choice least likely to help.
+            local chosen = {}
+            if type(rule and rule.auraIDs) == "table" then
+                for _, id in ipairs(rule.auraIDs) do chosen[id] = true end
+            end
+            if rule and rule.auraID then chosen[rule.auraID] = true end
             list = { { id = nil, name = L("its own aura", "своя аура") } }
             local names, rest = {}, {}
             local function Add(id, tracked)
@@ -685,9 +694,10 @@ local function Build()
                 local nm = ns.SpellName(id)
                 if not nm or nm:find("^spell:") or names[nm] then return end
                 names[nm] = true
+                local box = chosen[id] and "|cff0cd29f[x]|r " or "|cff606060[ ]|r "
                 rest[#rest + 1] = {
                     id = id, sort = nm, tracked = tracked and true or false,
-                    name = tracked and nm or ("|cff909090" .. nm .. "|r"),
+                    name = box .. (tracked and nm or ("|cff909090" .. nm .. "|r")),
                 }
             end
             for id in pairs(ns.cdmAuraSpells or {}) do Add(id, true) end
