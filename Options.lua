@@ -287,8 +287,7 @@ local function RefreshDetails()
                 -- The exact answer, and the one that needs no configuring:
                 -- the game reports what the cast costs right now.
                 watching = L("the cast costs nothing", "каст ничего не стоит")
-                warn = L("asked of the game - click to add a buff anyway",
-                         "спрашиваем у игры — можно и добавить бафф")
+                warn = L("by cost", "по стоимости")
             else
                 watching = named or L("the game's own proc alert",
                                       "штатная подсветка прока")
@@ -530,14 +529,21 @@ local function Build()
         if p[6] then edge:SetHeight(p[6]) end
     end
 
-    UI.auraRow.label = Label(UI.auraRow, "", 11, 0.75, 0.75, 0.75)
-    UI.auraRow.label:SetPoint("LEFT", 6, 0)
-
     UI.auraRow.arrow = Label(UI.auraRow, "▼", 10, 0.6, 0.6, 0.6)
     UI.auraRow.arrow:SetPoint("RIGHT", -6, 0)
 
     UI.auraRow.hint = Label(UI.auraRow, "", 10, 0.5, 0.5, 0.5)
     UI.auraRow.hint:SetPoint("RIGHT", UI.auraRow.arrow, "LEFT", -6, 0)
+    UI.auraRow.hint:SetJustifyH("RIGHT")
+    UI.auraRow.hint:SetWordWrap(false)
+
+    -- Bounded by the hint on its right. Both were free to grow towards the
+    -- middle and simply drew over each other there.
+    UI.auraRow.label = Label(UI.auraRow, "", 11, 0.75, 0.75, 0.75)
+    UI.auraRow.label:SetPoint("LEFT", 6, 0)
+    UI.auraRow.label:SetPoint("RIGHT", UI.auraRow.hint, "LEFT", -8, 0)
+    UI.auraRow.label:SetJustifyH("LEFT")
+    UI.auraRow.label:SetWordWrap(false)
 
     UI.auraRow:SetScript("OnEnter", function() arBg:SetColorTexture(0.05, 0.82, 0.62, 0.30) end)
     UI.auraRow:SetScript("OnLeave", function() arBg:SetColorTexture(1, 1, 1, 0.10) end)
@@ -667,15 +673,31 @@ local function Build()
             end)
             for _, item in ipairs(rest) do list[#list + 1] = item end
         else
-            local seen
-            seen, list = {}, { { id = nil, name = L("its own aura", "своя аура") } }
-            seen[selSpell] = true
-            for _, r in ipairs(CG:GetRules()) do
-                if r.spell and not seen[r.spell] then
-                    seen[r.spell] = true
-                    list[#list + 1] = { id = r.spell, name = ns.SpellName(r.spell) }
-                end
+            -- Everything that can actually be watched, not only spells that
+            -- already have rules. A state is pointed elsewhere precisely when
+            -- its own aura is invisible, and the useful targets are the ones
+            -- the Cooldown Manager tracks -- listing only configured spells
+            -- offered the choice least likely to help.
+            list = { { id = nil, name = L("its own aura", "своя аура") } }
+            local names, rest = {}, {}
+            local function Add(id, tracked)
+                if not id or id == selSpell then return end
+                local nm = ns.SpellName(id)
+                if not nm or nm:find("^spell:") or names[nm] then return end
+                names[nm] = true
+                rest[#rest + 1] = {
+                    id = id, sort = nm, tracked = tracked and true or false,
+                    name = tracked and nm or ("|cff909090" .. nm .. "|r"),
+                }
             end
+            for id in pairs(ns.cdmAuraSpells or {}) do Add(id, true) end
+            for _, r in ipairs(CG:GetRules()) do Add(r.spell, false) end
+            -- Tracked ones first: those are the ones that will work.
+            table.sort(rest, function(a, b)
+                if a.tracked ~= b.tracked then return a.tracked end
+                return a.sort < b.sort
+            end)
+            for _, item in ipairs(rest) do list[#list + 1] = item end
         end
 
         for i, e in ipairs(UI.auraList.entries) do
