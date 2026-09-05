@@ -214,6 +214,22 @@ local function RefreshDetails()
     end
     UI.hint:SetText(hint)
 
+    -- Said here rather than left to be discovered: an aura state whose spell
+    -- the Cooldown Manager does not track cannot work at all on a target
+    -- debuff, and there is nothing in the window to hint at that otherwise.
+    -- Finding out which spell is missing was the whole chore.
+    local blind = false
+    if rule and rule.kind == "aura" and not rule.proc then
+        local mf, isAuraEntry = ns.FindMirror(rule)
+        blind = not (mf and isAuraEntry) and not ns.ReadsWork(rule)
+    end
+    if blind then
+        UI.warn:SetText("|cffff6060" .. L("not tracked in the Cooldown Manager - add it there",
+                                          "нет в Cooldown Manager — добавь его туда") .. "|r")
+    else
+        UI.warn:SetText("")
+    end
+
     for _, t in ipairs(UI.toggles) do
         if not rule or (t.auraOnly and rule.kind ~= "aura")
            or (t.hide and t.hide(rule)) then
@@ -342,6 +358,13 @@ local function Build()
 
     UI.hint = Label(UI, "", 11, 0.6, 0.6, 0.6)
     UI.hint:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -4)
+
+    -- Sits with the aura row, where the state being edited is: the warning is
+    -- about this spell, not about the window.
+    UI.warn = Label(UI, "", 11, 1, 1, 1)
+    UI.warn:SetPoint("TOPLEFT", 264, -152)
+    UI.warn:SetPoint("RIGHT", UI, "LEFT", 642, 0)
+    UI.warn:SetJustifyH("LEFT")
 
     local close = TextButton(UI, "X", 22, 22, function() UI:Hide() end)
     close:SetPoint("TOPRIGHT", -10, -10)
