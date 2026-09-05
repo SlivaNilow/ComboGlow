@@ -696,11 +696,12 @@ end
 ---------------------------------------------------------------------------]]
 local soonCurves = setmetatable({}, { __mode = "k" })
 
+-- Zero is off. One number instead of a number and a switch that can disagree
+-- with it -- there is no useful reading of "warn me zero seconds before".
 function ns.SoonSeconds(rule)
     local db = ns.CG and ns.CG.db
-    if not db or not db.center or db.center.soonOn == false then return nil end
-    if rule.soon == false then return nil end
-    local n = tonumber(rule.soon) or tonumber(db.center.soon) or 5
+    if not db or not db.center then return nil end
+    local n = tonumber(rule.soon) or tonumber(db.center.soon) or 0
     if n <= 0 then return nil end
     return n
 end

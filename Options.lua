@@ -158,6 +158,10 @@ local function RefreshRows(list)
         UI.source:SetText(L("Cooldown Manager: %d auras, %d cooldowns",
                             "Cooldown Manager: аур %d, кулдаунов %d"):format(nAura, nEss))
     end
+    local soon = tonumber(CG.db.center.soon) or 0
+    UI.soonRow.label:SetText(soon > 0
+        and L("warn above the resource: %ds left", "предупреждать над ресурсом: за %d с"):format(soon)
+        or L("warn above the resource: off", "предупреждать над ресурсом: выкл"))
     UI.hideCDM.text:SetText(CG.db.hideCDM
         and L("show the Cooldown Manager", "показать Cooldown Manager")
         or L("hide the Cooldown Manager", "скрыть Cooldown Manager"))
@@ -969,6 +973,30 @@ local function Build()
     end)
     -- Above the status line, clear of the buttons along the bottom.
     UI.hideCDM:SetPoint("BOTTOMLEFT", 14, 62)
+
+    -- Seconds of warning before an aura runs out. Zero is off: there is no
+    -- useful reading of "warn me zero seconds before", so it does the job a
+    -- checkbox would have done and cannot disagree with the number beside it.
+    UI.soonRow = CreateFrame("Frame", nil, UI)
+    UI.soonRow:SetSize(236, 20)
+    UI.soonRow:SetPoint("BOTTOMLEFT", 12, 88)
+
+    UI.soonRow.label = Label(UI.soonRow, "", 11, 0.75, 0.75, 0.75)
+    UI.soonRow.label:SetPoint("LEFT", 2, 0)
+
+    local function StepSoon(delta)
+        local c = CG.db.center
+        if IsShiftKeyDown() then delta = delta * 5 end
+        c.soon = math.max(0, math.min(60, (tonumber(c.soon) or 0) + delta))
+        CG.lastSig = nil
+        CG:Rebuild()
+        Refresh()
+    end
+
+    UI.soonRow.plus = TextButton(UI.soonRow, "+", 22, 16, function() StepSoon(1) end)
+    UI.soonRow.plus:SetPoint("RIGHT", UI.soonRow, "RIGHT", -2, 0)
+    UI.soonRow.minus = TextButton(UI.soonRow, "-", 22, 16, function() StepSoon(-1) end)
+    UI.soonRow.minus:SetPoint("RIGHT", UI.soonRow.plus, "LEFT", -4, 0)
 
     UI.openCDM = TextButton(UI, L("Cooldown Manager settings", "Настройки Cooldown Manager"),
                             190, 22, function()

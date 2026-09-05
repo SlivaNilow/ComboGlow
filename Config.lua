@@ -1509,13 +1509,12 @@ local function Handler(msg)
         if rest == "" or rest == nil then
             Say(L("usage: /cg soon <seconds|off>", "формат: /cg soon <секунды|off>"))
         elseif rest:lower() == "off" then
-            CG.db.center.soonOn = false
+            CG.db.center.soon = 0
             CG.lastSig = nil
             CG:Rebuild()
             Say(L("about-to-expire warning: off", "предупреждение об истечении: выкл"))
         elseif n then
-            CG.db.center.soon = math.max(1, math.min(60, n))
-            CG.db.center.soonOn = true
+            CG.db.center.soon = math.max(0, math.min(60, n))
             CG.lastSig = nil
             CG:Rebuild()
             Say(L("warn above the resource with %ds left",
