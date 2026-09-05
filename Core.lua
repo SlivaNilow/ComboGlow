@@ -269,6 +269,12 @@ local function ScheduleCDMVisibility()
     C_Timer.After(0, function()
         cdmPending = false
         ns.ApplyCDMVisibility()
+        -- A viewer laying itself out again means its item frames were
+        -- rebuilt, and every mirror we hold points at the old ones. That is
+        -- what a specialization change does, and why the markers only came
+        -- back after a SECOND reload: the first one read the map before the
+        -- viewers existed, and nothing asked it to look again.
+        if CG.initialized then CG:MarkDirty() end
     end)
 end
 
@@ -1653,6 +1659,19 @@ CG:SetScript("OnEvent", function(self, event, ...)
         self:RefreshSpec()
         self:MarkDirty()
         self:QueueAutoPreset()
+        -- The Cooldown Manager rebuilds its viewers for the new spec, and its
+        -- Layout hook usually catches that. Usually: the viewers can lay
+        -- themselves out before their entries have any data, and then the map
+        -- we read is empty. Two later passes cost nothing and close that.
+        for _, delay in ipairs({ 2, 5 }) do
+            C_Timer.After(delay, function()
+                if self.initialized then
+                    ns.RebuildCDMMap()
+                    self.lastSig = nil
+                    self:Rebuild()
+                end
+            end)
+        end
     elseif event == "PLAYER_ENTERING_WORLD" then
         self:RefreshSpec()
         self:MarkDirty()
