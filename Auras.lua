@@ -658,6 +658,10 @@ local function MirrorDuration(itemFrame, rule)
     local caught = ns.CaughtDuration(itemFrame)
     if caught then return caught, "ok (caught)" end
 
+    -- Nothing passed an object, but something passed numbers. Build one.
+    local made, form = ns.MadeDuration(itemFrame)
+    if made then return made, "ok (made: " .. tostring(form) .. ")" end
+
     return nil, tried and "GetAuraDuration returned nothing" or "no auraDataUnit"
 end
 
@@ -739,6 +743,60 @@ local function HookCooldownDurations()
     return true
 end
 ns.HookCooldownDurations = HookCooldownDurations
+
+--[[-------------------------------------------------------------------------
+    Making a duration object out of what the game armed the widget with
+
+    The entries are armed with SetCooldown(start, duration) and both numbers
+    are secret: they can be forwarded, never read. C_DurationUtil.CreateDuration
+    takes numbers and hands back an OBJECT -- and an object is the one thing a
+    colour curve can be evaluated against.
+
+    So the secret goes in, an answer about it comes out, and the number itself
+    is never seen by us at any point. That is the same trade the whole addon
+    runs on, just built out of parts rather than found ready-made.
+
+    The call shape is learned by trying, because a wrong arity fails loudly and
+    a wrong GUESS would fail quietly -- only a table that can actually evaluate
+    a curve is accepted, and the two-argument form is tried first so a
+    one-argument fallback cannot quietly mean "starts now".
+---------------------------------------------------------------------------]]
+local madeDuration = setmetatable({}, { __mode = "k" })
+
+local function UsableDuration(d)
+    if type(d) ~= "table" then return false end
+    local ok, has = pcall(function() return d.EvaluateRemainingDuration ~= nil end)
+    return (ok and has) and true or false
+end
+
+local function MakeDuration(cd, args)
+    local cached = madeDuration[cd]
+    if cached and cached.args == args then return cached.obj, cached.form end
+    local CDU = C_DurationUtil
+    if not (CDU and CDU.CreateDuration) then return nil, "no factory" end
+
+    local obj, form
+    local shapes = { { "start,dur", args.a, args.b },
+                     { "dur", args.b },
+                     { "start", args.a } }
+    for _, shape in ipairs(shapes) do
+        local ok, d = pcall(CDU.CreateDuration, shape[2], shape[3])
+        if ok and UsableDuration(d) then
+            obj, form = d, shape[1]
+            break
+        end
+    end
+    madeDuration[cd] = { args = args, obj = obj, form = form or "none worked" }
+    return obj, form or "none worked"
+end
+
+-- A duration object built from what this entry was armed with, or nil.
+function ns.MadeDuration(itemFrame)
+    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
+    local args = cd and caughtArgs[cd]
+    if not args then return nil, "nothing captured" end
+    return MakeDuration(cd, args)
+end
 
 -- How this entry's widget was last armed, in whatever words the hook recorded.
 function ns.ArmedBy(itemFrame)
@@ -901,10 +959,15 @@ function ns.SoonReport(mf, rule)
     end
 
     local n = ns.SoonSeconds(rule)
-    return ("early-gone: soon=%s caught=%s armed=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
+    return ("early-gone: soon=%s caught=%s armed=%s made=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
         n and ("%ds"):format(n) or "off",
         ns.CaughtDuration(mf) and "|cff40ff40yes|r" or "|cffff4040no|r",
         ns.ArmedBy(mf),
+        (function()
+            local d, form = ns.MadeDuration(mf)
+            return d and ("|cff40ff40" .. tostring(form) .. "|r") or
+                   ("|cffff4040" .. tostring(form) .. "|r")
+        end)(),
         left and ("%.1fs"):format(left) or "|cffff4040none|r",
         why or "?", rawS, rawD, textWhat,
         #carriers > 0 and (" | carriers: " .. table.concat(carriers, ", ")) or "")
