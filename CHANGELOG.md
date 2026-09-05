@@ -50,10 +50,6 @@ from the secure action-button path, and a Lua closure in the middle of it
 spreads taint — which surfaces as blocked actions in combat, long after the
 change that caused it.
 
-**Two markers on one state.** Shift-click (or right-click) a marker in the
-gallery to layer a second one on top of the first — a pixel outline plus a proc
-glow reads as one distinct mark. Click it again to remove it.
-
 **A minimap button**, and a **Cooldown Manager settings** button in the options
 window -- that is where half the setup happens, and finding it was most of the
 chore. The readme now gives the order to do it in: put what you want marked

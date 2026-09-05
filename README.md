@@ -125,9 +125,8 @@ hand and it stops being managed. The strip above the gallery
 switches which state you are editing, and every gallery tile is a live preview:
 a real overlay running the same code as the bar, drawn on that spell's own icon.
 
-Clicking a tile picks the marker for that state. **Shift-click** (or right-click)
-layers a *second* marker on top of the first — a pixel outline plus a proc glow
-reads as one distinct mark. Shift-click it again to take it off.
+Clicking a tile picks the marker for that state. The first tile, **none**, turns
+the state off without deleting it.
 
 The resource threshold is set with `-` and `+`: one per click, ten with shift
 held, or **max** for "at the cap".
@@ -421,9 +420,8 @@ Cooldown Manager»** делает его невидимым, не выключа
 настоящий оверлей тем же кодом, что рисует на панели, на иконке этого
 заклинания.
 
-Клик по плитке выбирает отметку для состояния. **Shift+клик** (или правая
-кнопка) добавляет *вторую* отметку поверх первой — пиксельный контур плюс
-свечение прока читаются как одна заметная метка. Shift+клик ещё раз — снять.
+Клик по плитке выбирает отметку для состояния. Первая плитка, **без свечения**,
+выключает состояние, не удаляя его.
 
 Порог ресурса ставится кнопками `-` и `+`: по одному за клик, по десять с
 зажатым Shift, или **макс** — «на максимуме».
@@ -687,9 +685,7 @@ MIT, см. [LICENSE](LICENSE).
 画廊上方的条切换正在编辑的状态，每块画廊图块都是实时预览：和动作条上跑的是
 同一套代码，画在该法术自己的图标上。
 
-点击图块为该状态选择标记。**Shift+点击**（或右键）会在第一个标记之上叠加
-*第二个* —— 像素描边加上触发光效，合起来是一个醒目的标记。再次 Shift+点击
-即可去掉。
+点击图块为该状态选择标记。第一块图块**无光效**会关闭该状态而不删除它。
 
 资源阈值用 `-` 和 `+` 设置：每次一点，按住 Shift 每次十点，或者用 **max**
 表示「达到上限」。

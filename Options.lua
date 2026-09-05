@@ -215,8 +215,7 @@ local function RefreshDetails()
 
     local hint
     if rule then
-        hint = L("pick a marker - shift-click for a second one",
-                 "выбери отметку — с Shift добавится вторая")
+        hint = L("pick a marker for this state", "выбери отметку для этого состояния")
     elseif selSpell and not ns.CanAddSlot(selSpell, selSlot) then
         hint = L("nothing to be ready for: no resource cost, no cooldown",
                  "нечего ждать: ни стоимости ресурса, ни кулдауна")
@@ -838,8 +837,7 @@ local function Build()
         name:SetJustifyH("CENTER")
         name:SetWordWrap(false)
 
-        tile:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-        tile:SetScript("OnClick", function(self, button)
+        tile:SetScript("OnClick", function(self)
             if not selSpell then return end
             -- Clicking a marker on an empty state is what creates it: one
             -- click instead of hunting for an "add" button.
@@ -856,27 +854,16 @@ local function Build()
             end
             -- Picking any marker turns the state back on.
             rule.enabled = true
-            -- Shift (or right-click) layers a SECOND marker on the same
-            -- state instead of replacing the first. A pixel outline plus a
-            -- proc glow reads as one distinct mark, which is how you tell a
-            -- free cast from a paid one without inventing new styles.
-            if IsShiftKeyDown() or button == "RightButton" then
-                if rule.style2 == self.styleKey or rule.style == self.styleKey then
-                    rule.style2 = nil
-                else
-                    rule.style2 = self.styleKey
-                end
-                -- Chosen by hand, same as a plain click: the rebuild's
-                -- default look stops being applied to this rule.
-                rule.styleLocked = true
-            else
-                rule.style = self.styleKey
-                if self.defAlpha then rule.alpha = self.defAlpha end
-                if rule.style2 == rule.style then rule.style2 = nil end
-                -- Chosen by hand: the rebuild's correction for gold proc
-                -- markers leaves it alone from here on.
-                rule.styleLocked = true
-            end
+            rule.style = self.styleKey
+            -- A second layered marker used to live on shift-click. It existed
+            -- only while the proc marker was still coming out gold and looked
+            -- like it needed the help; one marker in a colour nothing else
+            -- uses does the job, and the extra click was one more thing to
+            -- explain for no gain.
+            rule.style2 = nil
+            if self.defAlpha then rule.alpha = self.defAlpha end
+            -- Chosen by hand: the rebuild stops applying the default look.
+            rule.styleLocked = true
             CG:Rebuild()
             Refresh()
         end)
@@ -1116,13 +1103,18 @@ function ns.CreateMinimapButton()
     local icon = mmButton:CreateTexture(nil, "BACKGROUND")
     icon:SetSize(20, 20)
     icon:SetPoint("CENTER", 0, 1)
-    icon:SetTexture("Interface\Icons\ability_rogue_eviscerate")
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    -- The addon's own art. TGA because the client reads TGA and BLP and
+    -- nothing else: a PNG in this slot simply draws nothing.
+    --
+    -- Forward slashes on purpose. The usual backslash form needs doubling in a
+    -- Lua string, and a single one here is not a path with a typo -- "\I" is an
+    -- invalid escape sequence and the whole file stops compiling.
+    icon:SetTexture("Interface/AddOns/ComboGlow/icon.tga")
 
     local border = mmButton:CreateTexture(nil, "OVERLAY")
     border:SetSize(53, 53)
     border:SetPoint("TOPLEFT")
-    border:SetTexture("Interface\Minimap\MiniMap-TrackingBorder")
+    border:SetTexture("Interface/Minimap/MiniMap-TrackingBorder")
 
     mmButton:SetScript("OnDragStart", function(self)
         self:SetScript("OnUpdate", DragMinimapButton)
