@@ -494,10 +494,22 @@ local lastTotals = setmetatable({}, { __mode = "k" })
 -- shared across that spell's states: they are all timing the same aura.
 local totalOfSpell = {}
 
+-- The SHORTEST length ever seen, not the most recent one.
+--
+-- Abilities that extend a debuff make a reading of 42 seconds just as true as
+-- one of 18, and the last one to arrive wins -- which is how the clock came to
+-- believe a Sunfire lasts 42 seconds and then ran into negative numbers. The
+-- shortest is the base duration: the one length that is always at least true.
+--
+-- It errs by firing early, which is the direction this feature is named after.
+-- Erring the other way means never firing at all, silently.
 local function LearnTotal(rule, total)
     if not (total and total > 0 and rule.spell) then return end
-    totalOfSpell[rule.spell] = total
-    rule.lastTotal = total
+    local known = totalOfSpell[rule.spell]
+    if not known or total < known then
+        totalOfSpell[rule.spell] = total
+        rule.lastTotal = total
+    end
 end
 
 function ns.KnownTotalFor(rule)
@@ -752,6 +764,11 @@ local caughtArgs = setmetatable({}, { __mode = "k" })
 ---------------------------------------------------------------------------]]
 local forwardTo = setmetatable({}, { __mode = "k" })
 
+-- Counters, because "the box did not move" has three causes that look the
+-- same: nobody subscribed, nobody armed, or the forwarded call threw and the
+-- pcall ate it.
+ns.forwardStats = { subscribed = 0, armings = 0, fired = 0, lastErr = nil }
+
 function ns.ForwardCooldown(sourceCD, targetCD)
     if not sourceCD then return false end
     if not targetCD then return true end
@@ -761,6 +778,7 @@ function ns.ForwardCooldown(sourceCD, targetCD)
         forwardTo[sourceCD] = set
     end
     set[targetCD] = true
+    ns.forwardStats.subscribed = ns.forwardStats.subscribed + 1
     return true
 end
 
@@ -808,13 +826,21 @@ local function HookCooldownDurations()
                 armedBy[cd] = m .. "(" .. type(a)
                     .. (IsSecret(a) and "!" or "") .. ")"
                 -- Straight on, while they are still arguments.
+                local st = ns.forwardStats
+                if m == "SetCooldown" then st.armings = st.armings + 1 end
                 local set = forwardTo[cd]
                 if set then
                     for target in pairs(set) do
+                        local ok, err
                         if m == "Clear" then
-                            pcall(target.Clear, target)
+                            ok, err = pcall(target.Clear, target)
                         elseif target[m] then
-                            pcall(target[m], target, a, b)
+                            ok, err = pcall(target[m], target, a, b)
+                        end
+                        if ok then
+                            st.fired = st.fired + 1
+                        elseif err then
+                            st.lastErr = tostring(err):sub(1, 90)
                         end
                     end
                 end
@@ -1572,9 +1598,9 @@ function ns.FormatterTest(mf, say, seconds, live)
     end
 
     if not args then
-        say(ns.L("forwarding armed: recast the spell, the box follows the real aura",
-                 "переадресация включена: перекастуй заклинание, рамка пойдёт "
-                 .. "за настоящей аурой"))
+        say(ns.L("forwarding armed on %d entries: recast the spell",
+                 "переадресация включена на %d записях: перекастуй заклинание"),
+            ns.forwardStats.subscribed)
         -- Watch it for half a minute and report only when something changes.
         -- In combat the text is secret, so "secret" is the good answer here:
         -- it means the engine rendered something. nil means it did not.
@@ -1593,11 +1619,15 @@ function ns.FormatterTest(mf, say, seconds, live)
                 st = IsSecret(x) and "secret" or tostring(x)
                 sd = IsSecret(y) and "secret" or tostring(y)
             end
-            local line = ("%s | %s/%s"):format(now, st, sd)
+            local fs2 = ns.forwardStats
+            local line = ("%s|%s/%s|%d|%d|%s"):format(now, st, sd,
+                fs2.armings, fs2.fired, tostring(fs2.lastErr))
             if line ~= last then
                 last = line
-                say(ns.L("box: text=%s times=%s/%s", "рамка: текст=%s время=%s/%s"),
-                    now, st, sd)
+                say(ns.L("box: text=%s times=%s/%s | armings=%d forwarded=%d %s",
+                         "рамка: текст=%s время=%s/%s | вооружений=%d передано=%d %s"),
+                    now, st, sd, fs2.armings, fs2.fired,
+                    fs2.lastErr and ("|cffff4040" .. fs2.lastErr .. "|r") or "")
             end
         end, 30)
     end
