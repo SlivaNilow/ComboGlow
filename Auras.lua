@@ -799,41 +799,87 @@ end
 --
 -- false means no order passed, and then no object is built at all. A duration
 -- that lies is worse than none: it lights everything, always, confidently.
+-- Candidate meanings for CreateDuration's two arguments. The seconds forms
+-- can carry a secret straight through; the millisecond ones cannot, because
+-- scaling a secret is arithmetic on it and that is refused -- so if one of
+-- those turns out to be the true shape, this road is closed in combat and we
+-- will at least know it rather than quietly trusting a lie.
+local DURATION_SHAPES = {
+    { name = "start,dur", secretSafe = true,
+      build = function(s, d) return s, d end },
+    { name = "dur,start", secretSafe = true,
+      build = function(s, d) return d, s end },
+    { name = "startMS,durMS", secretSafe = false,
+      build = function(s, d) return s * 1000, d * 1000 end },
+    { name = "durMS,startMS", secretSafe = false,
+      build = function(s, d) return d * 1000, s * 1000 end },
+    { name = "dur", secretSafe = true,
+      build = function(_, d) return d end },
+}
+
 local durationShape
 
-local function CalibrateDuration()
-    if durationShape ~= nil then return durationShape end
+-- Is this shape's object, built to have `want` seconds left, seen as being
+-- under `threshold`? Plain numbers in, so the answer may be read.
+local function ShapeSaysUnder(shape, secondsLeft, total, threshold)
     local CDU = C_DurationUtil
-    if not (CDU and CDU.CreateDuration and C_CurveUtil
-            and C_CurveUtil.CreateColorCurve and CreateColor) then
-        durationShape = false
-        return false
-    end
-
+    local now = GetTime()
+    local ok, d = pcall(CDU.CreateDuration, shape.build(now - (total - secondsLeft), total))
+    if not (ok and UsableDuration(d)) then return nil end
     local curve = C_CurveUtil.CreateColorCurve()
     if curve.SetType and Enum and Enum.LuaCurveType then
         curve:SetType(Enum.LuaCurveType.Step)
     end
     curve:AddPoint(0, CreateColor(1, 1, 1, 1))
-    curve:AddPoint(5, CreateColor(1, 1, 1, 0))
+    curve:AddPoint(threshold, CreateColor(1, 1, 1, 0))
+    local ok2, col = pcall(d.EvaluateRemainingDuration, d, curve)
+    if not (ok2 and HasMethod(col, "GetRGBA")) then return nil end
+    local ok3, _, _, _, a = pcall(col.GetRGBA, col)
+    if not ok3 or type(a) ~= "number" or IsSecret(a) then return nil end
+    return a > 0.5
+end
 
-    local now = GetTime()
-    for _, sh in ipairs({ { "start,dur", now - 8, 10 },
-                          { "dur,start", 10, now - 8 } }) do
-        local ok, d = pcall(CDU.CreateDuration, sh[2], sh[3])
-        if ok and UsableDuration(d) then
-            local ok2, col = pcall(d.EvaluateRemainingDuration, d, curve)
-            if ok2 and HasMethod(col, "GetRGBA") then
-                local ok3, _, _, _, a = pcall(col.GetRGBA, col)
-                if ok3 and type(a) == "number" and not IsSecret(a) and a > 0.5 then
-                    durationShape = sh[1]
-                    return durationShape
-                end
-            end
+-- Two cases, and a shape has to pass BOTH.
+--
+-- The earlier version asked only "is a nearly-spent duration seen as nearly
+-- spent", which an object that is ALWAYS spent passes without trying -- and
+-- that is exactly what a wrong argument order or a wrong unit produces. So
+-- there is a second case now that must come back the other way: a duration
+-- with a long time left has to be seen as having a long time left. One answer
+-- proves nothing; the pair is the test.
+local function CalibrateDuration()
+    if durationShape ~= nil then return durationShape end
+    if not (C_DurationUtil and C_DurationUtil.CreateDuration and C_CurveUtil
+            and C_CurveUtil.CreateColorCurve and CreateColor) then
+        durationShape = false
+        return false
+    end
+    for _, shape in ipairs(DURATION_SHAPES) do
+        local nearly = ShapeSaysUnder(shape, 2, 100, 5)
+        local plenty = ShapeSaysUnder(shape, 60, 100, 5)
+        if nearly == true and plenty == false then
+            durationShape = shape.name
+            return durationShape
         end
     end
     durationShape = false
     return false
+end
+
+-- For the report: every shape and how it answered, so a failure says which
+-- half it failed rather than just "no".
+function ns.DurationShapeReport(say)
+    for _, shape in ipairs(DURATION_SHAPES) do
+        local nearly = ShapeSaysUnder(shape, 2, 100, 5)
+        local plenty = ShapeSaysUnder(shape, 60, 100, 5)
+        local verdict = (nearly == true and plenty == false)
+            and "|cff40ff40PASS|r" or "|cffff4040no|r"
+        say("  %-16s 2s left -> %s | 60s left -> %s   %s%s",
+            shape.name,
+            nearly == nil and "?" or (nearly and "UNDER" or "over"),
+            plenty == nil and "?" or (plenty and "UNDER" or "over"),
+            verdict, shape.secretSafe and "" or " (needs plain numbers)")
+    end
 end
 ns.CalibrateDuration = CalibrateDuration
 
@@ -843,10 +889,14 @@ local function MakeDuration(cd, args)
     local shape = CalibrateDuration()
     if not shape then return nil, "uncalibrated" end
 
-    local x, y = args.a, args.b
-    if shape == "dur,start" then x, y = args.b, args.a end
-    local ok, d = pcall(C_DurationUtil.CreateDuration, x, y)
-    local obj = (ok and UsableDuration(d)) and d or nil
+    local def
+    for _, sh in ipairs(DURATION_SHAPES) do
+        if sh.name == shape then def = sh break end
+    end
+    -- A millisecond shape would need the secret scaled, which is arithmetic on
+    -- it, which is refused. Better to build nothing than to build a lie.
+    if not (def and def.secretSafe) then return nil, "shape needs plain numbers" end
+    local ok, d = pcall(C_DurationUtil.CreateDuration, def.build(args.a, args.b))    local obj = (ok and UsableDuration(d)) and d or nil
     madeDuration[cd] = { args = args, obj = obj, form = obj and shape or "build failed" }
     return obj, obj and shape or "build failed"
 end
@@ -1096,6 +1146,8 @@ function ns.DurationFactory(say, mf)
     end
 
     say("calibrated shape: |cffffd100%s|r", tostring(ns.CalibrateDuration()))
+    say("|cffffd100shape test (both halves must pass):|r")
+    ns.DurationShapeReport(say)
     say("|cffffd100plain control:|r")
     say("  " .. attempt("(now,10)", now, 10))
     say("  " .. attempt("(10,now)", 10, now))
