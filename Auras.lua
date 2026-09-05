@@ -222,41 +222,83 @@ local function ShowStacks(frame, rule, n)
     frame.StackText:Show()
 end
 
+-- Forward declaration: the stack lookup below needs the timer lookup, which is
+-- defined further down with the rest of the mirror.
+local FindTimerFS
+
 -- The Cooldown Manager's own count, copied verbatim. It writes the field only
 -- when there is more than one, so no threshold is needed here.
+--[[-------------------------------------------------------------------------
+    Where the count lives on an item frame
+
+    Not on the frame: /cg stacks reported "no font strings directly on the
+    frame" for every entry. They belong to its children, which is also why the
+    countdown lookup goes through itemFrame.Cooldown.
+
+    So the children are searched, minus the cooldown (its font string is the
+    timer) and minus whatever the timer lookup already claimed. Among what is
+    left, a count looks like one of two things: text that is SECRET, which is
+    what a stack count is under 12.1's restrictions, or a short run of digits.
+    Anything longer and readable is the spell name -- those frames carry one --
+    and drawing that as a stack count would be worse than drawing nothing.
+
+    Only a positive match is cached. An empty string is a count with nothing to
+    show yet, and caching that would freeze the answer at "no stacks".
+---------------------------------------------------------------------------]]
 local stackFS = setmetatable({}, { __mode = "k" })
+local function LooksLikeCount(rgn)
+    local ok, txt = pcall(rgn.GetText, rgn)
+    if not ok then return nil end
+    -- IsSecret first: a secret must not meet a comparison, "== nil" included.
+    if IsSecret(txt) then return true end
+    if type(txt) ~= "string" then return nil end       -- nil: empty for now
+    if #txt > 0 and #txt <= 3 and txt:match("^%d+$") then return true end
+    return false                                        -- readable text: a name
+end
+
 local function FindStackFS(itemFrame)
     local cached = stackFS[itemFrame]
-    if cached ~= nil then
-        if cached == false then return nil end
-        return cached
-    end
-    local found
+    if cached then return cached end
+
     for _, key in ipairs({ "Applications", "Count", "ChargeCount", "Stacks" }) do
         local sub = itemFrame[key]
         if type(sub) == "table" then
+            local fs
             if sub.GetObjectType and sub:GetObjectType() == "FontString" then
-                found = sub
+                fs = sub
             elseif type(sub.Text) == "table" and sub.Text.GetObjectType
                    and sub.Text:GetObjectType() == "FontString" then
-                found = sub.Text
+                fs = sub.Text
             end
-        end
-        if found then break end
-    end
-    -- Nothing under a name we know: take the frame's FIRST font string. The
-    -- countdown lookup takes the second, and on these item frames the count is
-    -- the other one.
-    if not found and itemFrame.GetRegions then
-        for _, rgn in pairs({ itemFrame:GetRegions() }) do
-            if rgn and rgn.GetObjectType and rgn:GetObjectType() == "FontString" then
-                found = rgn
-                break
+            if fs then
+                stackFS[itemFrame] = fs
+                return fs
             end
         end
     end
-    stackFS[itemFrame] = found or false
-    return found
+
+    if not itemFrame.GetChildren then return nil end
+    local cd = itemFrame.Cooldown or itemFrame.cooldown
+    local timer = FindTimerFS(itemFrame)
+    local empty
+    for _, child in pairs({ itemFrame:GetChildren() }) do
+        if child and child ~= cd and child.GetRegions then
+            for _, rgn in pairs({ child:GetRegions() }) do
+                if rgn and rgn ~= timer and rgn.GetObjectType
+                   and rgn:GetObjectType() == "FontString" then
+                    local verdict = LooksLikeCount(rgn)
+                    if verdict == true then
+                        stackFS[itemFrame] = rgn
+                        return rgn
+                    elseif verdict == nil and not empty then
+                        empty = rgn
+                    end
+                end
+            end
+        end
+    end
+    if empty then stackFS[itemFrame] = empty end
+    return empty
 end
 
 -- Diagnostic: every font string on a Cooldown Manager item frame and what it
@@ -308,6 +350,9 @@ local function MirrorStackText(frame, rule, itemFrame)
     if not fs then return false end
     local ok, txt = pcall(fs.GetText, fs)
     if not ok or type(txt) == "nil" then return false end
+    -- A readable empty string is a count with nothing to show. Secret text is
+    -- passed straight through: SetText takes it, and it is never looked at.
+    if not IsSecret(txt) and type(txt) == "string" and #txt == 0 then return false end
     if not pcall(frame.StackText.SetText, frame.StackText, txt) then return false end
     frame.StackText:Show()
     return true
@@ -480,7 +525,7 @@ end
 -- the first FontString and the timer in the second.
 local timerFS = setmetatable({}, { __mode = "k" })
 
-local function FindTimerFS(itemFrame)
+function FindTimerFS(itemFrame)
     local cached = timerFS[itemFrame]
     if cached ~= nil then
         if cached == false then return nil end
