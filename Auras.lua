@@ -746,19 +746,20 @@ local function Hex(r, g, b)
         math.floor((b or 0) * 255 + 0.5))
 end
 
-function ns.ApplyEntryFormatter(itemFrame, rule)
-    if ns.entryFormat == false then return false end
-    local n = ns.SoonSeconds(rule)
-    if not n then return false end
+-- Formatters are built once per look and kept. Rebuilding one per poll, per
+-- entry, was most of a frame's work on its own.
+local formatterCache = {}
+local entryFmtAt = setmetatable({}, { __mode = "k" })
+
+local function GetFormatter(n, colour)
+    local key = n .. colour
+    local cached = formatterCache[key]
+    if cached ~= nil then return cached or nil end
     if not (C_StringUtil and C_StringUtil.CreateNumericRuleFormatter
-            and Enum and Enum.NumericRuleFormatRounding) then return false end
-    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
-    if not (cd and cd.SetCountdownFormatter) then return false end
-
-    local colour = Hex(rule.wr or 1, rule.wg or 0.2, rule.wb or 0.2)
-    local stamp = ("%s|%s|%s"):format(n, armCount[cd] or 0, colour)
-    if entryFmtStamp[cd] == stamp then return true end
-
+            and Enum and Enum.NumericRuleFormatRounding) then
+        formatterCache[key] = false
+        return nil
+    end
     local rounding = Enum.NumericRuleFormatRounding.Nearest
     local formatter = C_StringUtil.CreateNumericRuleFormatter()
     local ok = pcall(formatter.SetBreakpoints, formatter, {
@@ -774,9 +775,38 @@ function ns.ApplyEntryFormatter(itemFrame, rule)
         { threshold = 60, format = "%dm", step = 1, rounding = rounding,
           components = { { div = 60, rounding = rounding, step = 1 } } },
     })
-    if not ok then return false end
+    if not ok then
+        formatterCache[key] = false
+        return nil
+    end
+    formatterCache[key] = formatter
+    return formatter
+end
+
+-- Only the "gone" rule installs it. Both states of a spell share one entry, so
+-- doing it from either is enough -- and the "gone" rule holds the threshold
+-- itself, which spares the sibling lookup on every poll of every frame.
+function ns.ApplyEntryFormatter(itemFrame, rule)
+    if ns.entryFormat == false or not rule.missing then return false end
+    local n = tonumber(rule.soon) or 0
+    if n <= 0 then return false end
+    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
+    if not (cd and cd.SetCountdownFormatter) then return false end
+
+    -- Re-applied when the look changes or the entry was re-armed, since that
+    -- is when another cooldown-text addon puts its own back. Never more than
+    -- twice a second: re-arming can happen many times in one.
+    local colour = Hex(rule.wr or 1, rule.wg or 0.2, rule.wb or 0.2)
+    local stamp = ("%s|%s|%s"):format(n, armCount[cd] or 0, colour)
+    if entryFmtStamp[cd] == stamp then return true end
+    local now = GetTime()
+    if (entryFmtAt[cd] or 0) + 0.5 > now then return true end
+
+    local formatter = GetFormatter(n, colour)
+    if not formatter then return false end
     if not pcall(cd.SetCountdownFormatter, cd, formatter) then return false end
     entryFmtStamp[cd] = stamp
+    entryFmtAt[cd] = now
     return true
 end
 
@@ -1073,7 +1103,10 @@ local function ApplyMirror(frame, rule, itemFrame)
     -- Everywhere, not just the strip. Confining it to the strip was a fix for
     -- the wrong problem: what was lost on the button was the countdown, not
     -- the state, and the countdown is back now.
-    local soon = ns.SoonSeconds(rule)
+    -- Read straight off the rule: SoonSeconds walks the rule list to find a
+    -- sibling, which is far too much for something asked five times a second
+    -- for every frame.
+    local soon = rule.missing and (tonumber(rule.soon) or 0) > 0 or nil
     local durObj = MirrorDuration(itemFrame, rule)
     -- Optional cooldown sweep, driven by the real aura duration object.
     local wantsSweep = ns.WantsSweep(rule)
