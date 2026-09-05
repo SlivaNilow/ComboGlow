@@ -866,6 +866,7 @@ local function Silence(frame)
     frame.pandemicOn = nil
     ns.ResetMirror(frame)
     ns.ClearTimer(frame)
+    ns.ClearStacks(frame)
     frame:StopArt()
     frame:Hide()
 end

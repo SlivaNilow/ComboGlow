@@ -795,6 +795,9 @@ local function Build()
         { key = "timer", auraOnly = true, label = L("timer", "таймер"),
           get = function(r) return r.timer ~= false end,
           set = function(r) r.timer = not (r.timer ~= false) end },
+        { key = "stacks", auraOnly = true, label = L("stacks", "стаки"),
+          get = function(r) return r.stacks ~= false end,
+          set = function(r) r.stacks = not (r.stacks ~= false) end },
         -- Only offered where it can do anything: an aura state has no resource
         -- to be ready for, and a spell with its own "proc" state has already
         -- answered the question -- the proc belongs to that marker.

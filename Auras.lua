@@ -148,7 +148,7 @@ function ns.QueryAura(rule)
     if dur and dur > 0 then total = dur end
     if not remaining and exp then remaining = exp - GetTime() end
 
-    return true, remaining, total, durObj
+    return true, remaining, total, durObj, PlainNumber(aura.applications)
 end
 
 --[[-------------------------------------------------------------------------
@@ -191,6 +191,74 @@ local function ClearTimer(frame)
     end
 end
 ns.ClearTimer = ClearTimer
+
+--[[-------------------------------------------------------------------------
+    Stack count
+
+    Read straight off the aura when it is readable, mirrored as TEXT from the
+    Cooldown Manager when it is not -- SetText accepts a secret string, so the
+    number reaches the screen without ever being looked at in Lua. Same trick
+    as the countdown.
+
+    Shown from two upwards: "1" on a stacking aura is the same as no number,
+    and a 1 on every icon is noise.
+---------------------------------------------------------------------------]]
+local function ClearStacks(frame)
+    if not frame.StackText then return end
+    if frame.StackText:IsShown() then
+        frame.StackText:SetText("")
+        frame.StackText:Hide()
+    end
+end
+ns.ClearStacks = ClearStacks
+
+local function ShowStacks(frame, rule, n)
+    if not frame.StackText then return end
+    -- Two frames on one button when a rule has a second marker; only the
+    -- first writes, or the number is drawn twice on top of itself.
+    if rule.stacks == false or frame.secondary then return ClearStacks(frame) end
+    if type(n) ~= "number" or IsSecret(n) or n < 2 then return ClearStacks(frame) end
+    frame.StackText:SetText(tostring(n))
+    frame.StackText:Show()
+end
+
+-- The Cooldown Manager's own count, copied verbatim. It writes the field only
+-- when there is more than one, so no threshold is needed here.
+local stackFS = setmetatable({}, { __mode = "k" })
+local function FindStackFS(itemFrame)
+    local cached = stackFS[itemFrame]
+    if cached ~= nil then
+        if cached == false then return nil end
+        return cached
+    end
+    local found
+    for _, key in ipairs({ "Applications", "Count", "ChargeCount" }) do
+        local sub = itemFrame[key]
+        if type(sub) == "table" then
+            if sub.GetObjectType and sub:GetObjectType() == "FontString" then
+                found = sub
+            elseif type(sub.Text) == "table" and sub.Text.GetObjectType
+                   and sub.Text:GetObjectType() == "FontString" then
+                found = sub.Text
+            end
+        end
+        if found then break end
+    end
+    stackFS[itemFrame] = found or false
+    return found
+end
+
+local function MirrorStackText(frame, rule, itemFrame)
+    if rule.stacks == false or rule.missing or frame.secondary then return false end
+    if not frame.StackText then return false end
+    local fs = FindStackFS(itemFrame)
+    if not fs then return false end
+    local ok, txt = pcall(fs.GetText, fs)
+    if not ok or type(txt) == "nil" then return false end
+    if not pcall(frame.StackText.SetText, frame.StackText, txt) then return false end
+    frame.StackText:Show()
+    return true
+end
 
 local function ShowTimer(frame, rule, remaining, total, durObj)
     -- A rule with two markers has two frames on the one button; only the first
@@ -544,6 +612,7 @@ local function ApplyMirror(frame, rule, itemFrame)
         frame.TimerText:SetText("")
         frame.TimerText:Hide()
     end
+    if not MirrorStackText(frame, rule, itemFrame) then ClearStacks(frame) end
 
     if not frame:IsShown() then frame:Show() end
     frame.pandemicOn = nil
@@ -701,16 +770,19 @@ function ns.ApplyAuraRule(frame, rule)
             SetProcActive(rule.spell, free)
             if not free then
                 ClearTimer(frame)
+                ClearStacks(frame)
                 frame:StopArt()
                 frame:Hide()
                 return false
             end
             if HasExplicitAura(rule) and rule.timer ~= false then
-                local f, rem, tot, d = ns.QueryAura(rule)
+                local f, rem, tot, d, a = ns.QueryAura(rule)
                 if f == true then
                     ShowTimer(frame, rule, rem, tot, d)
+                    ShowStacks(frame, rule, a)
                 else
                     ClearTimer(frame)
+                    ClearStacks(frame)
                 end
             else
                 ClearTimer(frame)
@@ -724,7 +796,7 @@ function ns.ApplyAuraRule(frame, rule)
         -- below treats them as an ordinary "this aura is on me" rule.
     end
 
-    local found, remaining, total, durObj = ns.QueryAura(rule)
+    local found, remaining, total, durObj, apps = ns.QueryAura(rule)
     local now = GetTime()
 
     -- A confirmed reading always wins over the optimistic guess.
@@ -779,6 +851,9 @@ function ns.ApplyAuraRule(frame, rule)
 
     local present = (found == true) or optActive
     if rule.proc then SetProcActive(rule.spell, found == true) end
+    -- Only a confirmed read carries a count; an optimistic guess after a cast
+    -- knows the aura is probably up but not how many of it there are.
+    if found == true then ShowStacks(frame, rule, apps) else ClearStacks(frame) end
 
     -- The timer is independent of the glow. While the aura is up you want to
     -- see the time left even in "glow when missing" mode -- there the icon

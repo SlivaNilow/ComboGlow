@@ -363,6 +363,9 @@ function ns.SetupTimer(self, w, h)
     if self.Art and self.Art.TimerText then
         self.TimerText = self.Art.TimerText
     end
+    if self.Art and self.Art.StackText then
+        self.StackText = self.Art.StackText
+    end
     if self.CD then
         -- Pinned to the icon rect explicitly. The overlay is deliberately
         -- larger than the button (the proc art needs the room), and a sweep
@@ -391,6 +394,17 @@ function ns.SetupTimer(self, w, h)
             self.TimerText:SetFont(font, math.max(10, math.floor(h * 0.36)), "OUTLINE")
         end
         self.TimerText:SetTextColor(1, 1, 1)
+    end
+    if self.StackText then
+        -- Top right, opposite the countdown at the bottom: on a small icon the
+        -- two would otherwise sit on each other.
+        self.StackText:ClearAllPoints()
+        self.StackText:SetPoint("TOPRIGHT", self.Art or self, "CENTER", w * 0.48, h * 0.48)
+        local font = self.StackText:GetFont()
+        if font then
+            self.StackText:SetFont(font, math.max(10, math.floor(h * 0.34)), "OUTLINE")
+        end
+        self.StackText:SetTextColor(1, 0.9, 0.4)
     end
 end
 

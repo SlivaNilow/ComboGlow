@@ -33,6 +33,11 @@
             <FontString parentKey="TimerText" inherits="NumberFontNormal" hidden="true">
               <Anchors><Anchor point="CENTER"/></Anchors>
             </FontString>
+            <!-- Stack count, opposite corner from the countdown so the two
+                 never overlap on a small icon. -->
+            <FontString parentKey="StackText" inherits="NumberFontNormal" hidden="true">
+              <Anchors><Anchor point="CENTER"/></Anchors>
+            </FontString>
           </Layer>
         </Layers>
         <Animations>
@@ -87,6 +92,11 @@
                  its parent's regions, so a countdown living on the frame
                  itself sat underneath the icon on the reminder strip. -->
             <FontString parentKey="TimerText" inherits="NumberFontNormal" hidden="true">
+              <Anchors><Anchor point="CENTER"/></Anchors>
+            </FontString>
+            <!-- Stack count, opposite corner from the countdown so the two
+                 never overlap on a small icon. -->
+            <FontString parentKey="StackText" inherits="NumberFontNormal" hidden="true">
               <Anchors><Anchor point="CENTER"/></Anchors>
             </FontString>
           </Layer>
