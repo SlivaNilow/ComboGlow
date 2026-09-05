@@ -619,16 +619,25 @@ end
 --
 -- nil means "no idea", never "none left" -- an expired sweep reads the same as
 -- an absent one, and the caller must not treat those alike.
+-- Returns left, why -- and the why is the point. "No number" has four
+-- different causes here and they need four different answers from us, so a
+-- bare nil would only move the guessing somewhere else.
 local function MirrorRemaining(itemFrame)
     local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
-    if not (cd and cd.GetCooldownTimes) then return nil end
+    if not cd then return nil, "no cooldown child" end
+    if not cd.GetCooldownTimes then return nil, "no GetCooldownTimes" end
     local ok, startMS, durMS = pcall(cd.GetCooldownTimes, cd)
-    if not ok then return nil end
-    if type(startMS) ~= "number" or type(durMS) ~= "number" then return nil end
-    if IsSecret(startMS) or IsSecret(durMS) or durMS <= 0 then return nil end
+    if not ok then return nil, "GetCooldownTimes errored" end
+    if type(startMS) ~= "number" or type(durMS) ~= "number" then
+        return nil, "not numbers"
+    end
+    if IsSecret(startMS) or IsSecret(durMS) then return nil, "secret" end
+    -- A cooldown armed from a duration object leaves the legacy pair at zero:
+    -- the widget draws from the object and never fills these in.
+    if durMS <= 0 then return nil, "duration 0 (armed from object?)" end
     local left = (startMS + durMS) / 1000 - GetTime()
-    if left <= 0 then return nil end
-    return left
+    if left <= 0 then return nil, "expired" end
+    return left, "ok"
 end
 
 -- The sweep is asked for either by the toggle or by picking a time-shaped
@@ -724,25 +733,41 @@ local soonCurves = setmetatable({}, { __mode = "k" })
 -- that can disagree with it: there is no useful reading of "count it gone zero
 -- seconds early". Unset is off too -- a state nobody has asked this of should
 -- not start doing it.
+-- One boundary, two states. "Counted gone at 5s left" and "counted up until
+-- 5s left" are the same sentence read from either end, so the number is stored
+-- once -- on the "gone" rule, which is what mainly consumes it -- and the "up"
+-- rule borrows it from its sibling. Storing a copy on each would let them
+-- drift apart, and a pair of states that disagree about where up ends is two
+-- markers lit at once saying opposite things.
 function ns.SoonSeconds(rule)
-    if not rule.missing then return nil end
-    local n = tonumber(rule.soon) or 0
+    if rule.kind ~= "aura" or rule.proc then return nil end
+    local src = rule
+    if not rule.missing then
+        src = (ns.FindSlotRule and ns.FindSlotRule(rule.spell, "missing")) or rule
+    end
+    local n = tonumber(src.soon) or 0
     if n <= 0 then return nil end
     return n
 end
 
-local function SoonCurve(n)
-    local cached = soonCurves[n]
+-- Two curves per threshold, one the mirror image of the other: the "gone"
+-- state wants to be visible inside the window and the "up" state wants to be
+-- gone from it, and that is the whole difference between them.
+local function SoonCurve(n, standDown)
+    local key = standDown and (-n) or n
+    local cached = soonCurves[key]
     if cached then return cached end
     if not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then return nil end
     local curve = C_CurveUtil.CreateColorCurve()
     if curve.SetType and Enum and Enum.LuaCurveType then
         curve:SetType(Enum.LuaCurveType.Step)
     end
-    -- Alpha carries the answer: opaque below the threshold, clear above it.
-    curve:AddPoint(0, CreateColor(1, 1, 1, 1))
-    curve:AddPoint(n, CreateColor(1, 1, 1, 0))
-    soonCurves[n] = curve
+    -- Alpha carries the answer.
+    local inside, outside = 1, 0
+    if standDown then inside, outside = 0, 1 end
+    curve:AddPoint(0, CreateColor(1, 1, 1, inside))
+    curve:AddPoint(n, CreateColor(1, 1, 1, outside))
+    soonCurves[key] = curve
     return curve
 end
 
@@ -756,7 +781,7 @@ function ns.ApplySoon(frame, rule, durObj)
     if not n then return false end
 
     if not (durObj and durObj.EvaluateRemainingDuration) then return false end
-    local curve = SoonCurve(n)
+    local curve = SoonCurve(n, not rule.missing)
     if not curve then return false end
     local ok, col = pcall(durObj.EvaluateRemainingDuration, durObj, curve)
     if not ok or type(col) ~= "table" or not col.GetRGBA then return false end
@@ -844,9 +869,6 @@ local function ApplyMirror(frame, rule, itemFrame)
 
     local shown, hidden = 1, 0
     if rule.missing then shown, hidden = 0, 1 end
-    -- A strip icon that is asking "is it about to fall off" answers that
-    -- instead: the curve already means "up AND running out", because a
-    -- duration object only exists while the aura is up.
     -- Counting it gone early, when there is a duration to measure. Two
     -- sources, and neither is a fallback for the other's answer -- only for
     -- its absence. The curve resolves it engine-side where a duration object
@@ -866,14 +888,13 @@ local function ApplyMirror(frame, rule, itemFrame)
         if left and left <= soon then
             -- Read, not resolved: the strip may pack this one for real.
             frame._mirroring = nil
-            frame:SetAlpha(1)
+            frame:SetAlpha(rule.missing and 1 or 0)
             if not frame:IsShown() then frame:Show() end
             frame.needSafeStyle = false
             frame:StartArt()
             return true
         end
-    end
-    local applied = pcall(frame.SetAlphaFromBoolean, frame, flag, shown, hidden)
+    end    local applied = pcall(frame.SetAlphaFromBoolean, frame, flag, shown, hidden)
     frame._mirroring = applied or nil
     if not applied then
         frame:SetAlpha(1)
@@ -1092,6 +1113,17 @@ function ns.ApplyAuraRule(frame, rule)
     end
 
     local present = (found == true) or optActive
+    -- The readable half of the shared boundary. Where the time comes back as a
+    -- plain number the comparison happens here rather than in a curve, and the
+    -- "up" state has to stand down in the same window the "gone" state lights
+    -- in -- otherwise both are on at once, saying opposite things.
+    if present and not rule.missing then
+        local soon = ns.SoonSeconds(rule)
+        if soon and found == true and type(remaining) == "number"
+           and not IsSecret(remaining) and remaining <= soon then
+            present = false
+        end
+    end
     if rule.proc then SetProcActive(rule.spell, found == true) end
     -- The count has its own source. A read can hand back the aura and still
     -- withhold "applications" -- the field is secret often enough -- and the
@@ -1320,11 +1352,50 @@ function ns.AuraCheck(rules, say)
                     tostring(isAuraEntry and usable or false))
                 local dUnit = type(mf.auraDataUnit) ~= "nil"
                 local dIID  = type(mf.auraInstanceID) ~= "nil"
-                local left = MirrorRemaining(mf)
-                say("     aura link: auraDataUnit=%s auraInstanceID=%s widgetLeft=%s | %s",
+                local left, leftWhy = MirrorRemaining(mf)
+                local cdChild = mf.Cooldown or mf.cooldown
+                local rawS, rawD = "-", "-"
+                if cdChild and cdChild.GetCooldownTimes then
+                    local okc, a, b = pcall(cdChild.GetCooldownTimes, cdChild)
+                    if okc then
+                        rawS = IsSecret(a) and "secret" or tostring(a)
+                        rawD = IsSecret(b) and "secret" or tostring(b)
+                    end
+                end
+                say("     aura link: auraDataUnit=%s auraInstanceID=%s | %s",
                     tostring(dUnit), tostring(dIID),
-                    left and ("%.1fs"):format(left) or "-",
                     ns.DebugWarnColor(nil, rule, mf))
+                -- Both known sources came back empty for this entry, so ask
+                -- the entry itself what it is holding: whatever draws its
+                -- countdown has to be reachable from somewhere on the frame.
+                local carriers = {}
+                if not left then
+                    local okp = pcall(function()
+                        for k, v in pairs(mf) do
+                            if type(v) == "table" then
+                                local okm = pcall(function()
+                                    if v.EvaluateRemainingDuration or v.GetRemainingDuration then
+                                        carriers[#carriers + 1] = tostring(k)
+                                    end
+                                end)
+                                if not okm then carriers[#carriers + 1] = tostring(k) .. "?" end
+                            end
+                        end
+                    end)
+                    if not okp then carriers[#carriers + 1] = "<pairs blocked>" end
+                    if cdChild then
+                        for _, m in ipairs({ "GetCooldownDuration", "GetCooldownTimes",
+                                             "GetCooldownDisplayDuration" }) do
+                            if cdChild[m] then carriers[#carriers + 1] = "CD:" .. m end
+                        end
+                    end
+                end
+                say("     early-gone: soon=%s widgetLeft=%s (%s) raw=%s/%s%s",
+                    ns.SoonSeconds(rule) and ("%ds"):format(ns.SoonSeconds(rule))
+                        or "off",
+                    left and ("%.1fs"):format(left) or "|cffff4040none|r",
+                    leftWhy or "?", rawS, rawD,
+                    #carriers > 0 and (" | carriers: " .. table.concat(carriers, ", ")) or "")
             else
                 blind[#blind + 1] = name
                 say("     cdm mirror: |cffff4040none|r%s", ns.L(

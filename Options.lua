@@ -96,6 +96,18 @@ local function CurrentRule()
     return ns.FindSlotRule(selSpell, selSlot)
 end
 
+-- Where the early-gone threshold is stored, which is not where it is edited.
+-- It belongs to "gone" -- that state consumes it -- but it is set from the
+-- "up" tab, because that is where you are looking at an aura that is still on
+-- the target and deciding when to stop calling it that. Same boundary from the
+-- other side.
+local function SoonRule()
+    if not selSpell then return nil end
+    local rule = CurrentRule()
+    if not rule or rule.kind ~= "aura" or rule.proc or rule.missing then return nil end
+    return ns.FindSlotRule(selSpell, "missing")
+end
+
 -- Keeps the selection pointing at something that exists.
 local function Normalise()
     local list = SpellList()
@@ -271,12 +283,12 @@ local function RefreshDetails()
         UI.countRow:Hide()
     end
 
-    -- How early to call the aura gone. Belongs to the "gone" state: that is
-    -- the one whose job is "refresh this", and firing it early is the whole
-    -- point. Zero is off.
-    if rule and rule.kind == "aura" and rule.missing then
+    -- How early to call the aura gone. Shown on the "up" tab and written to the
+    -- "gone" rule -- see SoonRule. Zero is off.
+    local soonRule = SoonRule()
+    if soonRule then
         UI.soonRow:Show()
-        local n = tonumber(rule.soon) or 0
+        local n = tonumber(soonRule.soon) or 0
         UI.soonRow.label:SetText(n > 0
             and L("count as gone %ds early", "считать, что нет, за %d с до конца"):format(n)
             or L("count as gone only when it is", "считать, что нет, только когда нет"))
@@ -997,7 +1009,7 @@ local function Build()
     srBg:SetColorTexture(1, 1, 1, 0.06)
 
     local function StepSoon(delta)
-        local rule = CurrentRule()
+        local rule = SoonRule()
         if not rule then return end
         if IsShiftKeyDown() then delta = delta * 5 end
         rule.soon = math.max(0, math.min(60, (tonumber(rule.soon) or 0) + delta))
