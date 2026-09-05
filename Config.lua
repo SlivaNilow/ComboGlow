@@ -934,6 +934,7 @@ local function PrintHelp()
         { "/cg mirror on|off",         L("fallback: take aura state from the Cooldown Manager", "запасной путь: брать состояние ауры у Cooldown Manager") },
         { "/cg blizzglow on|off",      L("the game's own gold proc glow (off by default)", "штатное золотое свечение прока (по умолчанию выключено)") },
         { "/cg procstrip on|off",      L("show procs in the reminder strip (on by default)", "показывать проки в полосе напоминаний (по умолчанию вкл)") },
+        { "/cg hidecdm on|off",        L("hide the Cooldown Manager without stopping it", "скрыть Cooldown Manager, не выключая его") },
         { "/cg stackpos <where>",      L("where the stack count sits on the marker", "где на отметке стоит счётчик стаков") },
         { "/cg stacksize <50-200>",    L("stack count size, in percent", "размер счётчика стаков, в процентах") },
         { "/cg auracheck",             L("report what the aura API answers here, with measured lag", "показать ответ aura API и замеренную задержку") },
@@ -1450,6 +1451,16 @@ local function Handler(msg)
         CG:UpdateAuras()
         Say(L("Cooldown Manager fallback: %s", "запасной путь через Cooldown Manager: %s"),
             CG.db.mirror and L("on", "вкл") or L("off", "выкл"))
+
+    elseif cmd == "hidecdm" then
+        CG.db.hideCDM = OnOff(rest:lower(), not CG.db.hideCDM)
+        ns.ApplyCDMVisibility()
+        Say(L("Cooldown Manager hidden: %s", "Cooldown Manager скрыт: %s"),
+            CG.db.hideCDM and L("yes", "да") or L("no", "нет"))
+        if CG.db.hideCDM then
+            Say(L("it keeps running - the aura states read it",
+                  "он продолжает работать — состояния по аурам читают его"))
+        end
 
     elseif cmd == "stackpos" then
         local where = rest:lower()

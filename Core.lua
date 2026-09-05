@@ -129,6 +129,7 @@ local DEFAULTS = {
     auraPoll   = 0.2,    -- re-read aura state every N seconds (0 = events only)
     mirror     = true,   -- fall back to Cooldown Manager state when reads fail
     blizzGlow  = false,  -- let the game draw its own gold proc glow as well
+    hideCDM    = false,  -- keep the Cooldown Manager running but invisible
     stackPos   = "topleft",  -- where the aura stack count sits on the marker
     stackScale = 100,        -- its size, as a percentage of the default
     presetDone = {},     -- [specID] = the default rules were offered once
@@ -239,6 +240,25 @@ local CDM_ALL_VIEWERS = {
     "BuffIconCooldownViewer", "BuffBarCooldownViewer",
 }
 
+--[[-------------------------------------------------------------------------
+    Hiding the Cooldown Manager
+
+    Everything the aura states know comes from it, so it has to keep running --
+    which is why this sets ALPHA and never calls Hide(). A hidden frame is not
+    guaranteed to keep updating, and the moment it stops, the mirror it feeds
+    goes with it. At zero alpha it is invisible and still ticking.
+
+    Re-applied on every map rebuild: Blizzard's own code sets these back when
+    the viewers are rebuilt, on a spec change among other things.
+---------------------------------------------------------------------------]]
+function ns.ApplyCDMVisibility()
+    local hide = CG.db and CG.db.hideCDM
+    for _, name in ipairs(CDM_ALL_VIEWERS) do
+        local f = _G[name]
+        if f and f.SetAlpha then pcall(f.SetAlpha, f, hide and 0 or 1) end
+    end
+end
+
 -- spellID -> Cooldown Manager item frame. The engine tracks aura presence on
 -- those frames itself, so when direct aura reads are unavailable their state
 -- can be mirrored onto a button without ever reading the aura. Fallback only:
@@ -324,6 +344,7 @@ function ns.RebuildCDMMap()
             end
         end
     end
+    ns.ApplyCDMVisibility()
 end
 
 -- Action slots run 1-120, plus the bonus/stance pages. 180 covers every

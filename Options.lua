@@ -158,6 +158,9 @@ local function RefreshRows(list)
         UI.source:SetText(L("Cooldown Manager: %d auras, %d cooldowns",
                             "Cooldown Manager: аур %d, кулдаунов %d"):format(nAura, nEss))
     end
+    UI.hideCDM.text:SetText(CG.db.hideCDM
+        and L("show the Cooldown Manager", "показать Cooldown Manager")
+        or L("hide the Cooldown Manager", "скрыть Cooldown Manager"))
 end
 
 local function RefreshTiles()
@@ -921,6 +924,16 @@ local function Build()
         Refresh()
     end)
     bPreset:SetPoint("BOTTOMLEFT", 12, 10)
+
+    -- Alpha, not Hide: the aura states read that frame, and a hidden one is
+    -- not guaranteed to keep updating.
+    UI.hideCDM = TextButton(UI, "", 190, 22, function()
+        CG.db.hideCDM = not CG.db.hideCDM
+        ns.ApplyCDMVisibility()
+        Refresh()
+    end)
+    -- Above the status line, clear of the buttons along the bottom.
+    UI.hideCDM:SetPoint("BOTTOMLEFT", 14, 62)
 
     local bDot = TextButton(UI, L("Add last cast", "Добавить последний каст"), 160, 22, function()
         if not CG.lastCast then
