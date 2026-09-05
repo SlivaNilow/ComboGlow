@@ -492,77 +492,13 @@ local lastTotals = setmetatable({}, { __mode = "k" })
 -- be had is a successful read -- which in combat never happens for a target
 -- debuff. So it is remembered on the rule, where it survives a reload, and
 -- shared across that spell's states: they are all timing the same aura.
-local totalOfSpell = {}
 
--- The SHORTEST length ever seen, not the most recent one.
---
--- Abilities that extend a debuff make a reading of 42 seconds just as true as
--- one of 18, and the last one to arrive wins -- which is how the clock came to
--- believe a Sunfire lasts 42 seconds and then ran into negative numbers. The
--- shortest is the base duration: the one length that is always at least true.
---
--- It errs by firing early, which is the direction this feature is named after.
--- Erring the other way means never firing at all, silently.
--- Stored as baseTotal, not lastTotal. The old field meant "the last length
--- read" and saved values recorded under that meaning are wrong under this one
--- -- a 42-second reading of an extended Sunfire, kept forever, puts the
--- threshold past the end of every normal cast of it. A new name is a cleaner
--- reset than a migration: the old key is simply never read again.
-local function LearnTotal(rule, total)
-    if not (total and total > 0 and rule.spell) then return end
-    local known = totalOfSpell[rule.spell]
-    if not known or total < known then
-        totalOfSpell[rule.spell] = total
-        rule.baseTotal = total
-    end
-end
 
-function ns.KnownTotalFor(rule)
-    if not rule or not rule.spell then return nil end
-    return totalOfSpell[rule.spell] or tonumber(rule.baseTotal)
-end
 
-local function KnownTotal(rule)
-    if not rule.spell then return nil end
-    local t = totalOfSpell[rule.spell]
-    if t then return t end
-    t = tonumber(rule.baseTotal)
-    if t and t > 0 then
-        totalOfSpell[rule.spell] = t
-        return t
-    end
-end
 
 -- When the player's own cast says this aura should run out, per spell.
-local estExpiry = {}
 
--- For the report: what the estimate believes, and what it was built from.
-function ns.EstimateState(rule)
-    if not rule or not rule.spell then return "-", "-" end
-    local est = estExpiry[rule.spell]
-    local total = ns.KnownTotalFor(rule)
-    return est and ("%.1fs"):format(est - GetTime()) or "no cast seen",
-           total and ("%.0fs"):format(total) or "|cffff4040length unknown|r"
-end
 
--- True when the estimate puts this aura inside its last `soon` seconds.
---
--- An estimate, and called one. In combat nothing will tell us the time: the
--- aura is secret, the widget's numbers are secret, its countdown text is
--- secret. What is not secret is that WE cast the spell and how long it lasted
--- the last time anyone could read it. So the clock runs from the cast.
---
--- It is only believed INSIDE the window it can be right about. Once it runs
--- out it is ignored entirely -- a dot refreshed by something we did not see
--- would otherwise stay marked as nearly gone for the rest of the fight, and
--- the real "it is gone" signal arrives on its own anyway.
-function ns.EstimatedNearlyGone(rule, soon)
-    local est = rule.spell and estExpiry[rule.spell]
-    if not est then return false end
-    local now = GetTime()
-    if now >= est then return false end
-    return (est - now) <= soon
-end
 local optimistic = setmetatable({}, { __mode = "k" })
 local castAt     = setmetatable({}, { __mode = "k" })
 local readsWork  = setmetatable({}, { __mode = "k" })
@@ -747,8 +683,6 @@ local durationHooked
 -- Which method last armed each widget, and with what. Nothing depends on it;
 -- it is here because "no object was caught" has two readings -- nobody passed
 -- one, or we were not listening -- and they need opposite fixes.
-local armedBy = setmetatable({}, { __mode = "k" })
-local caughtArgs = setmetatable({}, { __mode = "k" })
 
 --[[-------------------------------------------------------------------------
     Pass-through arming
@@ -767,12 +701,10 @@ local caughtArgs = setmetatable({}, { __mode = "k" })
     it can be asked "is this nearly over" and will draw the answer, which is
     the only way anyone gets to know in combat.
 ---------------------------------------------------------------------------]]
-local forwardTo = setmetatable({}, { __mode = "k" })
 
 -- Counters, because "the box did not move" has three causes that look the
 -- same: nobody subscribed, nobody armed, or the forwarded call threw and the
 -- pcall ate it.
-ns.forwardStats = { subscribed = 0, armings = 0, fired = 0, lastErr = nil }
 
 -- How many times the game has armed each widget. Re-arming is when other
 -- cooldown-text addons re-apply their own formatter, so it is also when ours
@@ -783,12 +715,7 @@ local armCount = setmetatable({}, { __mode = "k" })
 -- always will be; the moment it happened is not, and the moment is most of
 -- what we were missing. Every refresh and every extension re-arms the entry,
 -- so this is the aura's real start time, arriving by the only door left open.
-local armedAt = setmetatable({}, { __mode = "k" })
 
-function ns.EntryArmedAt(itemFrame)
-    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
-    return cd and armedAt[cd] or nil
-end
 
 --[[-------------------------------------------------------------------------
     Asking the engine to mark the last seconds, on its own widget
@@ -835,8 +762,14 @@ function ns.ApplyEntryFormatter(itemFrame, rule)
     local rounding = Enum.NumericRuleFormatRounding.Nearest
     local formatter = C_StringUtil.CreateNumericRuleFormatter()
     local ok = pcall(formatter.SetBreakpoints, formatter, {
-        -- Below the threshold: the warning colour. Above it: as before.
-        { threshold = 0, format = colour .. "%d|r", step = 1, rounding = rounding },
+        -- Below the threshold: the warning colour, and tenths.
+        --
+        -- The size cannot follow the threshold -- size belongs to the font
+        -- string and the engine hands us an answer as text, where colour and
+        -- format fit and a point size does not. A number that starts moving
+        -- ten times a second reads as urgent in the same way, and it is the
+        -- engine deciding when, off the real clock.
+        { threshold = 0, format = colour .. "%.1f|r", step = 0.1, rounding = rounding },
         { threshold = n, format = "%d", step = 1, rounding = rounding },
         { threshold = 60, format = "%dm", step = 1, rounding = rounding,
           components = { { div = 60, rounding = rounding, step = 1 } } },
@@ -847,30 +780,8 @@ function ns.ApplyEntryFormatter(itemFrame, rule)
     return true
 end
 
-function ns.ForwardCooldown(sourceCD, targetCD)
-    if not sourceCD then return false end
-    if not targetCD then return true end
-    local set = forwardTo[sourceCD]
-    if not set then
-        set = setmetatable({}, { __mode = "k" })
-        forwardTo[sourceCD] = set
-    end
-    set[targetCD] = true
-    ns.forwardStats.subscribed = ns.forwardStats.subscribed + 1
-    return true
-end
 
-function ns.StopForwarding(sourceCD, targetCD)
-    local set = forwardTo[sourceCD]
-    if set then set[targetCD] = nil end
-end
 
--- The arguments the game armed this widget with, to be passed straight on to
--- one of ours. Never read, only forwarded.
-function ns.CaughtArgs(itemFrame)
-    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
-    return cd and caughtArgs[cd] or nil
-end
 
 local STALE_ON = { "SetCooldown", "SetCooldownDuration",
                    "SetCooldownFromExpirationTime", "SetCooldownUNIX", "Clear" }
@@ -889,52 +800,15 @@ local function HookCooldownDurations()
     end
     hooksecurefunc(proto, "SetCooldownFromDurationObject", function(cd, durObj)
         caughtDuration[cd] = durObj
-        armedBy[cd] = "DurationObject"
-        local set = forwardTo[cd]
-        if set then
-            for target in pairs(set) do
-                pcall(target.SetCooldownFromDurationObject, target, durObj)
-            end
-        end
     end)
     for _, m in ipairs(STALE_ON) do
         if proto[m] then
-            hooksecurefunc(proto, m, function(cd, a, b)
+            hooksecurefunc(proto, m, function(cd)
                 caughtDuration[cd] = nil
-                armedBy[cd] = m .. "(" .. type(a)
-                    .. (IsSecret(a) and "!" or "") .. ")"
-                -- Straight on, while they are still arguments.
-                local st = ns.forwardStats
+                -- Re-arming is when other cooldown-text addons put their own
+                -- formatter back, so it is when ours has to go back too.
                 if m == "SetCooldown" then
-                    st.armings = st.armings + 1
                     armCount[cd] = (armCount[cd] or 0) + 1
-                    armedAt[cd] = GetTime()
-                elseif m == "Clear" then
-                    armedAt[cd] = nil
-                end
-                local set = forwardTo[cd]
-                if set then
-                    for target in pairs(set) do
-                        local ok, err
-                        if m == "Clear" then
-                            ok, err = pcall(target.Clear, target)
-                        elseif target[m] then
-                            ok, err = pcall(target[m], target, a, b)
-                        end
-                        if ok then
-                            st.fired = st.fired + 1
-                        elseif err then
-                            st.lastErr = tostring(err):sub(1, 90)
-                        end
-                    end
-                end
-                -- Kept, never inspected. A secret can still be handed to
-                -- another setter, which is enough to arm a widget of ours
-                -- with exactly what the game armed this one with.
-                if m == "Clear" then
-                    caughtArgs[cd] = nil
-                else
-                    caughtArgs[cd] = { m = m, a = a, b = b }
                 end
             end)
         end
@@ -961,89 +835,14 @@ ns.HookCooldownDurations = HookCooldownDurations
     a curve is accepted, and the two-argument form is tried first so a
     one-argument fallback cannot quietly mean "starts now".
 ---------------------------------------------------------------------------]]
-local madeDuration = setmetatable({}, { __mode = "k" })
 
 local function UsableDuration(d)
     return HasMethod(d, "EvaluateRemainingDuration")
 end
 
--- Which argument order CreateDuration wants, settled by asking it about a
--- duration whose answer we already know.
---
--- Both plausible orders hand back a perfectly valid object, so trying them in
--- turn and taking the first that works picks a coin toss and then trusts it.
--- The test is asymmetric instead: ten seconds long with eight already gone,
--- and a curve asked whether under five remain. Built from PLAIN numbers, so
--- for once the answer comes back plain and can simply be read.
---
--- false means no order passed, and then no object is built at all. A duration
--- that lies is worse than none: it lights everything, always, confidently.
--- Candidate meanings for CreateDuration's two arguments. The seconds forms
--- can carry a secret straight through; the millisecond ones cannot, because
--- scaling a secret is arithmetic on it and that is refused -- so if one of
--- those turns out to be the true shape, this road is closed in combat and we
--- will at least know it rather than quietly trusting a lie.
-local DURATION_SHAPES = {
-    { name = "start,dur", secretSafe = true,
-      build = function(s, d) return s, d end },
-    { name = "dur,start", secretSafe = true,
-      build = function(s, d) return d, s end },
-    { name = "startMS,durMS", secretSafe = false,
-      build = function(s, d) return s * 1000, d * 1000 end },
-    { name = "durMS,startMS", secretSafe = false,
-      build = function(s, d) return d * 1000, s * 1000 end },
-    { name = "dur", secretSafe = true,
-      build = function(_, d) return d end },
-}
 
-local durationShape
 
--- Is this shape's object, built to have `want` seconds left, seen as being
--- under `threshold`? Plain numbers in, so the answer may be read.
-local function ShapeSaysUnder(shape, secondsLeft, total, threshold)
-    local CDU = C_DurationUtil
-    local now = GetTime()
-    local ok, d = pcall(CDU.CreateDuration, shape.build(now - (total - secondsLeft), total))
-    if not (ok and UsableDuration(d)) then return nil end
-    local curve = C_CurveUtil.CreateColorCurve()
-    if curve.SetType and Enum and Enum.LuaCurveType then
-        curve:SetType(Enum.LuaCurveType.Step)
-    end
-    curve:AddPoint(0, CreateColor(1, 1, 1, 1))
-    curve:AddPoint(threshold, CreateColor(1, 1, 1, 0))
-    local ok2, col = pcall(d.EvaluateRemainingDuration, d, curve)
-    if not (ok2 and HasMethod(col, "GetRGBA")) then return nil end
-    local ok3, _, _, _, a = pcall(col.GetRGBA, col)
-    if not ok3 or type(a) ~= "number" or IsSecret(a) then return nil end
-    return a > 0.5
-end
 
--- Two cases, and a shape has to pass BOTH.
---
--- The earlier version asked only "is a nearly-spent duration seen as nearly
--- spent", which an object that is ALWAYS spent passes without trying -- and
--- that is exactly what a wrong argument order or a wrong unit produces. So
--- there is a second case now that must come back the other way: a duration
--- with a long time left has to be seen as having a long time left. One answer
--- proves nothing; the pair is the test.
-local function CalibrateDuration()
-    if durationShape ~= nil then return durationShape end
-    if not (C_DurationUtil and C_DurationUtil.CreateDuration and C_CurveUtil
-            and C_CurveUtil.CreateColorCurve and CreateColor) then
-        durationShape = false
-        return false
-    end
-    for _, shape in ipairs(DURATION_SHAPES) do
-        local nearly = ShapeSaysUnder(shape, 2, 100, 5)
-        local plenty = ShapeSaysUnder(shape, 60, 100, 5)
-        if nearly == true and plenty == false then
-            durationShape = shape.name
-            return durationShape
-        end
-    end
-    durationShape = false
-    return false
-end
 
 -- For the report: every shape and how it answered, so a failure says which
 -- half it failed rather than just "no".
@@ -1060,128 +859,14 @@ end
     pass under one of them: two seconds left of a hundred must read as under
     the threshold and sixty must not. Whatever the client means, the addon
     then speaks it -- including if a later patch changes its mind.
----------------------------------------------------------------------------]]
-local CURVE_AXES = {
-    { name = "seconds",  x = function(sec, _)     return sec end },
-    { name = "ms",       x = function(sec, _)     return sec * 1000 end },
-    { name = "fraction", x = function(sec, total)
-                                if not (total and total > 0) then return nil end
-                                return sec / total
-                            end },
-}
 
-local curveAxis
 
-local function CalibrateAxis()
-    if curveAxis ~= nil then return curveAxis end
-    local shape = DURATION_SHAPES[1]
-    for _, axis in ipairs(CURVE_AXES) do
-        local t = axis.x(5, 100)
-        if t then
-            local nearly = ShapeSaysUnder(shape, 2, 100, t)
-            local plenty = ShapeSaysUnder(shape, 60, 100, t)
-            if nearly == true and plenty == false then
-                curveAxis = axis
-                return curveAxis
-            end
-        end
-    end
-    curveAxis = false
-    return false
-end
-ns.CalibrateAxis = CalibrateAxis
 
--- The x value that means `sec` seconds on a curve, in whatever the client
--- measures.
---
--- When the calibration cannot decide, this answers in seconds -- the meaning
--- everything here has always assumed and which the warning colour has been
--- built on since the first version. A test that cannot run is not evidence
--- against what it was testing, and disabling working behaviour on the
--- strength of an inconclusive measurement is its own kind of wrong.
-function ns.CurveX(sec, total)
-    local axis = CalibrateAxis()
-    if not axis then return sec end
-    return axis.x(sec, total) or sec
-end
-function ns.CurveAxisName()
-    local axis = CalibrateAxis()
-    return axis and axis.name or "unknown"
-end
 
--- What the curve's x axis is measured in.
---
--- Every shape failing BOTH halves the same way says the argument order is not
--- the problem: the object is fine and we are asking the question in the wrong
--- units. A curve whose points sit at 0 and 5 means "five" of something, and
--- seconds is only the most obvious guess -- a fraction of the total and
--- milliseconds are just as plausible, and all three look identical until a
--- case is built that can only pass under one of them.
---
--- 2 seconds left of 100 must read as under the threshold, 60 must not. Only
--- the right unit separates those.
-function ns.CurveAxisReport(say)
-    local shape = DURATION_SHAPES[1]
-    for _, t in ipairs({ { 5, "seconds" }, { 0.05, "fraction of total" },
-                         { 0.5, "fraction, half" }, { 5000, "milliseconds" } }) do
-        local nearly = ShapeSaysUnder(shape, 2, 100, t[1])
-        local plenty = ShapeSaysUnder(shape, 60, 100, t[1])
-        say("  %-9s (%s): 2s -> %s | 60s -> %s   %s",
-            tostring(t[1]), t[2],
-            nearly == nil and "?" or (nearly and "UNDER" or "over"),
-            plenty == nil and "?" or (plenty and "UNDER" or "over"),
-            (nearly == true and plenty == false) and "|cff40ff40PASS|r" or "no")
-    end
-end
 
-function ns.DurationShapeReport(say)
-    for _, shape in ipairs(DURATION_SHAPES) do
-        local nearly = ShapeSaysUnder(shape, 2, 100, 5)
-        local plenty = ShapeSaysUnder(shape, 60, 100, 5)
-        local verdict = (nearly == true and plenty == false)
-            and "|cff40ff40PASS|r" or "|cffff4040no|r"
-        say("  %-16s 2s left -> %s | 60s left -> %s   %s%s",
-            shape.name,
-            nearly == nil and "?" or (nearly and "UNDER" or "over"),
-            plenty == nil and "?" or (plenty and "UNDER" or "over"),
-            verdict, shape.secretSafe and "" or " (needs plain numbers)")
-    end
-end
-ns.CalibrateDuration = CalibrateDuration
 
-local function MakeDuration(cd, args)
-    local cached = madeDuration[cd]
-    if cached and cached.args == args then return cached.obj, cached.form end
-    local shape = CalibrateDuration()
-    if not shape then return nil, "uncalibrated" end
 
-    local def
-    for _, sh in ipairs(DURATION_SHAPES) do
-        if sh.name == shape then def = sh break end
-    end
-    -- A millisecond shape would need the secret scaled, which is arithmetic on
-    -- it, which is refused. Better to build nothing than to build a lie.
-    if not (def and def.secretSafe) then return nil, "shape needs plain numbers" end
-    local ok, d = pcall(C_DurationUtil.CreateDuration, def.build(args.a, args.b))    local obj = (ok and UsableDuration(d)) and d or nil
-    madeDuration[cd] = { args = args, obj = obj, form = obj and shape or "build failed" }
-    return obj, obj and shape or "build failed"
-end
 
--- A duration object built from what this entry was armed with, or nil.
-function ns.MadeDuration(itemFrame)
-    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
-    local args = cd and caughtArgs[cd]
-    if not args then return nil, "nothing captured" end
-    return MakeDuration(cd, args)
-end
-
--- How this entry's widget was last armed, in whatever words the hook recorded.
-function ns.ArmedBy(itemFrame)
-    local hooked = HookCooldownDurations()
-    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
-    if not hooked then return "|cffff4040hook off|r" end
-    return cd and armedBy[cd] or "nothing seen"
-end
 
 -- What we caught for this entry, if it is still a usable object.
 function ns.CaughtDuration(itemFrame)
@@ -1202,334 +887,11 @@ end
 --
 -- Only a table with EvaluateRemainingDuration counts. A number here would be
 -- the wrong kind of right: accepted, then silently useless.
-local durationGetters = { "GetCooldownDuration", "GetCooldownDisplayDuration" }
-function ns.WidgetDuration(itemFrame)
-    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
-    if not cd then return nil end
-    for _, m in ipairs(durationGetters) do
-        if cd[m] then
-            local ok, d = pcall(cd[m], cd)
-            if ok and UsableDuration(d) then return d end
-        end
-    end
-    return nil
-end
 
--- Plain seconds left, off the Cooldown Manager's own cooldown widget.
---
--- The duration object is the better answer and is asked first everywhere this
--- is used, because it keeps working when the number is secret. But most target
--- debuffs do not have one: the instance id belongs to a unit we may not read,
--- so GetAuraDuration comes back empty and only the widget knows. It was told
--- the numbers by the game, so where they arrive plain they are exact.
---
--- nil means "no idea", never "none left" -- an expired sweep reads the same as
--- an absent one, and the caller must not treat those alike.
--- Returns left, why -- and the why is the point. "No number" has four
--- different causes here and they need four different answers from us, so a
--- bare nil would only move the guessing somewhere else.
-local function MirrorRemaining(itemFrame)
-    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
-    if not cd then return nil, "no cooldown child" end
-    if not cd.GetCooldownTimes then return nil, "no GetCooldownTimes" end
-    local ok, startMS, durMS = pcall(cd.GetCooldownTimes, cd)
-    if not ok then return nil, "GetCooldownTimes errored" end
-    if type(startMS) ~= "number" or type(durMS) ~= "number" then
-        return nil, "not numbers"
-    end
-    if IsSecret(startMS) or IsSecret(durMS) then return nil, "secret" end
-    -- A cooldown armed from a duration object leaves the legacy pair at zero:
-    -- the widget draws from the object and never fills these in.
-    if durMS <= 0 then return nil, "duration 0 (armed from object?)" end
-    local left = (startMS + durMS) / 1000 - GetTime()
-    if left <= 0 then return nil, "expired" end
-    return left, "ok"
-end
 
--- One line saying where the early-gone threshold could get a time from for
--- this entry, and what stopped it. Shared by /cgl auracheck and /cgl probe:
--- the compact command exists because this question has to be asked IN COMBAT,
--- where the full report is too long to read and half of it is beside the point.
-function ns.SoonReport(mf, rule)
-    local left, why = MirrorRemaining(mf)
-    local cdChild = mf and (mf.Cooldown or mf.cooldown)
-    local rawS, rawD = "-", "-"
-    if cdChild and cdChild.GetCooldownTimes then
-        local okc, x, y = pcall(cdChild.GetCooldownTimes, cdChild)
-        if okc then
-            rawS = IsSecret(x) and "secret" or tostring(x)
-            rawD = IsSecret(y) and "secret" or tostring(y)
-        end
-    end
 
-    -- Both known sources came up empty, so ask the entry what it is holding.
-    -- Blizzard draws a live countdown here in combat, which means the time is
-    -- reachable from somewhere; the question is under which name, and whether
-    -- it arrives plain.
-    local carriers = {}
-    if not left and mf then
-        local okp = pcall(function()
-            for k, v in pairs(mf) do
-                if type(v) == "table" then
-                    local okm = pcall(function()
-                        if v.EvaluateRemainingDuration or v.GetRemainingDuration then
-                            carriers[#carriers + 1] = tostring(k)
-                        end
-                    end)
-                    if not okm then carriers[#carriers + 1] = tostring(k) .. "?" end
-                end
-            end
-        end)
-        if not okp then carriers[#carriers + 1] = "<pairs blocked>" end
-        if mf.cooldownID and C_CooldownViewer
-           and C_CooldownViewer.GetCooldownViewerCooldownInfo then
-            local oki, info = pcall(
-                C_CooldownViewer.GetCooldownViewerCooldownInfo, mf.cooldownID)
-            if oki and type(info) == "table" then
-                for k, v in pairs(info) do
-                    local t = type(v)
-                    if t == "number" or t == "table" then
-                        carriers[#carriers + 1] = ("info.%s=%s%s"):format(
-                            tostring(k), t, IsSecret(v) and "!" or "")
-                    end
-                end
-            end
-        end
-        if cdChild then
-            for _, m in ipairs(durationGetters) do
-                if cdChild[m] then
-                    local okd, d = pcall(cdChild[m], cdChild)
-                    local what = not okd and "err" or type(d)
-                    if okd and UsableDuration(d) then
-                        what = "|cff40ff40durObj|r"
-                    elseif okd and IsSecret(d) then                        what = what .. "!"
-                    end
-                    carriers[#carriers + 1] = ("CD:%s->%s"):format(m, what)
-                end
-            end
-        end    end
 
-    -- The number the player can already see on the entry. If it arrives plain
-    -- it can be parsed and compared like anything else; if it is secret it can
-    -- only be handed to SetText, which is exactly what we do with it -- shown,
-    -- never read. Worth reporting either way: "we can see it" and "we can read
-    -- it" are different questions and they look identical on screen.
-    local fs = FindTimerFS(mf)
-    local textWhat = "no fontstring"
-    if fs then
-        local okt, txt = pcall(fs.GetText, fs)
-        if not okt then textWhat = "err"
-        elseif IsSecret(txt) then textWhat = "|cffff4040secret|r"
-        elseif type(txt) == "string" then textWhat = ("|cff40ff40%q|r"):format(txt)
-        else textWhat = type(txt) end
-    end
 
-    -- The verdict that actually decides this feature, in the short report
-    -- rather than buried in the long one.
-    local _, durWhy = ns.MirrorDurationFor(mf, rule)
-
-    local est, learned = ns.EstimateState(rule)
-    local armedAgo = ns.EntryArmedAt(mf)
-    armedAgo = armedAgo and ("%.1fs ago"):format(GetTime() - armedAgo) or "never"
-
-    local n = ns.SoonSeconds(rule)
-    return ("early-gone: soon=%s |cffffd100dur=%s est=%s of %s armed=%s|r caught=%s armed=%s made=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
-        n and ("%ds"):format(n) or "off",
-        tostring(durWhy), est, learned, armedAgo,
-        ns.CaughtDuration(mf) and "|cff40ff40yes|r" or "|cffff4040no|r",
-        ns.ArmedBy(mf),
-        (function()
-            local d, form = ns.MadeDuration(mf)
-            return d and ("|cff40ff40" .. tostring(form) .. "|r") or
-                   ("|cffff4040" .. tostring(form) .. "|r")
-        end)(),
-        left and ("%.1fs"):format(left) or "|cffff4040none|r",
-        why or "?", rawS, rawD, textWhat,
-        #carriers > 0 and (" | carriers: " .. table.concat(carriers, ", ")) or "")
-end
-
--- Every method a Cooldown widget has, sorted, with the ones that mention time
--- called out first. The engine answers questions about secret values through
--- methods like these -- SetAlphaFromBoolean, SetCountdownFormatter -- so if
--- there is a way to ask "is this nearly over" without ever reading a number,
--- its name is somewhere in this list.
-function ns.CooldownAPI(say)
-    local mt = ActionButton1Cooldown and getmetatable(ActionButton1Cooldown)
-    local proto = mt and mt.__index
-    if type(proto) ~= "table" then
-        say("no Cooldown metatable")
-        return
-    end
-    local hot, rest = {}, {}
-    for k, v in pairs(proto) do
-        if type(v) == "function" and type(k) == "string" then
-            local t = k:find("Duration") or k:find("Remain") or k:find("Expir")
-                or k:find("Countdown") or k:find("Boolean") or k:find("Curve")
-                or k:find("Formatter") or k:find("Time")
-            if t then hot[#hot + 1] = k else rest[#rest + 1] = k end
-        end
-    end
-    table.sort(hot)
-    table.sort(rest)
-    say("|cff40ff40Cooldown, time-related (%d):|r %s", #hot, table.concat(hot, ", "))
-    say("Cooldown, the rest (%d): %s", #rest, table.concat(rest, ", "))
-
-    -- And the two helpers tullaCTC leans on, which are the shape of answer we
-    -- are looking for: a rule the engine evaluates against a secret value.
-    say("C_StringUtil.CreateNumericRuleFormatter: %s",
-        tostring(C_StringUtil and C_StringUtil.CreateNumericRuleFormatter ~= nil))
-    say("canaccessvalue: %s", tostring(_G.canaccessvalue ~= nil))
-end
-
--- What C_DurationUtil.CreateDuration actually wants, answered by asking it.
---
--- Called first with PLAIN numbers, which is the control: if the plain call
--- fails the same way the secret one does, the signature is wrong and secrecy
--- has nothing to do with it. Those are opposite problems and they look
--- identical from a distance, which is how the last few rounds got spent.
-function ns.DurationFactory(say, mf)
-    local CDU = C_DurationUtil
-    if not (CDU and CDU.CreateDuration) then
-        say("C_DurationUtil.CreateDuration: absent")
-        return
-    end
-
-    local now = GetTime()
-    local function attempt(label, ...)
-        local ok, d = pcall(CDU.CreateDuration, ...)
-        if not ok then
-            return ("%s -> |cffff4040err|r %s"):format(label, tostring(d):sub(1, 90))
-        end
-        if not IsObject(d) then
-            return ("%s -> %s"):format(label, type(d))
-        end
-        if UsableDuration(d) then
-            -- Worth printing once: the object's own methods say what else it
-            -- can answer without ever being read.
-            local names = {}
-            pcall(function()
-                for k, v in pairs(getmetatable(d) and getmetatable(d).__index or d) do
-                    if type(k) == "string" and type(v) == "function" then
-                        names[#names + 1] = k
-                    end
-                end
-            end)
-            table.sort(names)
-            return ("%s -> |cff40ff40durObj|r {%s}"):format(label, table.concat(names, ","))
-        end
-        return ("%s -> table, no Evaluate"):format(label)
-    end
-
-    say("calibrated shape: |cffffd100%s|r", tostring(ns.CalibrateDuration()))
-    say("|cffffd100curve axis (what does 5 on the curve mean?):|r")
-    ns.CurveAxisReport(say)
-    say("|cffffd100shape test (both halves must pass):|r")
-    ns.DurationShapeReport(say)
-    say("|cffffd100plain control:|r")
-    say("  " .. attempt("(now,10)", now, 10))
-    say("  " .. attempt("(10,now)", 10, now))
-    say("  " .. attempt("(10)", 10))
-    say("  " .. attempt("(nowMS,10000)", now * 1000, 10000))
-    say("  " .. attempt("({start,dur})", { startTime = now, duration = 10 }))
-
-    local args = mf and ns.CaughtArgs(mf)
-    if not args then
-        say(ns.L("nothing captured for that entry yet - hit something first",
-                 "по этой записи ещё ничего не поймано — ударь по цели"))
-        return
-    end
-    say("|cffffd100captured %s:|r", tostring(args.m))
-    say("  " .. attempt("(a,b)", args.a, args.b))
-    say("  " .. attempt("(b,a)", args.b, args.a))
-    say("  " .. attempt("(b)", args.b))
-    say("  " .. attempt("(a)", args.a))
-end
-
--- Does the duration object we are about to trust actually tell the truth?
---
--- Run this OUT OF COMBAT, where the aura is readable and nothing is secret:
--- the real remaining time can be read, the object can be evaluated, and the
--- answer comes back plain. A curve is asked twice, on either side of that
--- known time -- "under remaining-1?" must be no, "under remaining+1?" must be
--- yes -- which catches an object that is right in kind and wrong in value.
---
--- In combat every answer here is secret and the test says nothing. That is not
--- a limitation of the test; it is the reason the test has to exist.
-function ns.SoonTest(rules, say)
-    local inCombat = InCombatLockdown and InCombatLockdown()
-    say(ns.L("--- duration truth test (%s) ---", "--- проверка объекта (%s) ---"),
-        inCombat and ns.L("IN COMBAT - answers will be secret",
-                          "В БОЮ — ответы будут секретными")
-                  or ns.L("out of combat", "вне боя"))
-    say("shape=%s", tostring(ns.CalibrateDuration()))
-
-    local function AlphaAt(durObj, t)
-        if not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then
-            return "no curve api"
-        end
-        local curve = C_CurveUtil.CreateColorCurve()
-        if curve.SetType and Enum and Enum.LuaCurveType then
-            curve:SetType(Enum.LuaCurveType.Step)
-        end
-        curve:AddPoint(0, CreateColor(1, 1, 1, 1))
-        curve:AddPoint(t, CreateColor(1, 1, 1, 0))
-        local ok, col = pcall(durObj.EvaluateRemainingDuration, durObj, curve)
-        if not ok then return "eval err" end
-        if not HasMethod(col, "GetRGBA") then return "no colour" end
-        local ok2, _, _, _, a = pcall(col.GetRGBA, col)
-        if not ok2 then return "no rgba" end
-        if IsSecret(a) then return "secret" end
-        if type(a) ~= "number" then return type(a) end
-        return a > 0.5 and "UNDER" or "over"
-    end
-
-    for _, rule in ipairs(rules) do
-        if rule.enabled ~= false and rule.kind == "aura" and not rule.proc
-           and not rule.missing then
-            local name = ns.SpellName and ns.SpellName(rule.spell) or rule.spell
-            local found, remaining = ns.QueryAura(rule)
-            local mf, isAura = ns.FindMirror(rule)
-            local durObj, why
-            if mf and isAura then
-                durObj, why = ns.MirrorDurationFor(mf, rule)
-            else
-                why = "no mirror"
-            end
-            if not durObj then
-                say("%s: |cffff4040no duration|r (%s)", name, tostring(why))
-            elseif type(remaining) ~= "number" or IsSecret(remaining) then
-                say("%s: duration %s, but remaining is %s - cannot check here",
-                    name, tostring(why),
-                    found == true and "secret" or "unreadable")
-            else
-                -- Just inside and just outside the real remaining time.
-                say("%s: remaining=%.1f via %s | at %.1f -> %s (want over) | "
-                    .. "at %.1f -> %s (want UNDER)",
-                    name, remaining, tostring(why),
-                    remaining - 1, AlphaAt(durObj, remaining - 1),
-                    remaining + 1, AlphaAt(durObj, remaining + 1))
-                -- What the widget was actually armed with. Out of combat
-                -- these are plain, and an object built from the wrong numbers
-                -- is indistinguishable from a good one until they are seen.
-                local args = ns.CaughtArgs(mf)
-                if args then
-                    local function show(v)
-                        if v == nil then return "nil" end
-                        if IsSecret(v) then return "secret" end
-                        if type(v) == "number" then return ("%.2f"):format(v) end
-                        return tostring(v)
-                    end
-                    say("   armed %s(%s, %s) | now=%.2f -> implies %s left",
-                        tostring(args.m), show(args.a), show(args.b), GetTime(),
-                        (type(args.a) == "number" and type(args.b) == "number"
-                         and not IsSecret(args.a) and not IsSecret(args.b))
-                            and ("%.1f"):format(args.a + args.b - GetTime())
-                            or "?")
-                end
-            end
-        end
-    end
-end
 
 --[[-------------------------------------------------------------------------
     The one door that is still open
@@ -1547,246 +909,8 @@ end
 
     This is the test rig, not the feature. It proves the mechanism or kills it.
 ---------------------------------------------------------------------------]]
-local fmtTest
 
--- live=false runs the rig on a plain twenty-second countdown of our own. That
--- has to be tried first: an empty box means either "secret arguments were
--- refused" or "this rig never renders anything", and only a control with
--- nothing secret in it can tell those apart.
-function ns.FormatterTest(mf, say, seconds, live)
-    if not (C_StringUtil and C_StringUtil.CreateNumericRuleFormatter) then
-        say("no CreateNumericRuleFormatter on this client")
-        return
-    end
-    -- mf is a LIST in live mode. Subscribing to one entry means guessing which
-    -- spell will be recast, and guessing wrong looks exactly like the
-    -- mechanism failing -- which is what it looked like. So it subscribes to
-    -- every tracked aura entry and whichever one is re-armed drives the box.
-    local args
-    if live then
-        local n2 = 0
-        for _, entry in ipairs(mf or {}) do
-            local src = entry.Cooldown or entry.cooldown
-            if src and ns.ForwardCooldown(src, nil) ~= nil then n2 = n2 + 1 end
-        end
-        if n2 == 0 then
-            say(ns.L("no tracked entry has a cooldown widget",
-                     "ни у одной записи нет виджета кулдауна"))
-            return
-        end
-        args = false
-    else
-        args = { a = GetTime(), b = 20 }
-    end
 
-    if not fmtTest then
-        fmtTest = CreateFrame("Frame", nil, UIParent)
-        fmtTest:SetSize(96, 96)
-        fmtTest:SetPoint("CENTER", 0, 220)
-        fmtTest.bg = fmtTest:CreateTexture(nil, "BACKGROUND")
-        fmtTest.bg:SetAllPoints()
-        fmtTest.bg:SetColorTexture(0, 0, 0, 0.35)
-        fmtTest.cd = CreateFrame("Cooldown", nil, fmtTest, "CooldownFrameTemplate")
-        fmtTest.cd:SetAllPoints()
-        fmtTest.cd:SetDrawSwipe(false)
-        fmtTest.cd:SetDrawEdge(false)
-        fmtTest.cd:SetDrawBling(false)
-        fmtTest.cd:SetHideCountdownNumbers(false)
-        -- The long-standing opt-out flag every cooldown-text addon honours.
-        -- Without it they re-theme this widget as their own -- tullaCTC did,
-        -- which is why the box drew a plain yellow number instead of ours.
-        fmtTest.cd.noCooldownCount = true
-    end
-    fmtTest:Show()
-
-    local n = seconds or 5
-    local formatter = C_StringUtil.CreateNumericRuleFormatter()
-    local rounding = Enum.NumericRuleFormatRounding
-        and Enum.NumericRuleFormatRounding.Nearest or nil
-    -- Below the threshold: a marker. Above it: nothing at all. The engine
-    -- decides which, by looking at a number we may not.
-    -- Both sides say something. An empty box would otherwise mean either "the
-    -- engine evaluated and we are above the threshold" or "nothing rendered at
-    -- all", and those are the two answers this test exists to tell apart.
-    formatter:SetBreakpoints({
-        { threshold = 0, format = "|cffff2020UNDER %d|r", step = 1, rounding = rounding },
-        { threshold = n, format = "|cff40ff40over %d|r", step = 1, rounding = rounding },
-    })
-    -- Arm first, format second. Cooldown-text addons hook SetCooldown, so a
-    -- formatter set before it is replaced by theirs a moment later; set after,
-    -- ours is the one that stands.
-    local armed, armErr = true, nil
-    if args then
-        armed, armErr = pcall(fmtTest.cd.SetCooldown, fmtTest.cd, args.a, args.b)
-    else
-        -- Subscribe and wait. Nothing can be armed from here: the arming
-        -- happens in the hook, next time the game re-arms one of these
-        -- entries, which for a dot is the next time you apply it.
-        for _, entry in ipairs(mf or {}) do
-            ns.ForwardCooldown(entry.Cooldown or entry.cooldown, fmtTest.cd)
-        end
-    end
-    fmtTest.cd:SetCountdownFormatter(formatter)
-
-    -- Did the widget actually take them? Reading its own times back answers
-    -- that without reading the values: secret/secret means armed, 0/0 means
-    -- the call was refused and quietly did nothing -- and a refused arming
-    -- looks exactly like a working one from outside.
-    local backS, backD = "-", "-"
-    if fmtTest.cd.GetCooldownTimes then
-        local okb, x, y = pcall(fmtTest.cd.GetCooldownTimes, fmtTest.cd)
-        if okb then
-            backS = IsSecret(x) and "secret" or tostring(x)
-            backD = IsSecret(y) and "secret" or tostring(y)
-        end
-    end
-    say(ns.L("armed=%s%s | our widget reads back %s/%s",
-             "вооружение=%s%s | наш виджет отдаёт %s/%s"),
-        tostring(armed), armed and "" or (" " .. tostring(armErr):sub(1, 80)),
-        backS, backD)
-
-    -- Blizzard's countdown text is off unless this is on, and a box that
-    -- renders nothing because the feature is switched off looks exactly like
-    -- a box that renders nothing because the mechanism does not work.
-    local cvar = GetCVar and GetCVar("countdownForCooldowns")
-    local fs = fmtTest.cd.GetCountdownFontString
-        and fmtTest.cd:GetCountdownFontString()
-    if fs then
-        -- A font string with no font draws nothing at all, silently.
-        local font = fs:GetFont()
-        if not font then
-            fs:SetFont(STANDARD_TEXT_FONT or "Fonts\FRIZQT__.TTF", 22, "OUTLINE")
-        end
-        fs:Show()
-    end
-
-    say(ns.L("test box armed (%s): countdownForCooldowns=%s fontstring=%s font=%s",
-             "тестовая рамка (%s): countdownForCooldowns=%s fontstring=%s шрифт=%s"),
-        live and ns.L("captured, secret", "пойманные, секретные")
-             or ns.L("plain 20s control", "контроль, обычные 20 с"),
-        tostring(cvar), tostring(fs ~= nil),
-        tostring(fs and (fs:GetFont()) or "-"))
-    -- Read the box back instead of asking what is on screen. On the control
-    -- run nothing is secret, so the text the engine put there can simply be
-    -- looked at -- and "nothing rendered" then means nothing rendered, rather
-    -- than meaning somebody glanced at the wrong moment.
-    if fs and C_Timer and C_Timer.After then
-        C_Timer.After(0.6, function()
-            local ok, txt = pcall(fs.GetText, fs)
-            local shown = fs:IsShown() and fs:GetParent():IsShown()
-            say(ns.L("box after 0.6s: text=%s shown=%s alpha=%.2f",
-                     "рамка через 0.6 с: текст=%s показан=%s альфа=%.2f"),
-                (not ok) and "err"
-                    or (txt == nil and "nil"
-                        or (IsSecret(txt) and "secret" or ("%q"):format(tostring(txt)))),
-                tostring(shown), fs:GetAlpha())
-        end)
-    end
-
-    if not args then
-        say(ns.L("forwarding armed on %d entries: recast the spell",
-                 "переадресация включена на %d записях: перекастуй заклинание"),
-            ns.forwardStats.subscribed)
-        -- Watch it for half a minute and report only when something changes.
-        -- In combat the text is secret, so "secret" is the good answer here:
-        -- it means the engine rendered something. nil means it did not.
-        if fmtTest.watch then fmtTest.watch:Cancel() end
-        local last
-        fmtTest.watch = C_Timer.NewTicker(1, function()
-            local f = fmtTest.cd.GetCountdownFontString
-                and fmtTest.cd:GetCountdownFontString()
-            local ok, txt = pcall(f.GetText, f)
-            local now = (not ok) and "err"
-                or (txt == nil and "nil"
-                    or (IsSecret(txt) and "secret" or ("%q"):format(tostring(txt))))
-            local st, sd = "-", "-"
-            local okb, x, y = pcall(fmtTest.cd.GetCooldownTimes, fmtTest.cd)
-            if okb then
-                st = IsSecret(x) and "secret" or tostring(x)
-                sd = IsSecret(y) and "secret" or tostring(y)
-            end
-            local fs2 = ns.forwardStats
-            local line = ("%s|%s/%s|%d|%d|%s"):format(now, st, sd,
-                fs2.armings, fs2.fired, tostring(fs2.lastErr))
-            if line ~= last then
-                last = line
-                say(ns.L("box: text=%s times=%s/%s | armings=%d forwarded=%d %s",
-                         "рамка: текст=%s время=%s/%s | вооружений=%d передано=%d %s"),
-                    now, st, sd, fs2.armings, fs2.fired,
-                    fs2.lastErr and ("|cffff4040" .. fs2.lastErr .. "|r") or "")
-            end
-        end, 30)
-    end
-    say(ns.L("it must read 'over' now and 'UNDER' in the last %d seconds",
-             "должно показывать 'over', а в последние %d с — 'UNDER'"), n)
-end
--- Deliberately terse. This is the one report that has to be read off the
--- screen mid-fight, so it prints a line per aura rule and nothing else.
-function ns.SoonProbe(rules, say)
-    -- Combat is not the question; secrecy is. They usually coincide and the
-    -- one time they do not is the run that proves nothing.
-    say(ns.L("--- early-gone probe (combat=%s, auras secret=%s) ---",
-             "--- зонд «нет заранее» (бой=%s, ауры закрыты=%s) ---"),
-        tostring(InCombatLockdown and InCombatLockdown() or false),
-        tostring(C_Secrets and C_Secrets.ShouldAurasBeSecret
-                 and C_Secrets.ShouldAurasBeSecret() or false))
-    -- Anything in the API that MAKES a duration object. If the entries turn
-    -- out to be armed with secret numbers, a factory taking numbers is the
-    -- only way back to something a curve can evaluate -- so it is worth
-    -- knowing whether one exists before designing around its absence.
-    local factories = {}
-    for name, tbl in pairs(_G) do
-        if type(name) == "string" and name:sub(1, 2) == "C_" and type(tbl) == "table" then
-            local okp = pcall(function()
-                for k, v in pairs(tbl) do
-                    if type(v) == "function" and type(k) == "string"
-                       and k:find("Duration") then
-                        factories[#factories + 1] = name .. "." .. k
-                    end
-                end
-            end)
-            if not okp then factories[#factories + 1] = name .. ".<blocked>" end
-        end
-    end
-    table.sort(factories)
-    say("duration API: %s", #factories > 0 and table.concat(factories, ", ") or "none")
-
-    local n = 0
-    for _, rule in ipairs(rules) do
-        if rule.enabled ~= false and rule.kind == "aura" and not rule.proc then
-            n = n + 1
-            local name = (C_Spell.GetSpellInfo(rule.spell) or {}).name or rule.spell
-            local mf, isAuraEntry = ns.FindMirror(rule)
-            local _, _, _, durObj = ns.QueryAura(rule)
-            say("%s [%s] durObj=%s mirror=%s", name,
-                rule.missing and ns.L("gone", "нет") or ns.L("up", "висит"),
-                tostring(durObj ~= nil),
-                mf and (isAuraEntry and "aura" or "cd-entry") or "none")
-            if mf then say("   " .. ns.SoonReport(mf, rule)) end
-            -- What the marker on the bar is running on THIS instant. The
-            -- countdown that ticks and the digit that reddens are the readable
-            -- path's own local clock, not a read -- and if that clock is
-            -- running here, it can answer "nearly gone" with no duration
-            -- object involved at all.
-            for _, fr in ipairs((ns.CG and ns.CG.auraFrames) or {}) do
-                if fr.rule == rule then
-                    say("   frame%s: shown=%s mirroring=%s expiresIn=%s pandemic=%s",
-                        fr.isStrip and "(strip)" or "(bar)",
-                        tostring(fr:IsShown()),
-                        tostring(fr._mirroring and true or false),
-                        fr.expiresAt and ("%.1fs"):format(fr.expiresAt - GetTime()) or "-",
-                        tostring(fr.pandemicOn and true or false))
-                end
-            end
-        end
-    end
-    if n == 0 then say(ns.L("no aura rules on this spec", "нет правил-аур на этом спеке")) end
-end
-
--- MirrorDuration, for the diagnostics: same source, same order, same answer.
-function ns.MirrorDurationFor(itemFrame, rule)
-    return MirrorDuration(itemFrame, rule)
-end
 
 -- The sweep is asked for either by the toggle or by picking a time-shaped
 -- marker, where the duration IS the marker.
@@ -1839,11 +963,10 @@ end
 local warnCurves = setmetatable({}, { __mode = "k" })
 
 local function WarnCurve(rule)
-    local x = ns.CurveX(rule.warn or 0, ns.KnownTotalFor(rule))
-    if not x then return nil end
-    local sig = ("%s|%s|%s|%s|%s|%s|%s|%s"):format(x,
+    local x = rule.warn or 0
+    local sig = ("%s|%s|%s|%s|%s|%s|%s"):format(x,
         rule.r or 0, rule.g or 0, rule.b or 0,
-        rule.wr or 1, rule.wg or 0, rule.wb or 0, ns.CurveAxisName())
+        rule.wr or 1, rule.wg or 0, rule.wb or 0)
     local cached = warnCurves[rule]
     if cached and cached.sig == sig then return cached.curve end
     if not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then return nil end
@@ -1876,7 +999,6 @@ end
     ordinary presence gate already says "gone", and when there is one the curve
     says "nearly gone". Exactly the trick the warning colour uses.
 ---------------------------------------------------------------------------]]
-local soonCurves = setmetatable({}, { __mode = "k" })
 
 -- Per state, and zero is off. One number rather than a number and a switch
 -- that can disagree with it: there is no useful reading of "count it gone zero
@@ -1899,48 +1021,6 @@ function ns.SoonSeconds(rule)
     return n
 end
 
--- Two curves per threshold, one the mirror image of the other: the "gone"
--- state wants to be visible inside the window and the "up" state wants to be
--- gone from it, and that is the whole difference between them.
-local function SoonCurve(n, standDown, total)
-    local x = ns.CurveX(n, total)
-    if not x then return nil end
-    local key = ("%s|%s|%s"):format(x, standDown and 1 or 0, ns.CurveAxisName())
-    local cached = soonCurves[key]
-    if cached then return cached end
-    if not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then return nil end
-    local curve = C_CurveUtil.CreateColorCurve()
-    if curve.SetType and Enum and Enum.LuaCurveType then
-        curve:SetType(Enum.LuaCurveType.Step)
-    end
-    -- Alpha carries the answer.
-    local inside, outside = 1, 0
-    if standDown then inside, outside = 0, 1 end
-    curve:AddPoint(0, CreateColor(1, 1, 1, inside))
-    curve:AddPoint(x, CreateColor(1, 1, 1, outside))
-    soonCurves[key] = curve
-    return curve
-end
--- True when it took over the frame's alpha. False means "nothing to measure
--- against", and the caller carries on as it would have: the marker then lights
--- when the aura is actually gone, which is the old behaviour and a fine thing
--- to fall back to. The readable case is not handled here -- there the remaining
--- time is a plain number and the answer belongs in the glow test, not in alpha.
-function ns.ApplySoon(frame, rule, durObj)
-    local n = ns.SoonSeconds(rule)
-    if not n then return false end
-
-    if not (durObj and durObj.EvaluateRemainingDuration) then return false end
-    local curve = SoonCurve(n, not rule.missing, ns.KnownTotalFor(rule))
-    if not curve then return false end
-    local ok, col = pcall(durObj.EvaluateRemainingDuration, durObj, curve)
-    if not ok or not HasMethod(col, "GetRGBA") then return false end
-    local ok2, _, _, _, a = pcall(col.GetRGBA, col)
-    if not ok2 then return false end
-    -- a may be secret. It is only ever handed to a setter, never looked at.
-    if not pcall(frame.SetAlpha, frame, a) then return false end
-    return true
-end
 
 -- Returns applied, why
 local function ApplyWarnColor(frame, rule, durObj)
@@ -2032,47 +1112,6 @@ local function ApplyMirror(frame, rule, itemFrame)
 
     local shown, hidden = 1, 0
     if rule.missing then shown, hidden = 0, 1 end
-    -- Counting it gone early, when there is a duration to measure. Two
-    -- sources, and neither is a fallback for the other's answer -- only for
-    -- its absence. The curve resolves it engine-side where a duration object
-    -- exists; where one does not, which is the ordinary case for a debuff on
-    -- the target, the widget's plain numbers are compared here. With neither,
-    -- the presence gate below still lights the marker once the aura actually
-    -- goes: the old behaviour, and a fine thing to land on.
-    if soon and ns.ApplySoon(frame, rule, durObj) then
-        frame._mirroring = true
-        if not frame:IsShown() then frame:Show() end
-        frame.needSafeStyle = false
-        frame:StartArt()
-        return true
-    elseif soon then
-        -- Measured, or not at all.
-        --
-        -- The state switch used to fall back to a clock of our own when
-        -- nothing would measure the aura. It cannot be made right: the length
-        -- is never told to us, and every guess at it is wrong in a different
-        -- direction depending on what happened. Extending a dot re-arms the
-        -- entry, so the clock restarts at the base length while the real
-        -- remainder is shorter, and the window then arrives after the aura is
-        -- already gone -- the marker simply stopped appearing.
-        --
-        -- What IS exact is the colour: ApplyEntryFormatter hands the engine a
-        -- threshold and the engine compares it against the real remaining
-        -- time, extension included, and draws the answer. That is the whole
-        -- feature now. A guess that is silently wrong is worse than a smaller
-        -- promise kept.
-        local left = MirrorRemaining(itemFrame)
-        local near = left and left <= soon
-        if near then
-            -- Read, not resolved: the strip may pack this one for real.
-            frame._mirroring = nil
-            frame:SetAlpha(rule.missing and 1 or 0)
-            if not frame:IsShown() then frame:Show() end
-            frame.needSafeStyle = false
-            frame:StartArt()
-            return true
-        end
-    end
 
     local applied = pcall(frame.SetAlphaFromBoolean, frame, flag, shown, hidden)
     frame._mirroring = applied or nil
@@ -2095,15 +1134,11 @@ function ns.OnPlayerCast(spellID)
     local rules = ns.castMap[spellID]
     if not rules then return false end
     local now = GetTime()
-    local total
     for _, rule in ipairs(rules) do
         optimistic[rule] = now + WINDOW
         castAt[rule] = now
         castGen[rule] = (castGen[rule] or 0) + 1
-        total = total or KnownTotal(rule)
     end
-    -- The cast is the one thing about this aura that is never secret.
-    if total then estExpiry[spellID] = now + total end
     return true
 end
 
@@ -2255,10 +1290,7 @@ function ns.ApplyAuraRule(frame, rule)
         readsWork[rule] = true
         misses[rule] = nil
         optimistic[rule] = nil
-        if total then
-            lastTotals[rule] = total
-            LearnTotal(rule, total)
-        end
+        if total then lastTotals[rule] = total end
     end
 
     local optUntil = optimistic[rule]
@@ -2300,17 +1332,6 @@ function ns.ApplyAuraRule(frame, rule)
     end
 
     local present = (found == true) or optActive
-    -- The readable half of the shared boundary. Where the time comes back as a
-    -- plain number the comparison happens here rather than in a curve, and the
-    -- "up" state has to stand down in the same window the "gone" state lights
-    -- in -- otherwise both are on at once, saying opposite things.
-    if present and not rule.missing then
-        local soon = ns.SoonSeconds(rule)
-        if soon and found == true and type(remaining) == "number"
-           and not IsSecret(remaining) and remaining <= soon then
-            present = false
-        end
-    end
     if rule.proc then SetProcActive(rule.spell, found == true) end
     -- The count has its own source. A read can hand back the aura and still
     -- withhold "applications" -- the field is secret often enough -- and the
@@ -2356,14 +1377,6 @@ function ns.ApplyAuraRule(frame, rule)
         -- Reads must have worked for this rule at least once; otherwise the
         -- mirror above owns this state, or nothing does.
         glow = (found == false) and not optActive and readsWork[rule] == true
-        -- Counted gone early: still up, but not for long. Only where the time
-        -- can actually be read; where it cannot, the curve above did it.
-        local soon = ns.SoonSeconds(rule)
-        if not glow and soon and found == true
-           and type(remaining) == "number" and not IsSecret(remaining)
-           and remaining <= soon then
-            glow = true
-        end
         if glow and rule.unit ~= "player"
            and not UnitCanAttack("player", rule.unit or "target") then
             glow = false   -- do not nag about something you cannot hit
@@ -2541,7 +1554,6 @@ function ns.AuraCheck(rules, say)
                     tostring(type(mf.auraDataUnit) ~= "nil"),
                     tostring(type(mf.auraInstanceID) ~= "nil"),
                     ns.DebugWarnColor(nil, rule, mf))
-                say("     " .. ns.SoonReport(mf, rule))
             else
                 blind[#blind + 1] = name
                 say("     cdm mirror: |cffff4040none|r%s", ns.L(

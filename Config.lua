@@ -958,7 +958,7 @@ local function PrintHelp()
         { "/cg minimap on|off",        L("the minimap button", "кнопка у миникарты") },
         { "/cg pack on|off",           L("close gaps in the reminder strip", "закрывать дырки в полосе напоминаний") },
         { "/cg rows on|off",           L("one strip row per kind, procs on top", "полоса строками по типу, проки сверху") },
-        { "/cg soon <#> <sec|off>",    L("warn on the strip with this long left on that state", "предупреждать на полосе за столько секунд, для состояния") },
+        { "/cg soon <#> <sec|off>",    L("countdown turns the warning colour this early", "за сколько секунд до конца отсчёт краснеет") },
         { "/cg stackpos <where>",      L("where the stack count sits on the marker", "где на отметке стоит счётчик стаков") },
         { "/cg stacksize <50-200>",    L("stack count size, in percent", "размер счётчика стаков, в процентах") },
         { "/cg auracheck",             L("report what the aura API answers here, with measured lag", "показать ответ aura API и замеренную задержку") },
@@ -1263,57 +1263,6 @@ local function Handler(msg)
             or L("entry formatter off - /reload to restore",
                  "форматтер записи выключен — /reload вернёт как было"))
 
-    elseif cmd == "fmttest" then
-        -- Proves or kills the formatter route: the engine draws an answer
-        -- about a value we are not allowed to read.
-        --
-        -- Every tracked aura entry, not the first that happens to have been
-        -- armed. Subscribing to one means guessing which spell gets recast,
-        -- and guessing wrong looks exactly like the mechanism failing.
-        ns.RebuildCDMMap()
-        local target, seen = {}, {}
-        for _, r in ipairs(CG:GetRules()) do
-            if r.kind == "aura" and not r.proc then
-                local mf, isAura = ns.FindMirror(r)
-                if mf and isAura and not seen[mf] then
-                    seen[mf] = true
-                    target[#target + 1] = mf
-                end
-            end
-        end
-        local live = rest and rest:find("live") ~= nil
-        ns.FormatterTest(target, Say, tonumber((rest or ""):match("%d+")), live)
-
-    elseif cmd == "soontest" then
-        -- Run OUT OF COMBAT: it checks the duration object against a
-        -- remaining time that can still be read.
-        ns.RebuildCDMMap()
-        ns.SoonTest(CG:GetRules(), Say)
-
-    elseif cmd == "mkdur" then
-        -- What the duration factory wants, asked rather than guessed. The
-        -- plain-number control separates a wrong signature from a rejected
-        -- secret; they look identical from a distance.
-        ns.RebuildCDMMap()
-        local target
-        for _, r in ipairs(CG:GetRules()) do
-            if r.kind == "aura" and not r.proc then
-                local mf, isAura = ns.FindMirror(r)
-                if mf and isAura and ns.CaughtArgs(mf) then target = mf break end
-            end
-        end
-        ns.DurationFactory(Say, target)
-
-    elseif cmd == "cdapi" then
-        -- The whole Cooldown widget API. If an engine-side answer about a
-        -- secret remaining time exists, its name is in this list.
-        ns.CooldownAPI(Say)
-
-    elseif cmd == "probe" then
-        -- The early-gone question, and only that. It has to be asked IN
-        -- COMBAT, where the full report scrolls off before it can be read.
-        ns.SoonProbe(CG:GetRules(), Say)
-
     elseif cmd == "stacks" then
         -- Where a stack count could come from, per aura rule: what our own
         -- read answers, and what the Cooldown Manager's frame actually holds.
@@ -1574,8 +1523,8 @@ local function Handler(msg)
                 rule.soon = math.max(0, math.min(60, n))
                 CG.lastSig = nil
                 CG:Rebuild()
-                Say(L("warn above the resource: %ds left", "предупреждать над ресурсом: за %d с"),
-                    rule.soon)
+                Say(L("countdown turns the warning colour %ds early",
+                      "отсчёт краснеет за %d с до конца"), rule.soon)
             end
         elseif not idx then
             Say(L("usage: /cg soon <#> <seconds|off>", "формат: /cg soon <№> <секунды|off>"))
