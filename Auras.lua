@@ -301,6 +301,8 @@ local function FindStackFS(itemFrame)
     return empty
 end
 
+ns.FindStackFS = FindStackFS
+
 -- Diagnostic: every font string on a Cooldown Manager item frame and what it
 -- says. Picking the right one has been guesswork twice now; this makes it a
 -- lookup. Text may be secret, so it is never formatted -- only reported as

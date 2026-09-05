@@ -1242,6 +1242,18 @@ local function Handler(msg)
                                         or L("cooldown entry", "запись кулдауна"))
                        or L("none", "нет"))
                 if mf then ns.DumpFontStrings(mf, Say, "     ") end
+                -- And what OUR side makes of it: the three links that have to
+                -- hold for a number to appear.
+                for _, f in ipairs(CG.auraFrames or {}) do
+                    if f.rule == r then
+                        Say("     our frame: StackText=%s shown=%s | picked=%s | stacks=%s",
+                            tostring(f.StackText ~= nil),
+                            f.StackText and tostring(f.StackText:IsShown()) or "-",
+                            tostring(mf ~= nil and ns.FindStackFS(mf) ~= nil),
+                            tostring(r.stacks))
+                        break
+                    end
+                end
             end
         end
 

@@ -396,10 +396,10 @@ function ns.SetupTimer(self, w, h)
         self.TimerText:SetTextColor(1, 1, 1)
     end
     if self.StackText then
-        -- Top right, opposite the countdown at the bottom: on a small icon the
-        -- two would otherwise sit on each other.
+        -- Top left, clear of the countdown at the bottom and of the charge
+        -- count the game itself draws in the bottom right.
         self.StackText:ClearAllPoints()
-        self.StackText:SetPoint("TOPRIGHT", self.Art or self, "CENTER", w * 0.48, h * 0.48)
+        self.StackText:SetPoint("TOPLEFT", self.Art or self, "CENTER", -w * 0.48, h * 0.48)
         local font = self.StackText:GetFont()
         if font then
             self.StackText:SetFont(font, math.max(10, math.floor(h * 0.34)), "OUTLINE")
