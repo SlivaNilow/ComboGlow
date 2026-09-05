@@ -1258,12 +1258,19 @@ local function Handler(msg)
     elseif cmd == "fmttest" then
         -- Proves or kills the formatter route: the engine draws an answer
         -- about a value we are not allowed to read.
+        --
+        -- Every tracked aura entry, not the first that happens to have been
+        -- armed. Subscribing to one means guessing which spell gets recast,
+        -- and guessing wrong looks exactly like the mechanism failing.
         ns.RebuildCDMMap()
-        local target
+        local target, seen = {}, {}
         for _, r in ipairs(CG:GetRules()) do
             if r.kind == "aura" and not r.proc then
                 local mf, isAura = ns.FindMirror(r)
-                if mf and isAura and ns.CaughtArgs(mf) then target = mf break end
+                if mf and isAura and not seen[mf] then
+                    seen[mf] = true
+                    target[#target + 1] = mf
+                end
             end
         end
         local live = rest and rest:find("live") ~= nil

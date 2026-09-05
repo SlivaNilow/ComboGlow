@@ -753,7 +753,8 @@ local caughtArgs = setmetatable({}, { __mode = "k" })
 local forwardTo = setmetatable({}, { __mode = "k" })
 
 function ns.ForwardCooldown(sourceCD, targetCD)
-    if not (sourceCD and targetCD) then return false end
+    if not sourceCD then return false end
+    if not targetCD then return true end
     local set = forwardTo[sourceCD]
     if not set then
         set = setmetatable({}, { __mode = "k" })
@@ -1445,12 +1446,20 @@ function ns.FormatterTest(mf, say, seconds, live)
         say("no CreateNumericRuleFormatter on this client")
         return
     end
+    -- mf is a LIST in live mode. Subscribing to one entry means guessing which
+    -- spell will be recast, and guessing wrong looks exactly like the
+    -- mechanism failing -- which is what it looked like. So it subscribes to
+    -- every tracked aura entry and whichever one is re-armed drives the box.
     local args
     if live then
-        local src = mf and (mf.Cooldown or mf.cooldown)
-        if not src then
-            say(ns.L("that entry has no cooldown widget",
-                     "у этой записи нет виджета кулдауна"))
+        local n2 = 0
+        for _, entry in ipairs(mf or {}) do
+            local src = entry.Cooldown or entry.cooldown
+            if src and ns.ForwardCooldown(src, nil) ~= nil then n2 = n2 + 1 end
+        end
+        if n2 == 0 then
+            say(ns.L("no tracked entry has a cooldown widget",
+                     "ни у одной записи нет виджета кулдауна"))
             return
         end
         args = false
@@ -1498,10 +1507,12 @@ function ns.FormatterTest(mf, say, seconds, live)
     if args then
         armed, armErr = pcall(fmtTest.cd.SetCooldown, fmtTest.cd, args.a, args.b)
     else
-        -- Live: subscribe and wait. There is nothing to arm from here -- the
-        -- arming happens in the hook, next time the game re-arms the entry,
-        -- which for a dot is the next time you apply it.
-        ns.ForwardCooldown(mf.Cooldown or mf.cooldown, fmtTest.cd)
+        -- Subscribe and wait. Nothing can be armed from here: the arming
+        -- happens in the hook, next time the game re-arms one of these
+        -- entries, which for a dot is the next time you apply it.
+        for _, entry in ipairs(mf or {}) do
+            ns.ForwardCooldown(entry.Cooldown or entry.cooldown, fmtTest.cd)
+        end
     end
     fmtTest.cd:SetCountdownFormatter(formatter)
 
