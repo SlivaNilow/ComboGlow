@@ -1418,9 +1418,12 @@ function ns.FormatterTest(mf, say, seconds)
         and Enum.NumericRuleFormatRounding.Nearest or nil
     -- Below the threshold: a marker. Above it: nothing at all. The engine
     -- decides which, by looking at a number we may not.
+    -- Both sides say something. An empty box would otherwise mean either "the
+    -- engine evaluated and we are above the threshold" or "nothing rendered at
+    -- all", and those are the two answers this test exists to tell apart.
     formatter:SetBreakpoints({
-        { threshold = 0, format = "|cffff2020UNDER|r", step = 1, rounding = rounding },
-        { threshold = n, format = "", step = 1, rounding = rounding },
+        { threshold = 0, format = "|cffff2020UNDER %d|r", step = 1, rounding = rounding },
+        { threshold = n, format = "|cff40ff40over %d|r", step = 1, rounding = rounding },
     })
     fmtTest.cd:SetCountdownFormatter(formatter)
     fmtTest.cd:SetCooldown(args.a, args.b)
@@ -1701,12 +1704,10 @@ local function ApplyMirror(frame, rule, itemFrame)
     -- standing: it is invisible exactly when the aura is gone.
     frame.expiresAt = nil
     frame.totalDur = nil
-    -- Only above the resource. On the button the countdown is the point --
-    -- you look there to see exactly how long is left -- and a marker that
-    -- flips to "gone" while the number is still ticking takes that away to
-    -- say something the strip is already saying. The strip is the reminder;
-    -- the button is the instrument.
-    local soon = frame.isStrip and ns.SoonSeconds(rule) or nil
+    -- Everywhere, not just the strip. Confining it to the strip was a fix for
+    -- the wrong problem: what was lost on the button was the countdown, not
+    -- the state, and the countdown is back now.
+    local soon = ns.SoonSeconds(rule)
     local durObj = MirrorDuration(itemFrame, rule)
     -- Optional cooldown sweep, driven by the real aura duration object.
     local wantsSweep = ns.WantsSweep(rule)
@@ -2002,7 +2003,7 @@ function ns.ApplyAuraRule(frame, rule)
     -- plain number the comparison happens here rather than in a curve, and the
     -- "up" state has to stand down in the same window the "gone" state lights
     -- in -- otherwise both are on at once, saying opposite things.
-    if present and not rule.missing and frame.isStrip then
+    if present and not rule.missing then
         local soon = ns.SoonSeconds(rule)
         if soon and found == true and type(remaining) == "number"
            and not IsSecret(remaining) and remaining <= soon then
@@ -2056,7 +2057,7 @@ function ns.ApplyAuraRule(frame, rule)
         glow = (found == false) and not optActive and readsWork[rule] == true
         -- Counted gone early: still up, but not for long. Only where the time
         -- can actually be read; where it cannot, the curve above did it.
-        local soon = frame.isStrip and ns.SoonSeconds(rule) or nil
+        local soon = ns.SoonSeconds(rule)
         if not glow and soon and found == true
            and type(remaining) == "number" and not IsSecret(remaining)
            and remaining <= soon then
