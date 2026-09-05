@@ -957,6 +957,7 @@ local function PrintHelp()
         { "/cg hidecdm on|off",        L("hide the Cooldown Manager without stopping it", "скрыть Cooldown Manager, не выключая его") },
         { "/cg minimap on|off",        L("the minimap button", "кнопка у миникарты") },
         { "/cg pack on|off",           L("close gaps in the reminder strip", "закрывать дырки в полосе напоминаний") },
+        { "/cg rows on|off",           L("one strip row per kind, procs on top", "полоса строками по типу, проки сверху") },
         { "/cg stackpos <where>",      L("where the stack count sits on the marker", "где на отметке стоит счётчик стаков") },
         { "/cg stacksize <50-200>",    L("stack count size, in percent", "размер счётчика стаков, в процентах") },
         { "/cg auracheck",             L("report what the aura API answers here, with measured lag", "показать ответ aura API и замеренную задержку") },
@@ -1282,6 +1283,34 @@ local function Handler(msg)
             end
         end
 
+    elseif cmd == "secretapi" then
+        -- Which widget methods take a secret value. SetAlphaFromBoolean is the
+        -- one this addon already leans on; if there is a shown- or size-from-
+        -- boolean beside it, the reminder strip can close its gaps instead of
+        -- reserving a slot for a state only the engine can see.
+        local probe = CreateFrame("Frame", nil, UIParent)
+        local function Scan(obj, label)
+            local mt = getmetatable(obj)
+            local idx = mt and mt.__index
+            if type(idx) ~= "table" then
+                Say("%s: %s", label, L("no method table", "таблицы методов нет"))
+                return
+            end
+            local names = {}
+            for k, v in pairs(idx) do
+                if type(v) == "function"
+                   and (k:find("Boolean") or k:find("Secret")) then
+                    names[#names + 1] = k
+                end
+            end
+            table.sort(names)
+            Say("%s: %d", label, #names)
+            for _, k in ipairs(names) do Say("  " .. k) end
+        end
+        Scan(probe, "Frame")
+        Scan(probe:CreateTexture(nil, "ARTWORK"), "Texture")
+        Scan(probe:CreateFontString(nil, "OVERLAY"), "FontString")
+
     elseif cmd == "cdmdump" then
         -- Every category the Cooldown Manager knows and what is in it. We read
         -- four viewer frames; if a spell is tracked in a category none of them
@@ -1473,6 +1502,13 @@ local function Handler(msg)
         CG:UpdateAuras()
         Say(L("Cooldown Manager fallback: %s", "запасной путь через Cooldown Manager: %s"),
             CG.db.mirror and L("on", "вкл") or L("off", "выкл"))
+
+    elseif cmd == "rows" then
+        CG.db.center.rows = OnOff(rest:lower(), CG.db.center.rows)
+        CG.lastSig = nil
+        CG:Rebuild()
+        Say(L("strip in rows by kind: %s", "полоса строками по типу: %s"),
+            CG.db.center.rows and L("on", "вкл") or L("off", "выкл"))
 
     elseif cmd == "pack" then
         CG.db.center.pack = OnOff(rest:lower(), CG.db.center.pack ~= false)

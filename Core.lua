@@ -152,6 +152,9 @@ local DEFAULTS = {
         -- Close the gap where a state we can read is not lit. Mirrored ones
         -- keep their place either way -- their state is not ours to know.
         pack = true,
+        -- One row per kind instead of one long row: each packs on its own, so
+        -- a kind with nothing lit takes no height at all.
+        rows = false,
     },
     specs = {},
 }
@@ -552,6 +555,22 @@ end
 -- Everything that decides what is drawn. Two rebuilds with the same
 -- fingerprint would produce identical frames, so the second one is skipped
 -- instead of tearing the live ones down.
+-- What an icon on the reminder strip MEANS, which is how the row is ordered
+-- and, in rows mode, which row it lands on. Left to right, bottom to top: a
+-- free cast, what is up, what has fallen off, and last the buttons that are
+-- simply ready. State first, things to press at the end.
+--
+-- Ordering by this rather than by the order rules were created in also puts
+-- the gaps in one place: a state we cannot read holds its slot whether or not
+-- it is lit, and scattered between the lit icons those spaces look like a
+-- fault.
+local function StripRank(rule)
+    if rule.kind == "aura" and rule.proc then return 1 end
+    if rule.kind == "aura" and rule.missing then return 3 end
+    if rule.kind == "aura" then return 2 end
+    return 4
+end
+
 local function RuleFingerprint(rule)
     return table.concat({
         tostring(rule.kind), tostring(rule.spell), tostring(rule.style),
@@ -714,20 +733,6 @@ function CG:Rebuild()
         end
         sigParts[#sigParts + 1] = "sz" .. tostring(self.db.center.size)
 
-        -- Grouped by what an icon MEANS, not by the order its rule happened to
-        -- be created in. Reading left to right: a free cast, what is up, what
-        -- has fallen off, and last the buttons that are simply ready. State
-        -- first, things to press at the end.
-        --
-        -- It also puts the gaps in one place. A state we cannot read holds its
-        -- slot whether or not it is lit, and scattered between the lit icons
-        -- those spaces look like a fault.
-        local function StripRank(rule)
-            if rule.kind == "aura" and rule.proc then return 1 end
-            if rule.kind == "aura" and rule.missing then return 3 end
-            if rule.kind == "aura" then return 2 end
-            return 4
-        end
         -- table.sort is not stable, so the position it came in at is the
         -- tiebreak; without it the row reshuffles between rebuilds.
         local came = {}
@@ -811,6 +816,7 @@ function CG:Rebuild()
                 local ic = self.centerPool:Acquire()
                 ic.secondary = nil
                 ic.isStrip = true
+                ic.stripRank = StripRank(rule)
                 self.centerIcons[#self.centerIcons + 1] = ic
                 ic:SetParent(a)
                 ic:Setup(size, ns.SpellIcon(rule.spell))
@@ -1163,6 +1169,7 @@ function CG:PackStrip()
 
     local size = c.size or 52
     local spacing = c.spacing or 10
+
     -- Repositioning runs on every update pass, so the set is fingerprinted and
     -- the work skipped unless it actually changed.
     local live, sig = {}, ""
@@ -1174,13 +1181,51 @@ function CG:PackStrip()
             sig = sig .. tostring(ic)
         end
     end
+    sig = sig .. tostring(c.rows)
     if sig == self._packSig then return end
     self._packSig = sig
+
+    local a = anchor
+
+    -- One row per kind, stacked upward with the free casts on top. Each row
+    -- packs on its own, so a kind with nothing lit takes no height at all --
+    -- and the kinds we CAN read leave no gaps, whatever the mirrored ones do.
+    if c.rows then
+        local groups, ranks = {}, {}
+        for _, ic in ipairs(live) do
+            local r = ic.stripRank or 4
+            if not groups[r] then
+                groups[r] = {}
+                ranks[#ranks + 1] = r
+            end
+            groups[r][#groups[r] + 1] = ic
+        end
+        table.sort(ranks)
+
+        local widest, row = size, 0
+        -- Highest rank at the bottom, so rank 1 (a free cast) ends up on top.
+        for i = #ranks, 1, -1 do
+            local g = groups[ranks[i]]
+            local n = #g
+            local w = n * size + (n - 1) * spacing
+            if w > widest then widest = w end
+            local y = row * (size + spacing)
+            for j, ic in ipairs(g) do
+                local x = (j - 1) * (size + spacing) - w * 0.5 + size * 0.5
+                ic:ClearAllPoints()
+                ic:SetPoint("CENTER", a or ic:GetParent(), "CENTER", x, y)
+            end
+            row = row + 1
+        end
+        if a then
+            a:SetSize(widest, math.max(size, row * (size + spacing) - spacing))
+        end
+        return
+    end
 
     local n = #live
     local totalW = size
     if n > 0 then totalW = n * size + (n - 1) * spacing end
-    local a = anchor
     if a then a:SetSize(totalW, size) end
     for i, ic in ipairs(live) do
         local x = (i - 1) * (size + spacing) - totalW * 0.5 + size * 0.5
