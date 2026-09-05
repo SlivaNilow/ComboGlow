@@ -325,8 +325,10 @@ local function RefreshDetails()
         end
     end
 
-    UI.del.text:SetText(rule and L("Delete state", "Удалить состояние")
-                             or L("Delete spell", "Удалить заклинание"))
+    -- Greyed rather than hidden: the pair keeps its place, so the one you want
+    -- is always in the same spot.
+    UI.del:SetAlpha(rule and 1 or 0.35)
+    UI.delSpell:SetAlpha(selSpell and 1 or 0.35)
 end
 
 local function Refresh()
@@ -947,22 +949,32 @@ local function Build()
     end)
     bDot:SetPoint("LEFT", bPreset, "RIGHT", 8, 0)
 
-    UI.del = TextButton(UI, "", 140, 22, function()
+    -- Two buttons, because they were one and the whole-spell half was
+    -- unreachable: it only appeared when the open state had no rule, so as
+    -- long as any state existed the button removed them one at a time, and
+    -- when the last one went the selection jumped to another spell.
+    UI.del = TextButton(UI, L("Delete state", "Удалить состояние"), 140, 22, function()
         local rules = CG:GetRules()
         local rule, idx = CurrentRule()
         if rule and idx then
             table.remove(rules, idx)
-        elseif selSpell then
-            -- No rule in this state: the button removes the whole spell.
-            for i = #rules, 1, -1 do
-                if rules[i].spell == selSpell then table.remove(rules, i) end
-            end
-            selSpell = nil
+            CG:Rebuild()
+            Refresh()
         end
+    end)
+    UI.del:SetPoint("BOTTOMRIGHT", -12, 10)
+
+    UI.delSpell = TextButton(UI, L("Delete spell", "Удалить заклинание"), 150, 22, function()
+        if not selSpell then return end
+        local rules = CG:GetRules()
+        for i = #rules, 1, -1 do
+            if rules[i].spell == selSpell then table.remove(rules, i) end
+        end
+        selSpell = nil
         CG:Rebuild()
         Refresh()
     end)
-    UI.del:SetPoint("BOTTOMRIGHT", -12, 10)
+    UI.delSpell:SetPoint("BOTTOMRIGHT", UI.del, "BOTTOMLEFT", -8, 0)
 
     UI:SetScript("OnHide", function()
         for _, tile in ipairs(UI.tiles) do
