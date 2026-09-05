@@ -763,14 +763,17 @@ end
     Every way a button might carry the alert is tried, because there is no one
     supported way and third-party bars roll their own.
 ---------------------------------------------------------------------------]]
-local ALERT_KEYS = {
-    -- Blizzard
-    "SpellActivationAlert", "overlay", "Overlay",
-    -- LibCustomGlow, which is what most third-party bars draw theirs with
-    "_ProcGlow", "_ButtonGlow", "_PixelGlow", "_AutoCastGlow",
-    "__LCG_ProcGlow",
-}
-
+-- Only what Blizzard documents for this, and nothing else.
+--
+-- An earlier version also called EllesmereUI's StopGlow on the button and hid
+-- any frame the button kept under a LibCustomGlow key or under "overlay" /
+-- "Overlay". That made the action bars vanish in combat: those names are not
+-- reserved for proc glows, and on someone else's button they are parts of the
+-- button. Reaching into another addon's fields to hide something is guesswork,
+-- and guessing wrong here costs the player their bars mid-fight.
+--
+-- If a third-party bar draws its own proc glow, that is its feature and its
+-- option to turn off. Ours is not the code to fight it.
 local function HideAlertOn(button)
     if not button then return end
     if button.HideSpellActivationAlert then
@@ -778,15 +781,8 @@ local function HideAlertOn(button)
     end
     local mgr = _G.ActionButtonSpellAlertManager
     if mgr and mgr.HideAlert then pcall(mgr.HideAlert, mgr, button) end
-    -- EllesmereUI's bars draw their proc glow through the same library we
-    -- borrow for our markers. Ours live on the overlay's own wrapper frame,
-    -- never on the button, so stopping the button's glow cannot touch them.
-    local G = ns.EUIGlows and ns.EUIGlows()
-    if G then pcall(G.StopGlow, button) end
-    for _, key in ipairs(ALERT_KEYS) do
-        local a = button[key]
-        if type(a) == "table" and a.Hide then pcall(a.Hide, a) end
-    end
+    local a = button.SpellActivationAlert
+    if type(a) == "table" and a.Hide then pcall(a.Hide, a) end
 end
 
 -- spellID limits the sweep to the buttons that spell sits on; without one
