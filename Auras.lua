@@ -2046,34 +2046,23 @@ local function ApplyMirror(frame, rule, itemFrame)
         frame:StartArt()
         return true
     elseif soon then
-        -- Measured if anything will measure it; estimated when nothing will.
+        -- Measured, or not at all.
+        --
+        -- The state switch used to fall back to a clock of our own when
+        -- nothing would measure the aura. It cannot be made right: the length
+        -- is never told to us, and every guess at it is wrong in a different
+        -- direction depending on what happened. Extending a dot re-arms the
+        -- entry, so the clock restarts at the base length while the real
+        -- remainder is shorter, and the window then arrives after the aura is
+        -- already gone -- the marker simply stopped appearing.
+        --
+        -- What IS exact is the colour: ApplyEntryFormatter hands the engine a
+        -- threshold and the engine compares it against the real remaining
+        -- time, extension included, and draws the answer. That is the whole
+        -- feature now. A guess that is silently wrong is worse than a smaller
+        -- promise kept.
         local left = MirrorRemaining(itemFrame)
         local near = left and left <= soon
-        if not left then
-            -- Prefer the entry's own arming moment over our cast. It covers
-            -- refreshes nobody saw us make, and it restarts on an extension --
-            -- so the clock cannot quietly run out while the aura is still up,
-            -- which is what made the marker vanish mid-fight. The LENGTH is
-            -- still the base one, so an extended aura is called gone early:
-            -- the direction this feature is named after, and visible, unlike
-            -- the alternative.
-            local armed = ns.EntryArmedAt(itemFrame)
-            local total = ns.KnownTotalFor(rule)
-            if armed and total then
-                -- Once the window opens it stays open until the aura really
-                -- goes. An extended aura outlives the base length we count
-                -- against, and refusing to answer past zero left a silent gap
-                -- between "our clock ran out" and "the aura ran out" -- the
-                -- exact stretch where the reminder is wanted most.
-                --
-                -- Staying lit says "refresh this", which is what the state
-                -- means and what is true from here on. It cannot stick: every
-                -- refresh re-arms the entry and restarts the clock.
-                near = (armed + total - GetTime()) <= soon
-            else
-                near = ns.EstimatedNearlyGone(rule, soon)
-            end
-        end
         if near then
             -- Read, not resolved: the strip may pack this one for real.
             frame._mirroring = nil

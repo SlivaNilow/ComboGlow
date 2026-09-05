@@ -290,8 +290,10 @@ local function RefreshDetails()
         UI.soonRow:Show()
         local n = tonumber(soonRule.soon) or 0
         UI.soonRow.label:SetText(n > 0
-            and L("count as gone %ds early", "считать «нет» за %d с до конца"):format(n)
-            or L("count as gone only when it is", "считать «нет» вовремя"))
+            and L("countdown turns the warning colour %ds early",
+                  "отсчёт краснеет за %d с до конца"):format(n)
+            or L("countdown never changes colour",
+                 "отсчёт не меняет цвет"))
     else
         UI.soonRow:Hide()
     end
