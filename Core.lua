@@ -1177,11 +1177,22 @@ function CG:PackStrip()
 
     -- Repositioning runs on every update pass, so the set is fingerprinted and
     -- the work skipped unless it actually changed.
+    -- Two passes, and the order matters. An icon whose state the engine owns
+    -- is present whatever its alpha -- we cannot tell -- so it always holds a
+    -- slot, lit or not. Those go LAST, after everything we can actually read,
+    -- which puts every gap at the end of the row instead of between the icons
+    -- that are lit. It is the most that can be done: closing a gap means
+    -- knowing whether the icon above it is visible, and that is exactly what
+    -- is being hidden from us.
     local live, sig = {}, ""
     for _, ic in ipairs(icons) do
-        -- A mirrored icon counts as present whatever its alpha: its state is
-        -- the engine's to know, not ours.
-        if ic._mirroring or ic:IsShown() then
+        if not ic._mirroring and ic:IsShown() then
+            live[#live + 1] = ic
+            sig = sig .. tostring(ic)
+        end
+    end
+    for _, ic in ipairs(icons) do
+        if ic._mirroring then
             live[#live + 1] = ic
             sig = sig .. tostring(ic)
         end
