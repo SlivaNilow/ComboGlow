@@ -739,11 +739,26 @@ function ns.SoonReport(mf, rule)
             end
         end    end
 
+    -- The number the player can already see on the entry. If it arrives plain
+    -- it can be parsed and compared like anything else; if it is secret it can
+    -- only be handed to SetText, which is exactly what we do with it -- shown,
+    -- never read. Worth reporting either way: "we can see it" and "we can read
+    -- it" are different questions and they look identical on screen.
+    local fs = FindTimerFS(mf)
+    local textWhat = "no fontstring"
+    if fs then
+        local okt, txt = pcall(fs.GetText, fs)
+        if not okt then textWhat = "err"
+        elseif IsSecret(txt) then textWhat = "|cffff4040secret|r"
+        elseif type(txt) == "string" then textWhat = ("|cff40ff40%q|r"):format(txt)
+        else textWhat = type(txt) end
+    end
+
     local n = ns.SoonSeconds(rule)
-    return ("early-gone: soon=%s widgetLeft=%s (%s) raw=%s/%s%s"):format(
+    return ("early-gone: soon=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
         n and ("%ds"):format(n) or "off",
         left and ("%.1fs"):format(left) or "|cffff4040none|r",
-        why or "?", rawS, rawD,
+        why or "?", rawS, rawD, textWhat,
         #carriers > 0 and (" | carriers: " .. table.concat(carriers, ", ")) or "")
 end
 
