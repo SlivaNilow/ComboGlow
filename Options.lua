@@ -983,6 +983,24 @@ local function Build()
     -- Above the status line, clear of the buttons along the bottom.
     UI.hideCDM:SetPoint("BOTTOMLEFT", 14, 62)
 
+    UI.openCDM = TextButton(UI, L("Cooldown Manager settings", "Настройки Cooldown Manager"),
+                            190, 22, function()
+        local ok, why = ns.OpenCooldownManagerSettings()
+        if ok then
+            UI:Hide()
+            if why == "editmode" then
+                ns.Say(L("Edit Mode: pick the Cooldown Manager to choose its spells",
+                         "Режим редактирования: выбери Cooldown Manager, чтобы задать заклинания"))
+            end
+        elseif why == "combat" then
+            ns.Say(L("not in combat", "не в бою"))
+        else
+            ns.Say(L("could not open it - Game Menu, Edit Mode, Cooldown Manager",
+                     "не удалось открыть — Меню игры, Режим редактирования, Cooldown Manager"))
+        end
+    end)
+    UI.openCDM:SetPoint("BOTTOMLEFT", UI.hideCDM, "TOPLEFT", 0, 4)
+
     local bDot = TextButton(UI, L("Add last cast", "Добавить последний каст"), 160, 22, function()
         if not CG.lastCast then
             if ns.Say then ns.Say(L("cast something first", "сначала примени способность")) end
@@ -1025,4 +1043,105 @@ function ns.ToggleOptions()
         UI:Show()
         Refresh()
     end
+end
+
+--[[-------------------------------------------------------------------------
+    Opening Blizzard's Cooldown Manager settings
+
+    There is no documented entry point, so the known ones are tried in turn:
+    the settings panel itself if this client has it, then Edit Mode, which is
+    where the Cooldown Manager is configured. If neither is there the caller
+    says where to go by hand rather than failing silently.
+---------------------------------------------------------------------------]]
+function ns.OpenCooldownManagerSettings()
+    if InCombatLockdown() then return false, "combat" end
+
+    local panel = _G.CooldownViewerSettings
+    if panel and _G.ShowUIPanel then
+        local ok = pcall(_G.ShowUIPanel, panel)
+        if ok and panel:IsShown() then return true end
+    end
+
+    local em = _G.EditModeManagerFrame
+    if em and em.EnterEditMode then
+        local ok = pcall(em.EnterEditMode, em)
+        if ok then return true, "editmode" end
+    end
+    return false
+end
+
+--[[-------------------------------------------------------------------------
+    Minimap button
+
+    Written out rather than pulled from LibDBIcon: this is the only library
+    the addon would need, for one button, and it would have to be shipped
+    alongside. The angle is saved, so it stays where it is dragged.
+---------------------------------------------------------------------------]]
+local mmButton
+
+local function PlaceMinimapButton()
+    if not mmButton then return end
+    local angle = math.rad(CG.db.minimap.angle or 200)
+    mmButton:ClearAllPoints()
+    mmButton:SetPoint("CENTER", Minimap, "CENTER",
+                      math.cos(angle) * 80, math.sin(angle) * 80)
+end
+
+local function DragMinimapButton(self)
+    local mx, my = Minimap:GetCenter()
+    local scale = Minimap:GetEffectiveScale()
+    local px, py = GetCursorPosition()
+    px, py = px / scale, py / scale
+    CG.db.minimap.angle = math.deg(math.atan2(py - my, px - mx))
+    PlaceMinimapButton()
+end
+
+function ns.UpdateMinimapButton()
+    if not mmButton then return end
+    mmButton:SetShown(not CG.db.minimap.hide)
+    PlaceMinimapButton()
+end
+
+function ns.CreateMinimapButton()
+    if mmButton or not Minimap then return end
+
+    mmButton = CreateFrame("Button", "ComboGlowMinimapButton", Minimap)
+    mmButton:SetSize(31, 31)
+    mmButton:SetFrameStrata("MEDIUM")
+    mmButton:SetFrameLevel(8)
+    mmButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    mmButton:RegisterForDrag("LeftButton")
+    mmButton:SetMovable(true)
+
+    local icon = mmButton:CreateTexture(nil, "BACKGROUND")
+    icon:SetSize(20, 20)
+    icon:SetPoint("CENTER", 0, 1)
+    icon:SetTexture("Interface\Icons\ability_rogue_eviscerate")
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    local border = mmButton:CreateTexture(nil, "OVERLAY")
+    border:SetSize(53, 53)
+    border:SetPoint("TOPLEFT")
+    border:SetTexture("Interface\Minimap\MiniMap-TrackingBorder")
+
+    mmButton:SetScript("OnDragStart", function(self)
+        self:SetScript("OnUpdate", DragMinimapButton)
+    end)
+    mmButton:SetScript("OnDragStop", function(self)
+        self:SetScript("OnUpdate", nil)
+    end)
+    mmButton:SetScript("OnClick", function() ns.ToggleOptions() end)
+
+    mmButton:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:AddLine("ComboGlow")
+        GameTooltip:AddLine(L("Click to open the options", "Клик — открыть настройки"),
+                            1, 1, 1)
+        GameTooltip:AddLine(L("Drag to move around the minimap",
+                              "Перетащить — сдвинуть по краю миникарты"), 0.6, 0.6, 0.6)
+        GameTooltip:Show()
+    end)
+    mmButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    ns.UpdateMinimapButton()
 end

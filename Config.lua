@@ -955,6 +955,7 @@ local function PrintHelp()
         { "/cg blizzglow on|off",      L("the game's own gold proc glow (off by default)", "штатное золотое свечение прока (по умолчанию выключено)") },
         { "/cg procstrip on|off",      L("show procs in the reminder strip (on by default)", "показывать проки в полосе напоминаний (по умолчанию вкл)") },
         { "/cg hidecdm on|off",        L("hide the Cooldown Manager without stopping it", "скрыть Cooldown Manager, не выключая его") },
+        { "/cg minimap on|off",        L("the minimap button", "кнопка у миникарты") },
         { "/cg stackpos <where>",      L("where the stack count sits on the marker", "где на отметке стоит счётчик стаков") },
         { "/cg stacksize <50-200>",    L("stack count size, in percent", "размер счётчика стаков, в процентах") },
         { "/cg auracheck",             L("report what the aura API answers here, with measured lag", "показать ответ aura API и замеренную задержку") },
@@ -1471,6 +1472,14 @@ local function Handler(msg)
         CG:UpdateAuras()
         Say(L("Cooldown Manager fallback: %s", "запасной путь через Cooldown Manager: %s"),
             CG.db.mirror and L("on", "вкл") or L("off", "выкл"))
+
+    elseif cmd == "minimap" then
+        -- The command talks about showing it; the flag stores the opposite.
+        local show = OnOff(rest:lower(), not CG.db.minimap.hide)
+        CG.db.minimap.hide = not show
+        if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
+        Say(L("minimap button: %s", "кнопка у миникарты: %s"),
+            CG.db.minimap.hide and L("off", "выкл") or L("on", "вкл"))
 
     elseif cmd == "hidecdm" then
         CG.db.hideCDM = OnOff(rest:lower(), not CG.db.hideCDM)

@@ -130,6 +130,7 @@ local DEFAULTS = {
     mirror     = true,   -- fall back to Cooldown Manager state when reads fail
     blizzGlow  = false,  -- let the game draw its own gold proc glow as well
     hideCDM    = false,  -- keep the Cooldown Manager running but invisible
+    minimap    = { angle = 200, hide = false },
     stackPos   = "topleft",  -- where the aura stack count sits on the marker
     stackScale = 100,        -- its size, as a percentage of the default
     presetDone = {},     -- [specID] = the default rules were offered once
@@ -1302,6 +1303,7 @@ function CG:Initialize()
     self:SetAnchorLocked(self.db.center.locked ~= false)
 
     self.initialized = true
+    if ns.CreateMinimapButton then ns.CreateMinimapButton() end
 
     for _, ev in ipairs(REBUILD_EVENTS) do
         pcall(self.RegisterEvent, self, ev)
