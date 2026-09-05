@@ -1418,6 +1418,10 @@ function ns.FormatterTest(mf, say, seconds, live)
         fmtTest.cd:SetDrawEdge(false)
         fmtTest.cd:SetDrawBling(false)
         fmtTest.cd:SetHideCountdownNumbers(false)
+        -- The long-standing opt-out flag every cooldown-text addon honours.
+        -- Without it they re-theme this widget as their own -- tullaCTC did,
+        -- which is why the box drew a plain yellow number instead of ours.
+        fmtTest.cd.noCooldownCount = true
     end
     fmtTest:Show()
 
@@ -1434,8 +1438,11 @@ function ns.FormatterTest(mf, say, seconds, live)
         { threshold = 0, format = "|cffff2020UNDER %d|r", step = 1, rounding = rounding },
         { threshold = n, format = "|cff40ff40over %d|r", step = 1, rounding = rounding },
     })
-    fmtTest.cd:SetCountdownFormatter(formatter)
+    -- Arm first, format second. Cooldown-text addons hook SetCooldown, so a
+    -- formatter set before it is replaced by theirs a moment later; set after,
+    -- ours is the one that stands.
     fmtTest.cd:SetCooldown(args.a, args.b)
+    fmtTest.cd:SetCountdownFormatter(formatter)
 
     -- Blizzard's countdown text is off unless this is on, and a box that
     -- renders nothing because the feature is switched off looks exactly like
