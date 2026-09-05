@@ -142,6 +142,9 @@ local DEFAULTS = {
         -- Every "glow while the aura is GONE" state is a reminder by nature,
         -- so it joins the strip without a second toggle.
         autoMissing = true,
+        -- So is a free cast appearing: it happens to you rather than because
+        -- you pressed something, which is exactly what the strip is for.
+        autoProc = true,
     },
     specs = {},
 }
@@ -625,22 +628,28 @@ function CG:Rebuild()
     local centerRules = {}
     if self.db.center.enabled then
         local auto = self.db.center.autoMissing ~= false
+        local autoProc = self.db.center.autoProc ~= false
         -- One slot per spell, not per rule. Named apart from the outer
         -- "watched" (action slots) it would otherwise shadow.
         local onStrip = {}
         for _, rule in ipairs(rules) do
-            -- Auto-added: "gone" states that watch their OWN aura.
+            -- Auto-added: "gone" states that watch their OWN aura, bursts
+            -- whose cooldown is up, and procs.
             --
-            -- A redirected one is excluded on purpose. Primal Wrath's "gone"
+            -- A redirected "gone" is excluded on purpose. Primal Wrath's
             -- means "Rip is not up", which Rip's own icon already says, and it
             -- is a situational choice rather than something you forgot to
             -- press -- so it would be a second nag for the same fact. The
             -- manual /cg center flag still forces one in.
-            -- A burst whose cooldown is up is the same kind of nudge as a dot
-            -- that fell off, so it joins the strip too.
-            local autoWanted = auto and not onStrip[rule.spell]
-                and ((rule.kind == "aura" and rule.missing and not rule.auraID)
-                     or rule.kind == "cd")
+            --
+            -- A burst coming up and a free cast appearing are the same kind of
+            -- nudge as a dot falling off: something changed that you did not
+            -- press a button to cause, and the strip is where those go.
+            local isProc = rule.kind == "aura" and rule.proc
+            local autoWanted = not onStrip[rule.spell]
+                and (((rule.kind == "aura" and rule.missing and not rule.auraID)
+                      or rule.kind == "cd") and auto
+                     or (isProc and autoProc))
             if (rule.center or autoWanted) and rule.enabled ~= false then
                 onStrip[rule.spell] = true
                 centerRules[#centerRules + 1] = rule

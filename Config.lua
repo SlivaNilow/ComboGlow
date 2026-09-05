@@ -923,6 +923,7 @@ local function PrintHelp()
         { "/cg poll <ms>",             L("how often aura state is re-read (0 = events only)", "как часто перечитывать ауры (0 = только по событиям)") },
         { "/cg mirror on|off",         L("fallback: take aura state from the Cooldown Manager", "запасной путь: брать состояние ауры у Cooldown Manager") },
         { "/cg blizzglow on|off",      L("the game's own gold proc glow (off by default)", "штатное золотое свечение прока (по умолчанию выключено)") },
+        { "/cg procstrip on|off",      L("show procs in the reminder strip (on by default)", "показывать проки в полосе напоминаний (по умолчанию вкл)") },
         { "/cg auracheck",             L("report what the aura API answers here, with measured lag", "показать ответ aura API и замеренную задержку") },
         { "/cg procs",                 L("what each proc state watches, and whether it is lit", "за чем следит каждое прок-состояние и горит ли оно") },
         { "/cg why",                   L("what OURS is lit right now, and which rule did it", "что горит именно у нас прямо сейчас и от какого правила") },
@@ -1334,6 +1335,12 @@ local function Handler(msg)
         CG:UpdateAuras()
         Say(L("Cooldown Manager fallback: %s", "запасной путь через Cooldown Manager: %s"),
             CG.db.mirror and L("on", "вкл") or L("off", "выкл"))
+
+    elseif cmd == "procstrip" then
+        CG.db.center.autoProc = OnOff(rest:lower(), CG.db.center.autoProc ~= false)
+        CG:Rebuild()
+        Say(L("procs in the reminder strip: %s", "проки в полосе напоминаний: %s"),
+            CG.db.center.autoProc and L("on", "вкл") or L("off", "выкл"))
 
     elseif cmd == "blizzglow" then
         CG.db.blizzGlow = OnOff(rest:lower(), CG.db.blizzGlow ~= false)
