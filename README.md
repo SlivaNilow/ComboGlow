@@ -17,7 +17,7 @@ Highlights an action bar button on four states per spell:
 | **up** | your aura is on the unit | green marching dashes |
 | **gone** | the aura is missing | red colour wash |
 | **ready** | the resource threshold is met, or a burst came off cooldown | gold glow |
-| **proc** | the spell lit up on its own -- this cast is free | cyan shine |
+| **proc** | the cast currently costs nothing | cyan frame |
 
 Works for combo points, holy power, chi, soul shards, arcane charges, essence,
 astral power, insanity, maelstrom, runes -- every class. The resource is
@@ -255,7 +255,7 @@ in any amount you like:
 | **висит** | твоя аура на цели | зелёный бегущий пунктир |
 | **нет** | ауры нет | красная заливка |
 | **готово** | набран ресурс или бурст вышел из кулдауна | золотое свечение |
-| **прок** | заклинание прокнуло — этот каст бесплатный | голубое сияние |
+| **прок** | каст прямо сейчас ничего не стоит | голубая рамка |
 
 Работает с комбо-очками, святой силой, ци, осколками души, чародейскими
 зарядами, сущностью, силой звёзд, безумием, маэльстромом, рунами — со всеми
@@ -494,7 +494,7 @@ MIT, см. [LICENSE](LICENSE).
 | **生效中** | 你的光环在目标身上 | 绿色流动虚线框 |
 | **已消失** | 光环不在了 | 红色色块覆盖 |
 | **就绪** | 资源达到阈值，或爆发技冷却结束 | 金色光效 |
-| **触发** | 法术自行触发 —— 这一次施放是免费的 | 青色闪光 |
+| **触发** | 这一次施放当前不消耗资源 | 青色边框 |
 
 适用于连击点、神圣能量、真气、灵魂碎片、奥术充能、精华等等。
 
