@@ -1,10 +1,12 @@
 --[[---------------------------------------------------------------------------
     ComboGlow - Options.lua
 
-    One row per SPELL, not per rule. A spell can carry four states (up, gone,
-    ready, proc) and listing them as four separate rows made the same icon
-    appear four times and hid the fact that states exist at all. Internally
-    each state is still its own rule; this window just groups them.
+    One row per SPELL, not per rule. A spell can carry several states and
+    listing them as separate rows made the same icon appear several times and
+    hid the fact that states exist at all. Internally each state is still its
+    own rule; this window just groups them.
+
+    The proc state is not shown: it needs no configuring.
 
     Every gallery tile is a LIVE preview: a real overlay from the same
     template, running the same code as the bar, drawn on the spell's own icon.
@@ -25,7 +27,11 @@ local selSpell, selSlot = nil, "active"
 
 local function L(en, ru) return ns.L(en, ru) end
 
-local SLOTS = { "active", "missing", "ready", "proc" }
+-- The proc state is deliberately absent: it configures itself from the cast's
+-- cost and always wears the same cyan frame, so a tab for it would only offer
+-- ways to get it wrong -- which is exactly what the buff picker did. It is
+-- still created, still works, and /cg del removes one if it is ever unwanted.
+local SLOTS = { "active", "missing", "ready" }
 
 --[[-------------------------------------------------------------------------
     Small helpers -- plain frames and textures, no backdrop template needed
@@ -411,12 +417,11 @@ local function Build()
         -- Ready and proc are split: one says you saved up for it, the other
         -- says this cast is free. Same button, different decision.
         { key = "ready",   label = L("ready", "готово") },
-        { key = "proc",    label = L("proc", "прок") },
     }
     for i, def in ipairs(slotDefs) do
         local b = CreateFrame("Button", nil, UI)
-        b:SetSize(90, 20)
-        b:SetPoint("TOPLEFT", 264 + (i - 1) * 96, -80)
+        b:SetSize(120, 20)
+        b:SetPoint("TOPLEFT", 264 + (i - 1) * 126, -80)
         b.slot = def.key
 
         local bg = b:CreateTexture(nil, "BACKGROUND")

@@ -213,12 +213,10 @@ local STATE_DEFAULTS = {
     -- Blizzard's proc artwork, a gold animation that ignores the colour it is
     -- handed -- and gold is what "ready" already means. A proc looking like a
     -- full resource bar defeats the entire point of splitting them.
-    -- Two layers, because one was not enough to pick out at a glance: a thick
-    -- frame plus a wash of the same colour. Nothing else uses two, so the free
-    -- cast reads as its own thing even beside an action bar drawing its own
-    -- gold glow on the same button.
-    proc    = { style = "solid", style2 = "fill", thick = 5,
-                r = 0.2, g = 0.9, b = 1 },
+    -- A thick cyan frame, and only that. A wash was added on top while the
+    -- marker was still coming out gold and looked like it needed the help; it
+    -- does not. One layer in a colour nothing else uses is enough.
+    proc    = { style = "solid", thick = 5, r = 0.2, g = 0.9, b = 1 },
     -- "ready" is the slot name the options window uses for the resource
     -- threshold (or, for a burst, its cooldown being up).
     ready   = { style = "modern", r = 1, g = 0.85, b = 0.1 },
