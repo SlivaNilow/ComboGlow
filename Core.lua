@@ -547,18 +547,16 @@ function CG:Rebuild()
             -- those tiles "(gold)", so it is an informed one.
             local d = ns.STATE_DEFAULTS and ns.STATE_DEFAULTS.proc
             if d and not rule.styleLocked then
-                -- The WHOLE look, not just the style key. An earlier repair
-                -- moved the style off the gold artwork and left the gold
-                -- COLOUR behind, so the marker went on looking like "ready"
-                -- and every later check saw a style that needed no fixing.
-                -- Patching one field at a time is what kept missing it.
-                local st = ns.StyleByKey(rule.style)
-                if st and st.fixedColor then
-                    rule.style = d.style
-                    rule.alpha = nil
-                end
-                rule.style2 = rule.style2 or d.style2
-                rule.thick = d.thick or rule.thick
+                -- The WHOLE look, assigned outright. Merging field by field is
+                -- what kept this broken: one repair moved the style off the
+                -- gold artwork and left the gold COLOUR behind, and a later
+                -- one added a second layer that then had no way to go away
+                -- again. An unlocked proc state simply looks like the default,
+                -- and picking anything by hand locks it out of this.
+                rule.style  = d.style
+                rule.style2 = d.style2
+                rule.alpha  = ns.StyleAlpha and ns.StyleAlpha(d.style) or nil
+                rule.thick  = d.thick or rule.thick
                 rule.r, rule.g, rule.b = d.r, d.g, d.b
             end
         end

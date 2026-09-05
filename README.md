@@ -17,7 +17,7 @@ Highlights an action bar button on four states per spell:
 | **up** | your aura is on the unit | green marching dashes |
 | **gone** | the aura is missing | red colour wash |
 | **ready** | the resource threshold is met, or a burst came off cooldown | gold glow |
-| **proc** | the cast currently costs nothing | cyan frame |
+| **proc** | the cast currently costs nothing | cyan wash |
 
 Works for combo points, holy power, chi, soul shards, arcane charges, essence,
 astral power, insanity, maelstrom, runes -- every class. The resource is
@@ -71,7 +71,8 @@ Re-scan after rearranging your bars with `/cg preset`; wipe the spec with
 The list shows **one row per spell** with four pips on the right — green, red,
 gold, cyan — lit for the states that are set up. The proc tab is there for one
 thing: pointing the state at the buffs behind it, for spells whose cost cannot
-answer. Its detection and its marker look after themselves. The strip above the gallery
+answer. Its detection and its marker look after themselves -- pick a marker by
+hand and it stops being managed. The strip above the gallery
 switches which state you are editing, and every gallery tile is a live preview:
 a real overlay running the same code as the bar, drawn on that spell's own icon.
 
@@ -261,7 +262,7 @@ in any amount you like:
 | **висит** | твоя аура на цели | зелёный бегущий пунктир |
 | **нет** | ауры нет | красная заливка |
 | **готово** | набран ресурс или бурст вышел из кулдауна | золотое свечение |
-| **прок** | каст прямо сейчас ничего не стоит | голубая рамка |
+| **прок** | каст прямо сейчас ничего не стоит | голубая заливка |
 
 Работает с комбо-очками, святой силой, ци, осколками души, чародейскими
 зарядами, сущностью, силой звёзд, безумием, маэльстромом, рунами — со всеми
@@ -506,7 +507,7 @@ MIT, см. [LICENSE](LICENSE).
 | **生效中** | 你的光环在目标身上 | 绿色流动虚线框 |
 | **已消失** | 光环不在了 | 红色色块覆盖 |
 | **就绪** | 资源达到阈值，或爆发技冷却结束 | 金色光效 |
-| **触发** | 这一次施放当前不消耗资源 | 青色边框 |
+| **触发** | 这一次施放当前不消耗资源 | 青色色块 |
 
 适用于连击点、神圣能量、真气、灵魂碎片、奥术充能、精华等等。
 

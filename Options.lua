@@ -768,6 +768,9 @@ local function Build()
                 else
                     rule.style2 = self.styleKey
                 end
+                -- Chosen by hand, same as a plain click: the rebuild's
+                -- default look stops being applied to this rule.
+                rule.styleLocked = true
             else
                 rule.style = self.styleKey
                 if self.defAlpha then rule.alpha = self.defAlpha end
