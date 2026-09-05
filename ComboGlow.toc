@@ -5,7 +5,7 @@
 ## Author: SLCode
 ## X-Website: https://github.com/SlivaNilow/ComboGlow
 ## X-License: MIT
-## Version: 1.3.0
+## Version: 1.3.1
 ## IconTexture: Interface\Icons\ability_rogue_eviscerate
 ## Category: Combat
 ## Category-ruRU: Бой

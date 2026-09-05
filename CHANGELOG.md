@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.1
+
+**Every free slash prefix is registered, not just the first one.** `/cg` is the
+short one and the documentation is written with it, but CityGuide claims it and
+ComboGlow steps aside rather than fight over it — which used to mean the readme
+was right for most people, wrong for anyone whose `/cg` was taken, and there was
+no way to tell which you were except by typing a command that did nothing.
+
+`/cgl` and `/comboglow` now work on every install whatever happened to `/cg`,
+and all of them take the same commands.
+
+
 ## 1.3.0
 
 **The countdown warns you itself.** Set a number of seconds on an aura's **up**

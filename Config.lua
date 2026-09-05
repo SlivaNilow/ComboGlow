@@ -31,16 +31,23 @@ local function TokenFree(token)
     return true
 end
 
+-- Every free token is registered, not just the first one, and /cgl leads the
+-- list: nothing has been seen claiming it, so it is the prefix that works on
+-- every install and therefore the one the documentation can name. /cg is a
+-- convenience on top, taken only when nothing else wants it -- and CityGuide
+-- does want it.
+--
+-- Documenting whichever token happened to be free made the readme right for
+-- most people and wrong for anyone whose /cg was taken, with no way to tell
+-- which you were until a command did nothing.
+local slashTokens = {}
 ns.SLASH = "/comboglow"
-for _, token in ipairs({ "/cg", "/cgl", "/cglow" }) do
-    if TokenFree(token) then
-        ns.SLASH = token
-        break
-    end
+for _, token in ipairs({ "/cgl", "/cg", "/cglow" }) do
+    if TokenFree(token) then slashTokens[#slashTokens + 1] = token end
 end
+if slashTokens[1] then ns.SLASH = slashTokens[1] end
 
 local function Localize(msg)
-    if ns.SLASH == "/cg" then return msg end
     -- %f[%W] is the frontier pattern: "/cg" only when the next character is
     -- not a letter, so "/cglow" and "/comboglow" are left alone.
     return (msg:gsub("/cg%f[%W]", ns.SLASH))
@@ -1763,7 +1770,7 @@ local function Handler(msg)
 end
 
 SLASH_COMBOGLOW1 = "/comboglow"
-if ns.SLASH ~= "/comboglow" then
-    SLASH_COMBOGLOW2 = ns.SLASH
+for i, token in ipairs(slashTokens) do
+    _G["SLASH_COMBOGLOW" .. (i + 1)] = token
 end
 SlashCmdList["COMBOGLOW"] = Handler

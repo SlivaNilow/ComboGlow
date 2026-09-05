@@ -177,10 +177,11 @@ duration is secret: it is baked into a step colour curve the engine evaluates.
 
 ## Commands
 
-**If `/cg` does nothing, yours is `/cgl`.** Another addon can claim `/cg`
-first -- CityGuide does -- and ComboGlow steps aside rather than fight for it,
-falling back to `/cgl`, then `/cglow`. `/comboglow` always works, and every
-command below takes whichever prefix you have. The one it settled on is printed
+**`/cgl` always works.** `/cg` is shorter and it is what the commands below are
+written with, but another addon can claim it first -- CityGuide does -- and
+ComboGlow steps aside rather than fight for it. Every free prefix is
+registered, so `/cgl` and `/comboglow` are there whatever happened to `/cg`,
+and each takes the same commands. The one this install advertises is printed
 when you log in.
 
 | Command | What it does |
@@ -291,8 +292,8 @@ do not show in restricted instances and work normally everywhere else.
 
 ## Notes
 
-* `/cg` is a short alias. If another addon claims it, ComboGlow falls back to
-  `/cgl`, then `/cglow`; `/comboglow` always works.
+* `/cg` is the short alias, taken when it is free. Every free prefix is
+  registered, so `/cgl` and `/comboglow` always work.
 * The addon only reads `UnitPower` and draws frames. It casts nothing and
   presses nothing — ordinary UI code.
 
@@ -483,10 +484,11 @@ Cooldown Manager»** делает его невидимым, не выключа
 
 ## Команды
 
-**Если `/cg` не отвечает — у тебя `/cgl`.** Префикс может занять другой аддон
-(CityGuide, например), и ComboGlow не отбирает его, а уступает: сначала `/cgl`,
-затем `/cglow`. `/comboglow` работает всегда, и любая команда ниже принимает
-тот префикс, который достался. Какой именно — печатается при входе в игру.
+**`/cgl` работает всегда.** `/cg` короче, и команды ниже записаны через него, но
+префикс может занять другой аддон — CityGuide, например, — и ComboGlow уступает,
+а не отбирает. Регистрируются все свободные префиксы, поэтому `/cgl` и
+`/comboglow` есть в любом случае, и каждый принимает те же команды. Какой именно
+объявлен на этой установке — печатается при входе в игру.
 
 | Команда | Что делает |
 |---------|-----------|
@@ -596,8 +598,8 @@ FontString, а `SetText` принимает секретные строки, т�
 
 ## Мелочи
 
-* `/cg` — короткий алиас. Если его занял другой аддон, ComboGlow берёт `/cgl`,
-  потом `/cglow`; `/comboglow` работает всегда.
+* `/cg` — короткий алиас, берётся если свободен. Регистрируются все свободные
+  префиксы, так что `/cgl` и `/comboglow` работают всегда.
 * Аддон только читает `UnitPower` и рисует рамки. Ничего не кастует и не
   нажимает — обычный UI-код.
 
