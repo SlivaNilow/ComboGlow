@@ -532,6 +532,25 @@ function CG:Rebuild()
     for _, rule in ipairs(rules) do
         if rule.enabled ~= false and rule.kind == "aura" and rule.proc and rule.spell then
             ns.procOwned[rule.spell] = true
+            -- A proc drawn with Blizzard's gold artwork is the same mark as
+            -- "ready", whatever colour is stored, which defeats the entire
+            -- point of separating them. Corrected here, on every rebuild,
+            -- rather than in a database migration or a rescan: both are
+            -- one-shot paths that fire on one version or one button press,
+            -- and this correction has now been missed by both.
+            --
+            -- styleLocked means the marker was chosen by hand in the options
+            -- window. A deliberate choice is left alone -- the gallery labels
+            -- those tiles "(gold)", so it is an informed one.
+            if not rule.styleLocked then
+                local st = ns.StyleByKey(rule.style)
+                if st and st.fixedColor then
+                    local d = ns.STATE_DEFAULTS and ns.STATE_DEFAULTS.proc
+                    rule.style = (d and d.style) or "solid"
+                    rule.alpha = nil
+                    if d then rule.r, rule.g, rule.b = d.r, d.g, d.b end
+                end
+            end
         end
     end
     for _, rule in ipairs(rules) do

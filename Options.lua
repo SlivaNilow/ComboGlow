@@ -766,6 +766,9 @@ local function Build()
                 rule.style = self.styleKey
                 if self.defAlpha then rule.alpha = self.defAlpha end
                 if rule.style2 == rule.style then rule.style2 = nil end
+                -- Chosen by hand: the rebuild's correction for gold proc
+                -- markers leaves it alone from here on.
+                rule.styleLocked = true
             end
             CG:Rebuild()
             Refresh()
