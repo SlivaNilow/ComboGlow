@@ -2060,8 +2060,16 @@ local function ApplyMirror(frame, rule, itemFrame)
             local armed = ns.EntryArmedAt(itemFrame)
             local total = ns.KnownTotalFor(rule)
             if armed and total then
-                local leftEst = armed + total - GetTime()
-                near = leftEst > 0 and leftEst <= soon
+                -- Once the window opens it stays open until the aura really
+                -- goes. An extended aura outlives the base length we count
+                -- against, and refusing to answer past zero left a silent gap
+                -- between "our clock ran out" and "the aura ran out" -- the
+                -- exact stretch where the reminder is wanted most.
+                --
+                -- Staying lit says "refresh this", which is what the state
+                -- means and what is true from here on. It cannot stick: every
+                -- refresh re-arms the entry and restarts the clock.
+                near = (armed + total - GetTime()) <= soon
             else
                 near = ns.EstimatedNearlyGone(rule, soon)
             end
