@@ -599,6 +599,9 @@ function CG:Teardown()
     ns.UntrackAuraFrames()
     wipe(ns.procActive)
     self._packSig = nil
+    -- Released frames keep their rule reference, and a rebuild that ends up
+    -- with an empty strip would otherwise leave the last one's icons here.
+    if self.centerIcons then wipe(self.centerIcons) end
     wipe(self.powerFrames)
     wipe(self.auraFrames)
     wipe(self.watchedSlots)
@@ -1204,10 +1207,10 @@ function CG:PackStrip()
         sig = sig .. tostring(ic)
     end
     for _, ic in ipairs(icons) do
-        if not ic._mirroring and ic:IsShown() then Take(ic) end
+        if ic.rule and not ic._mirroring and ic:IsShown() then Take(ic) end
     end
     for _, ic in ipairs(icons) do
-        if ic._mirroring then
+        if ic.rule and ic._mirroring then
             local keep = true
             if trustShown then
                 local mf, isAura = ns.FindMirror(ic.rule)
