@@ -1177,26 +1177,51 @@ function CG:PackStrip()
 
     -- Repositioning runs on every update pass, so the set is fingerprinted and
     -- the work skipped unless it actually changed.
-    -- Two passes, and the order matters. An icon whose state the engine owns
-    -- is present whatever its alpha -- we cannot tell -- so it always holds a
-    -- slot, lit or not. Those go LAST, after everything we can actually read,
-    -- which puts every gap at the end of the row instead of between the icons
-    -- that are lit. It is the most that can be done: closing a gap means
-    -- knowing whether the icon above it is visible, and that is exactly what
-    -- is being hidden from us.
-    local live, sig = {}, ""
-    for _, ic in ipairs(icons) do
-        if not ic._mirroring and ic:IsShown() then
-            live[#live + 1] = ic
-            sig = sig .. tostring(ic)
+    -- Whether the Cooldown Manager's own frames can be believed.
+    --
+    -- IsActive() on an entry is a secret boolean and must never be read. But
+    -- IsShown() is a plain one -- it only means "inactive" when the player has
+    -- "hide when inactive" turned on for that viewer, and there is no way to
+    -- ask which setting they chose. So it is inferred: if any tracked entry is
+    -- hidden right now, the setting is on and the flag can be trusted. With it
+    -- off nothing is ever hidden, nothing is inferred, and the layout falls
+    -- back to reserving a slot. Conservative in the only direction that
+    -- matters -- it never packs away an icon that might be lit.
+    local trustShown = false
+    for _, f in pairs(ns.cdmAuraFrames or {}) do
+        if f.IsShown and not f:IsShown() then
+            trustShown = true
+            break
         end
+    end
+
+    -- Two passes, and the order matters. What we can read packs first;
+    -- anything still unknowable goes last, so a gap that cannot be closed
+    -- lands at the end of the row rather than between the icons that are lit.
+    local live, sig = {}, ""
+    local function Take(ic)
+        live[#live + 1] = ic
+        sig = sig .. tostring(ic)
+    end
+    for _, ic in ipairs(icons) do
+        if not ic._mirroring and ic:IsShown() then Take(ic) end
     end
     for _, ic in ipairs(icons) do
         if ic._mirroring then
-            live[#live + 1] = ic
-            sig = sig .. tostring(ic)
+            local keep = true
+            if trustShown then
+                local mf, isAura = ns.FindMirror(ic.rule)
+                if mf and isAura and mf.IsShown then
+                    local up = mf:IsShown()
+                    -- A "gone" state is lit by absence, so the two read the
+                    -- entry in opposite directions.
+                    keep = ic.rule.missing and (not up) or (not ic.rule.missing and up)
+                end
+            end
+            if keep then Take(ic) end
         end
     end
+    sig = sig .. tostring(trustShown)
     sig = sig .. tostring(c.rows)
     if sig == self._packSig then return end
     self._packSig = sig
