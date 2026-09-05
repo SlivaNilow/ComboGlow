@@ -1228,6 +1228,24 @@ local function Handler(msg)
     elseif cmd == "auracheck" then
         ns.AuraCheck(CG:GetRules(), Say)
 
+    elseif cmd == "cdmapi" then
+        -- Everything the client exposes on C_CooldownViewer, so "can the addon
+        -- add spells to the Cooldown Manager itself" is answered by looking
+        -- rather than by guessing. A setter would show up here; if only
+        -- getters exist, that list is Blizzard's to edit and ours to read.
+        if type(C_CooldownViewer) ~= "table" then
+            Say(L("C_CooldownViewer is not present on this client",
+                  "C_CooldownViewer на этом клиенте нет"))
+        else
+            local names = {}
+            for k, v in pairs(C_CooldownViewer) do
+                if type(v) == "function" then names[#names + 1] = k end
+            end
+            table.sort(names)
+            Say(L("C_CooldownViewer: %d functions", "C_CooldownViewer: функций %d"), #names)
+            for _, k in ipairs(names) do Say("  " .. k) end
+        end
+
     elseif cmd == "why" then
         -- Everything of OURS that is lit this instant, and which rule is
         -- doing it. A gold button with nothing listed here is somebody

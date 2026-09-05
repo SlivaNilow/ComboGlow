@@ -147,6 +147,17 @@ local function RefreshRows(list)
         end
     end
     UI.empty:SetShown(total == 0)
+
+    local nAura, nEss = 0, 0
+    for _ in pairs(ns.cdmAuraSpells or {}) do nAura = nAura + 1 end
+    for _ in pairs(ns.cdmEssentialSpells or {}) do nEss = nEss + 1 end
+    if nAura == 0 then
+        UI.source:SetText("|cffff6060" .. L("Cooldown Manager tracks no auras for this spec",
+                                            "Cooldown Manager не отслеживает аур в этом спеке") .. "|r")
+    else
+        UI.source:SetText(L("Cooldown Manager: %d auras, %d cooldowns",
+                            "Cooldown Manager: аур %d, кулдаунов %d"):format(nAura, nEss))
+    end
 end
 
 local function RefreshTiles()
@@ -400,6 +411,15 @@ local function Build()
     UI.empty = Label(UI, L("nothing here yet - use the buttons below",
                            "пока пусто — используй кнопки внизу"), 11, 0.7, 0.7, 0.7)
     UI.empty:SetPoint("TOPLEFT", 14, -62)
+
+    -- What the scan has to work with, under the list where it is always
+    -- visible. Aura states are only as good as the Cooldown Manager's tracked
+    -- list, that list is per specialization, and a spec where it is empty
+    -- looks exactly like a broken addon from here.
+    UI.source = Label(UI, "", 10, 0.55, 0.55, 0.55)
+    UI.source:SetPoint("BOTTOMLEFT", 14, 40)
+    UI.source:SetPoint("RIGHT", UI, "LEFT", 246, 0)
+    UI.source:SetJustifyH("LEFT")
 
     -- Selected spell --------------------------------------------------------
     UI.titleIcon = UI:CreateTexture(nil, "ARTWORK")
