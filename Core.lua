@@ -259,15 +259,28 @@ local CDM_ALL_VIEWERS = {
     the viewers are rebuilt, on a spec change among other things.
 ---------------------------------------------------------------------------]]
 local cdmHooked, cdmPending, cdmDirtyAt = {}, false, 0
--- The alpha each viewer had before we first touched it. Unhiding put it back
--- to 1 flat, which would overwrite whatever the player had set -- another
--- addon dimming the Cooldown Manager, or their own choice.
-local cdmAlpha = setmetatable({}, { __mode = "k" })
+-- What each viewer looked like before we first touched it, so unhiding puts
+-- back what the player had rather than assuming defaults.
+local cdmWas = setmetatable({}, { __mode = "k" })
+
+--[[-------------------------------------------------------------------------
+    Hidden by SCALE, not by alpha and not by Hide()
+
+    Hide() is what the dedicated addons use and it is not open to us: a hidden
+    frame stops updating, and the aura states read the countdown text off these
+    very frames. Invisible is required; stopped is not.
+
+    Alpha was the obvious middle ground and it lost. Blizzard fades the viewer
+    in when its contents change, and a fade drives alpha -- so whatever we set
+    was overwritten by the animation a moment later, which is what the blink
+    every few seconds was. Reapplying faster only made the fight faster.
+
+    Scale is not animated. At 0.01 the viewer is half a pixel across, still
+    laid out, still ticking, still readable by us -- and nothing puts it back.
+---------------------------------------------------------------------------]]
+local HIDDEN_SCALE = 0.01
 
 local function ScheduleCDMVisibility()
-    -- Next frame, not now: Blizzard's Layout is still running and would put
-    -- the alpha straight back. Borrowed from Clean Cooldown Manager, which
-    -- fights the same rebuild.
     if cdmPending then return end
     cdmPending = true
     C_Timer.After(0, function()
@@ -291,36 +304,31 @@ end
 
 function ns.ApplyCDMVisibility()
     -- Never hidden while Edit Mode is open: that is where the Cooldown Manager
-    -- is configured, and an invisible frame cannot be configured.
+    -- is configured, and a half-pixel frame cannot be configured.
     local em = _G.EditModeManagerFrame
     local editing = em and em.IsEditModeActive and em:IsEditModeActive()
     local hide = CG.db and CG.db.hideCDM and not editing
 
     for _, name in ipairs(CDM_ALL_VIEWERS) do
         local f = _G[name]
-        if f and f.SetAlpha then
-            if cdmAlpha[f] == nil and f.GetAlpha then
-                local okA, a = pcall(f.GetAlpha, f)
-                cdmAlpha[f] = (okA and a) or 1
+        if f and f.SetScale then
+            if cdmWas[f] == nil then
+                local okS, s = pcall(f.GetScale, f)
+                cdmWas[f] = (okS and s and s > HIDDEN_SCALE and s) or 1
             end
-            pcall(f.SetAlpha, f, hide and 0 or (cdmAlpha[f] or 1))
+            pcall(f.SetScale, f, hide and HIDDEN_SCALE or cdmWas[f])
 
             if not cdmHooked[f] then
                 cdmHooked[f] = true
                 if f.Layout then
                     pcall(hooksecurefunc, f, "Layout", ScheduleCDMVisibility)
                 end
-                -- OnShow applies at once, not next frame. Blizzard restores
-                -- the alpha as it shows the viewer, so a deferred reapply left
-                -- exactly one frame of it visible -- which, with "hide when
-                -- inactive" on, is every time an entry comes back and reads as
-                -- the thing flickering on and off.
                 if f.HookScript then
                     pcall(f.HookScript, f, "OnShow", function(self)
                         local e = _G.EditModeManagerFrame
                         local ed = e and e.IsEditModeActive and e:IsEditModeActive()
                         if CG.db and CG.db.hideCDM and not ed then
-                            pcall(self.SetAlpha, self, 0)
+                            pcall(self.SetScale, self, HIDDEN_SCALE)
                         end
                     end)
                 end
