@@ -503,25 +503,30 @@ local totalOfSpell = {}
 --
 -- It errs by firing early, which is the direction this feature is named after.
 -- Erring the other way means never firing at all, silently.
+-- Stored as baseTotal, not lastTotal. The old field meant "the last length
+-- read" and saved values recorded under that meaning are wrong under this one
+-- -- a 42-second reading of an extended Sunfire, kept forever, puts the
+-- threshold past the end of every normal cast of it. A new name is a cleaner
+-- reset than a migration: the old key is simply never read again.
 local function LearnTotal(rule, total)
     if not (total and total > 0 and rule.spell) then return end
     local known = totalOfSpell[rule.spell]
     if not known or total < known then
         totalOfSpell[rule.spell] = total
-        rule.lastTotal = total
+        rule.baseTotal = total
     end
 end
 
 function ns.KnownTotalFor(rule)
     if not rule or not rule.spell then return nil end
-    return totalOfSpell[rule.spell] or tonumber(rule.lastTotal)
+    return totalOfSpell[rule.spell] or tonumber(rule.baseTotal)
 end
 
 local function KnownTotal(rule)
     if not rule.spell then return nil end
     local t = totalOfSpell[rule.spell]
     if t then return t end
-    t = tonumber(rule.lastTotal)
+    t = tonumber(rule.baseTotal)
     if t and t > 0 then
         totalOfSpell[rule.spell] = t
         return t
