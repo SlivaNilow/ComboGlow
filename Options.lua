@@ -209,6 +209,7 @@ local function RefreshDetails()
             t:Hide()
         else
             t:Show()
+            if t.labelFor then t.fs:SetText(t.labelFor(selSlot)) end
             t.check:SetShown(t.get(rule) and true or false)
         end
     end
@@ -805,7 +806,18 @@ local function Build()
         -- included. Reading rule.center alone left the box empty next to an
         -- icon that was plainly on the strip.
         { key = "center", auraOnly = false,
-          label = L("show above the resource", "показывать над ресурсом"),
+          -- Named for the state being edited. "Show above the resource" left
+          -- out the half that matters: above the resource WHEN?
+          labelFor = function(slot)
+              if slot == "missing" then
+                  return L("on the strip while gone", "над ресурсом, если нет")
+              elseif slot == "ready" then
+                  return L("on the strip while ready", "над ресурсом, если готов")
+              elseif slot == "proc" then
+                  return L("on the strip on a proc", "над ресурсом, если прок")
+              end
+              return L("on the strip while up", "над ресурсом, если висит")
+          end,
           get = function(r) return ns.OnStrip(r) end,
           set = function(r)
               if ns.OnStrip(r) then
@@ -837,8 +849,10 @@ local function Build()
         check:Hide()
         t.check = check
 
-        local fs = Label(t, def.label, 11, 0.85, 0.85, 0.85)
+        local fs = Label(t, def.label or "", 11, 0.85, 0.85, 0.85)
         fs:SetPoint("LEFT", box, "RIGHT", 5, 0)
+        t.fs = fs
+        t.labelFor = def.labelFor
 
         t:SetScript("OnClick", function()
             local rule = CurrentRule()
