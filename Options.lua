@@ -6,7 +6,8 @@
     hid the fact that states exist at all. Internally each state is still its
     own rule; this window just groups them.
 
-    The proc state is not shown: it needs no configuring.
+    The proc state is shown for one thing only: pointing it at the buffs behind
+    it. Its detection and its marker look after themselves.
 
     Every gallery tile is a LIVE preview: a real overlay from the same
     template, running the same code as the bar, drawn on the spell's own icon.
@@ -27,11 +28,10 @@ local selSpell, selSlot = nil, "active"
 
 local function L(en, ru) return ns.L(en, ru) end
 
--- The proc state is deliberately absent: it configures itself from the cast's
--- cost and always wears the same cyan frame, so a tab for it would only offer
--- ways to get it wrong -- which is exactly what the buff picker did. It is
--- still created, still works, and /cg del removes one if it is ever unwanted.
-local SLOTS = { "active", "missing", "ready" }
+-- Proc is here for one reason: pointing the state at the buffs behind it, for
+-- the spells whose cost cannot answer. Its marker needs no choosing -- it is
+-- kept the same cyan frame unless one is picked by hand.
+local SLOTS = { "active", "missing", "ready", "proc" }
 
 --[[-------------------------------------------------------------------------
     Small helpers -- plain frames and textures, no backdrop template needed
@@ -247,8 +247,8 @@ local function RefreshDetails()
                 -- The exact answer, and the one that needs no configuring:
                 -- the game reports what the cast costs right now.
                 watching = L("the cast costs nothing", "каст ничего не стоит")
-                warn = L("no buff to pick - the game is asked directly",
-                         "бафф выбирать не нужно — спрашиваем у игры")
+                warn = L("asked of the game - click to add a buff anyway",
+                         "спрашиваем у игры — можно и добавить бафф")
             else
                 watching = named or L("the game's own proc alert",
                                       "штатная подсветка прока")
@@ -417,11 +417,12 @@ local function Build()
         -- Ready and proc are split: one says you saved up for it, the other
         -- says this cast is free. Same button, different decision.
         { key = "ready",   label = L("ready", "готово") },
+        { key = "proc",    label = L("proc", "прок") },
     }
     for i, def in ipairs(slotDefs) do
         local b = CreateFrame("Button", nil, UI)
-        b:SetSize(120, 20)
-        b:SetPoint("TOPLEFT", 264 + (i - 1) * 126, -80)
+        b:SetSize(90, 20)
+        b:SetPoint("TOPLEFT", 264 + (i - 1) * 96, -80)
         b.slot = def.key
 
         local bg = b:CreateTexture(nil, "BACKGROUND")

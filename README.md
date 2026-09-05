@@ -68,10 +68,10 @@ Re-scan after rearranging your bars with `/cg preset`; wipe the spec with
 
 ## The options window
 
-The list shows **one row per spell** with three pips on the right — green, red,
-gold — lit for the states that are set up. The proc state has no tab: it is
-detected from the cast's cost and always wears the same cyan frame, so there is
-nothing in it to choose. The strip above the gallery
+The list shows **one row per spell** with four pips on the right — green, red,
+gold, cyan — lit for the states that are set up. The proc tab is there for one
+thing: pointing the state at the buffs behind it, for spells whose cost cannot
+answer. Its detection and its marker look after themselves. The strip above the gallery
 switches which state you are editing, and every gallery tile is a live preview:
 a real overlay running the same code as the bar, drawn on that spell's own icon.
 
@@ -314,10 +314,10 @@ in any amount you like:
 
 ## Окно настроек
 
-В списке **одна строка на заклинание**, справа три точки — зелёная, красная,
-золотая, — горят те, чьи состояния настроены. У прока вкладки нет: он
-определяется по стоимости каста и всегда выглядит одной и той же голубой
-рамкой, выбирать там нечего. Полоска над галереей
+В списке **одна строка на заклинание**, справа четыре точки — зелёная, красная,
+золотая, голубая, — горят те, чьи состояния настроены. Вкладка прока нужна для
+одного: указать баффы, от которых он зависит, если стоимость каста ответа не
+даёт. Определение и внешний вид он держит сам. Полоска над галереей
 переключает редактируемое состояние, а каждая плитка галереи это живое превью:
 настоящий оверлей тем же кодом, что рисует на панели, на иконке этого
 заклинания.
@@ -543,9 +543,9 @@ MIT, см. [LICENSE](LICENSE).
 
 ## 设置窗口
 
-列表里**每个法术一行**，右侧三个小点（绿、红、金）表示哪些状态已经设置。
-触发状态没有单独的标签页：它由施放当前的资源消耗判定，样式固定为青色边框，
-没有可选项。
+列表里**每个法术一行**，右侧四个小点（绿、红、金、青）表示哪些状态已经设置。
+触发标签页只为一件事存在：为资源消耗无法判定的法术指定其依赖的增益。
+它的判定和样式都由插件自己维护。
 画廊上方的条切换正在编辑的状态，每块画廊图块都是实时预览：和动作条上跑的是
 同一套代码，画在该法术自己的图标上。
 
