@@ -1157,6 +1157,22 @@ function ns.AuraCheck(rules, say)
                 local ok, v = pcall(C_Secrets.ShouldSpellAuraBeSecret, rule.auraID or rule.spell)
                 secretForSpell = ok and tostring(v) or "err"
             end
+            -- The precise answer, where the client has it: a level rather than
+            -- a yes/no, and "NeverSecret" means the direct read can be trusted
+            -- instead of being tried and measured.
+            if C_Secrets and C_Secrets.GetSpellAuraSecrecy then
+                local okS, lvl = pcall(C_Secrets.GetSpellAuraSecrecy,
+                                       rule.auraID or rule.spell)
+                if okS then
+                    local nameOf = tostring(lvl)
+                    if type(Enum) == "table" and type(Enum.SecrecyLevel) == "table" then
+                        for k, v in pairs(Enum.SecrecyLevel) do
+                            if v == lvl then nameOf = k break end
+                        end
+                    end
+                    secretForSpell = secretForSpell .. "/" .. nameOf
+                end
+            end
             local found, remaining, total, durObj = ns.QueryAura(rule)
             local lat = ns.auraLatency[rule]
             say("%d. %s [%s] -> found=%s remain=%s total=%s durObj=%s spellSecret=%s lag=%s reads=%s",
