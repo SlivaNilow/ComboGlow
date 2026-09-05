@@ -686,6 +686,11 @@ end
 local caughtDuration = setmetatable({}, { __mode = "k" })
 local durationHooked
 
+-- Which method last armed each widget, and with what. Nothing depends on it;
+-- it is here because "no object was caught" has two readings -- nobody passed
+-- one, or we were not listening -- and they need opposite fixes.
+local armedBy = setmetatable({}, { __mode = "k" })
+
 local STALE_ON = { "SetCooldown", "SetCooldownDuration",
                    "SetCooldownFromExpirationTime", "SetCooldownUNIX", "Clear" }
 
@@ -703,16 +708,29 @@ local function HookCooldownDurations()
     end
     hooksecurefunc(proto, "SetCooldownFromDurationObject", function(cd, durObj)
         caughtDuration[cd] = durObj
+        armedBy[cd] = "DurationObject"
     end)
     for _, m in ipairs(STALE_ON) do
         if proto[m] then
-            hooksecurefunc(proto, m, function(cd) caughtDuration[cd] = nil end)
+            hooksecurefunc(proto, m, function(cd, a)
+                caughtDuration[cd] = nil
+                armedBy[cd] = m .. "(" .. type(a)
+                    .. (IsSecret(a) and "!" or "") .. ")"
+            end)
         end
     end
     durationHooked = true
     return true
 end
 ns.HookCooldownDurations = HookCooldownDurations
+
+-- How this entry's widget was last armed, in whatever words the hook recorded.
+function ns.ArmedBy(itemFrame)
+    local hooked = HookCooldownDurations()
+    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
+    if not hooked then return "|cffff4040hook off|r" end
+    return cd and armedBy[cd] or "nothing seen"
+end
 
 -- What we caught for this entry, if it is still a usable object.
 function ns.CaughtDuration(itemFrame)
@@ -867,9 +885,10 @@ function ns.SoonReport(mf, rule)
     end
 
     local n = ns.SoonSeconds(rule)
-    return ("early-gone: soon=%s caught=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
+    return ("early-gone: soon=%s caught=%s armed=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
         n and ("%ds"):format(n) or "off",
         ns.CaughtDuration(mf) and "|cff40ff40yes|r" or "|cffff4040no|r",
+        ns.ArmedBy(mf),
         left and ("%.1fs"):format(left) or "|cffff4040none|r",
         why or "?", rawS, rawD, textWhat,
         #carriers > 0 and (" | carriers: " .. table.concat(carriers, ", ")) or "")
@@ -881,6 +900,27 @@ function ns.SoonProbe(rules, say)
     say(ns.L("--- early-gone probe (%s) ---", "--- зонд «нет заранее» (%s) ---"),
         InCombatLockdown and InCombatLockdown()
             and ns.L("in combat", "в бою") or ns.L("out of combat", "вне боя"))
+    -- Anything in the API that MAKES a duration object. If the entries turn
+    -- out to be armed with secret numbers, a factory taking numbers is the
+    -- only way back to something a curve can evaluate -- so it is worth
+    -- knowing whether one exists before designing around its absence.
+    local factories = {}
+    for name, tbl in pairs(_G) do
+        if type(name) == "string" and name:sub(1, 2) == "C_" and type(tbl) == "table" then
+            local okp = pcall(function()
+                for k, v in pairs(tbl) do
+                    if type(v) == "function" and type(k) == "string"
+                       and k:find("Duration") then
+                        factories[#factories + 1] = name .. "." .. k
+                    end
+                end
+            end)
+            if not okp then factories[#factories + 1] = name .. ".<blocked>" end
+        end
+    end
+    table.sort(factories)
+    say("duration API: %s", #factories > 0 and table.concat(factories, ", ") or "none")
+
     local n = 0
     for _, rule in ipairs(rules) do
         if rule.enabled ~= false and rule.kind == "aura" and not rule.proc then
@@ -1663,3 +1703,7 @@ function ns.AuraCheck(rules, say)
                  "добавь их в Настройки — Cooldown Manager для ЭТОЙ специализации"))
     end
 end
+
+-- Hooked as early as the client allows; the lazy path retries if this is
+-- too early for the action bars to exist yet.
+HookCooldownDurations()
