@@ -542,14 +542,21 @@ function CG:Rebuild()
             -- styleLocked means the marker was chosen by hand in the options
             -- window. A deliberate choice is left alone -- the gallery labels
             -- those tiles "(gold)", so it is an informed one.
-            if not rule.styleLocked then
+            local d = ns.STATE_DEFAULTS and ns.STATE_DEFAULTS.proc
+            if d and not rule.styleLocked then
+                -- The WHOLE look, not just the style key. An earlier repair
+                -- moved the style off the gold artwork and left the gold
+                -- COLOUR behind, so the marker went on looking like "ready"
+                -- and every later check saw a style that needed no fixing.
+                -- Patching one field at a time is what kept missing it.
                 local st = ns.StyleByKey(rule.style)
                 if st and st.fixedColor then
-                    local d = ns.STATE_DEFAULTS and ns.STATE_DEFAULTS.proc
-                    rule.style = (d and d.style) or "solid"
+                    rule.style = d.style
                     rule.alpha = nil
-                    if d then rule.r, rule.g, rule.b = d.r, d.g, d.b end
                 end
+                rule.style2 = rule.style2 or d.style2
+                rule.thick = d.thick or rule.thick
+                rule.r, rule.g, rule.b = d.r, d.g, d.b
             end
         end
     end

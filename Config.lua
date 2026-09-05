@@ -213,7 +213,12 @@ local STATE_DEFAULTS = {
     -- Blizzard's proc artwork, a gold animation that ignores the colour it is
     -- handed -- and gold is what "ready" already means. A proc looking like a
     -- full resource bar defeats the entire point of splitting them.
-    proc    = { style = "solid",  r = 0.2, g = 0.9, b = 1  },
+    -- Two layers, because one was not enough to pick out at a glance: a thick
+    -- frame plus a wash of the same colour. Nothing else uses two, so the free
+    -- cast reads as its own thing even beside an action bar drawing its own
+    -- gold glow on the same button.
+    proc    = { style = "solid", style2 = "fill", thick = 5,
+                r = 0.2, g = 0.9, b = 1 },
     -- "ready" is the slot name the options window uses for the resource
     -- threshold (or, for a burst, its cooldown being up).
     ready   = { style = "modern", r = 1, g = 0.85, b = 0.1 },
@@ -500,8 +505,9 @@ function ns.AddSlotRule(spellID, slot)
             unit = "player", helpful = true,
             timer = buffs and true or false,
             style = dProc.style,
+            style2 = dProc.style2,
             alpha = StyleAlpha(dProc.style),
-            thick = 3, warn = 4,
+            thick = dProc.thick or 3, warn = 4,
             r = dProc.r, g = dProc.g, b = dProc.b,
             wr = 1, wg = 0, wb = 0,
             center = false, enabled = true,
@@ -803,8 +809,9 @@ local function BuildPreset(quiet, intro)
             helpful  = true,
             timer    = false,
             style    = p.style,
+            style2   = p.style2,
             alpha    = StyleAlpha(p.style),
-            thick    = 3, warn = 4,
+            thick    = p.thick or 3, warn = 4,
             r = p.r, g = p.g, b = p.b,
             wr = 1, wg = 0, wb = 0,
             center   = false,
@@ -822,6 +829,8 @@ local function BuildPreset(quiet, intro)
             if h.restyle then
                 local p = STATE_DEFAULTS.proc
                 h.rule.style = p.style
+                h.rule.style2 = p.style2
+                h.rule.thick = p.thick or 3
                 h.rule.alpha = StyleAlpha(p.style)
                 h.rule.r, h.rule.g, h.rule.b = p.r, p.g, p.b
                 Say(L("~ %s: proc marker was gold, same as ready - recoloured",
@@ -1223,10 +1232,11 @@ local function Handler(msg)
             else
                 what = L("up", "висит")
             end
-            Say("%s #%s %s | %s | %s",
+            Say("%s #%s %s | %s | %s | rgb %.1f %.1f %.1f",
                 frame.isStrip and L("strip", "полоска") or L("bar", "панель"),
                 tostring(idx[r] or "?"), ns.SpellName(r.spell), what,
-                tostring(r.style) .. (r.style2 and ("+" .. r.style2) or ""))
+                tostring(r.style) .. (r.style2 and ("+" .. r.style2) or ""),
+                r.r or 1, r.g or 1, r.b or 1)
         end
         for _, f in ipairs(CG.powerFrames or {}) do report(f) end
         for _, f in ipairs(CG.auraFrames or {}) do report(f) end
@@ -1380,6 +1390,7 @@ local function Handler(msg)
                 PrintStyles()
             else
                 rule.style = entry.key
+                rule.styleLocked = true
                 CG:Rebuild()
                 Say(L("style: %s", "стиль: %s"), entry.label)
             end
@@ -1392,6 +1403,8 @@ local function Handler(msg)
         local rule = idx and GetRule(idx)
         if rule then
             rule.r, rule.g, rule.b = tonumber(r) / 255, tonumber(g) / 255, tonumber(b) / 255
+            -- Chosen by hand: the rebuild stops managing this rule's look.
+            rule.styleLocked = true
             CG:Rebuild()
             Say(L("colour set", "цвет установлен"))
         elseif not idx then
