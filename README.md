@@ -73,7 +73,32 @@ so the animated markers match the rest of the interface.
 >
 > Resource, proc and burst states do not depend on it at all.
 
-Nothing to configure. The first time you log in on a specialization the addon
+### Setting it up, in order
+
+Do this once per specialization. The order matters: the scan can only pick up
+auras the Cooldown Manager is already tracking.
+
+1. **Put everything you want marked into the Cooldown Manager.** Game Menu →
+   Edit Mode → Cooldown Manager, or the **Cooldown Manager settings** button in
+   the options window. Add the dots and buffs you want to see on your bars; the
+   cooldown sections are for cooldowns and do not help an aura state.
+2. **Open ComboGlow** -- the minimap button, or `/cg`.
+3. **Press "Scan bars".** It reads your bars and creates the rules, printing
+   what it added.
+4. **Adjust.** Pick a spell on the left, a state along the top, then a marker.
+   The first tile, *none*, turns a state off without deleting it.
+
+If you change talents or rearrange your bars, press "Scan bars" again -- it
+tops up what is missing and leaves what you have configured alone. A state
+whose spell is not in the Cooldown Manager says so in red, so there is nothing
+to hunt for.
+
+The Cooldown Manager itself can be hidden once it is set up: **hide the Cooldown
+Manager** in the options window makes it invisible while it keeps running.
+
+### What the scan does
+
+The first time you log in on a specialization the addon
 scans your bars and creates a rule for **every spell that spends the class
 resource**, printing what it added.
 
@@ -344,6 +369,30 @@ in any amount you like:
 >
 > Состояния по ресурсу, проку и бурстам от него не зависят вовсе.
 
+### Настройка, по порядку
+
+Один раз на каждую специализацию. Порядок важен: сканирование подхватывает
+только те ауры, которые Cooldown Manager уже отслеживает.
+
+1. **Вынеси в Cooldown Manager всё, что хочешь видеть отмеченным.** Меню игры →
+   Режим редактирования → Cooldown Manager, либо кнопка **«Настройки Cooldown
+   Manager»** в окне аддона. Добавляй доты и баффы; разделы способностей — это
+   про кулдауны, состоянию по ауре они не помогут.
+2. **Открой ComboGlow** — кнопкой у миникарты или `/cg`.
+3. **Нажми «Сканировать панели».** Он прочитает панели, создаст правила и
+   напишет в чат, что добавил.
+4. **Донастрой.** Заклинание слева, состояние сверху, потом отметка. Первая
+   плитка, *без свечения*, выключает состояние, не удаляя его.
+
+Поменял таланты или переставил панели — жми «Сканировать панели» снова: он
+дополнит недостающее и не тронет то, что ты настроил. Состояние, заклинания
+которого нет в Cooldown Manager, скажет об этом красным — искать не придётся.
+
+Сам Cooldown Manager можно убрать с глаз, когда он настроен: кнопка **«скрыть
+Cooldown Manager»** делает его невидимым, не выключая.
+
+### Что делает сканирование
+
 Настраивать ничего не нужно. При первом входе на специализацию аддон сам
 сканирует панели и создаёт правило на **каждое заклинание, которое тратит
 классовый ресурс**, и пишет в чат, что добавил.
@@ -596,6 +645,26 @@ MIT, см. [LICENSE](LICENSE).
 > 设置窗口会指出缺少的法术，`/cg hidecdm` 可以让冷却管理器隐形但继续运行。
 >
 > 资源、触发和爆发技状态完全不依赖它。
+
+### 按顺序设置
+
+每个专精做一次。顺序很重要：扫描只能识别冷却管理器已经在追踪的光环。
+
+1. **把你想标记的一切放进冷却管理器。** 游戏菜单 → 编辑模式 → 冷却管理器，
+   或使用设置窗口里的**「冷却管理器设置」**按钮。加入你想在动作条上看到的
+   持续伤害和增益；冷却相关的分区是给冷却用的，对光环状态没有帮助。
+2. **打开 ComboGlow** —— 小地图按钮，或 `/cg`。
+3. **点击「扫描动作条」。** 它会读取动作条并建立规则，把添加的内容打印出来。
+4. **调整。** 左边选法术，上面选状态，然后选一个标记。第一块图块*无光效*
+   会关闭该状态而不删除它。
+
+换天赋或重排动作条之后，再点一次「扫描动作条」：它会补齐缺少的，不动你已经
+配置好的。法术不在冷却管理器里的状态会用红字说明，无需自己去找。
+
+设置好之后可以把冷却管理器藏起来：设置窗口里的**「隐藏冷却管理器」**让它不可见
+但继续运行。
+
+### 扫描做了什么
 
 不需要配置。你第一次用某个专精登录时，插件会扫描你的动作条，为**每个消耗职业
 资源的法术**建立规则，并把添加的内容打印到聊天框。

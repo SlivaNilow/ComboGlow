@@ -54,6 +54,27 @@ change that caused it.
 gallery to layer a second one on top of the first — a pixel outline plus a proc
 glow reads as one distinct mark. Click it again to remove it.
 
+**A minimap button**, and a **Cooldown Manager settings** button in the options
+window -- that is where half the setup happens, and finding it was most of the
+chore. The readme now gives the order to do it in: put what you want marked
+into the Cooldown Manager first, then scan the bars, because the scan can only
+pick up auras it already tracks.
+
+**A state can watch several auras.** One cast can land two debuffs -- Vampiric
+Touch applies Shadow Word: Pain with the talent -- so the **watching:** row is a
+checklist, and an ordinary state is "up" only when all of its auras are. A proc
+reads its list the other way: any one of its buffs will do.
+
+**The gallery starts with a "none" tile** that turns a state off without
+deleting it, replacing both the "state on" checkbox and the "delete state"
+button. Deleting a state you may want back was never the right answer to "do
+not light this one".
+
+**Runes no longer produce resource rules.** They refill by themselves and
+continuously, so "you have two runes" is true most of the time and a Frost
+death knight lit up nearly every button. Their cost is still read for the proc
+state, where zero means a genuinely free cast.
+
 **The Cooldown Manager dependency is stated up front**, in capitals, at the top
 of every language's getting-started section. The aura states are not "any
 spell": they read Blizzard's Cooldown Manager and cover exactly what it is set
