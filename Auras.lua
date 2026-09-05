@@ -27,6 +27,27 @@ local GetTime = GetTime
 
 local UA = C_UnitAuras
 
+-- A duration object is USERDATA on 12.1, not a table.
+--
+-- Every check in here used to say "table" and therefore threw away every real
+-- one. Out of combat nothing noticed: a plain remaining time answered instead,
+-- and the object was never needed. In combat there is no plain anything, so
+-- the entire mirrored path went dark and looked like a missing API.
+local function IsObject(v)
+    local t = type(v)
+    return t == "table" or t == "userdata"
+end
+ns.IsObject = IsObject
+
+-- Indexing userdata goes through a metatable and can throw, so it is asked
+-- for rather than looked up.
+local function HasMethod(v, name)
+    if not IsObject(v) then return false end
+    local ok, m = pcall(function() return v[name] end)
+    return ok and m ~= nil
+end
+ns.HasMethod = HasMethod
+
 ns.AURA_UNITS = { player = true, target = true, focus = true, mouseover = true, pet = true }
 
 --[[-------------------------------------------------------------------------
@@ -157,7 +178,7 @@ function ns.QueryAura(rule)
     local iid = aura.auraInstanceID
     if iid ~= nil and not IsSecret(iid) and UA.GetAuraDuration then
         local ok2, d = pcall(UA.GetAuraDuration, unit, iid)
-        if ok2 and type(d) == "table" then durObj = d end
+        if ok2 and IsObject(d) then durObj = d end
     end
 
     local remaining, total
@@ -646,12 +667,12 @@ local function MirrorDuration(itemFrame, rule)
     if type(unit) ~= "nil" then
         tried = true
         local ok, durObj = pcall(UA.GetAuraDuration, unit, iid)
-        if ok and type(durObj) == "table" then return durObj, "ok" end
+        if ok and IsObject(durObj) then return durObj, "ok" end
     end
 
     local fallbackUnit = rule and rule.unit or "target"
     local ok, durObj = pcall(UA.GetAuraDuration, fallbackUnit, iid)
-    if ok and type(durObj) == "table" then return durObj, "ok (rule unit)" end
+    if ok and IsObject(durObj) then return durObj, "ok (rule unit)" end
 
     -- Caught on its way into the widget. In combat this is the only one there
     -- is, and it is the very object drawing the countdown on screen.
@@ -764,9 +785,7 @@ ns.HookCooldownDurations = HookCooldownDurations
 local madeDuration = setmetatable({}, { __mode = "k" })
 
 local function UsableDuration(d)
-    if type(d) ~= "table" then return false end
-    local ok, has = pcall(function() return d.EvaluateRemainingDuration ~= nil end)
-    return (ok and has) and true or false
+    return HasMethod(d, "EvaluateRemainingDuration")
 end
 
 local function MakeDuration(cd, args)
@@ -811,9 +830,7 @@ function ns.CaughtDuration(itemFrame)
     HookCooldownDurations()
     local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
     local d = cd and caughtDuration[cd]
-    if type(d) ~= "table" then return nil end
-    local ok, has = pcall(function() return d.EvaluateRemainingDuration ~= nil end)
-    if ok and has then return d end
+    if UsableDuration(d) then return d end
     return nil
 end
 
@@ -834,12 +851,7 @@ function ns.WidgetDuration(itemFrame)
     for _, m in ipairs(durationGetters) do
         if cd[m] then
             local ok, d = pcall(cd[m], cd)
-            if ok and type(d) == "table" then
-                local okm, has = pcall(function()
-                    return d.EvaluateRemainingDuration ~= nil
-                end)
-                if okm and has then return d end
-            end
+            if ok and UsableDuration(d) then return d end
         end
     end
     return nil
@@ -930,13 +942,9 @@ function ns.SoonReport(mf, rule)
                 if cdChild[m] then
                     local okd, d = pcall(cdChild[m], cdChild)
                     local what = not okd and "err" or type(d)
-                    if okd and type(d) == "table" then
-                        local okm, has = pcall(function()
-                            return d.EvaluateRemainingDuration ~= nil
-                        end)
-                        what = (okm and has) and "|cff40ff40durObj|r" or "table"
-                    elseif okd and IsSecret(d) then
-                        what = what .. "!"
+                    if okd and UsableDuration(d) then
+                        what = "|cff40ff40durObj|r"
+                    elseif okd and IsSecret(d) then                        what = what .. "!"
                     end
                     carriers[#carriers + 1] = ("CD:%s->%s"):format(m, what)
                 end
@@ -1025,11 +1033,10 @@ function ns.DurationFactory(say, mf)
         if not ok then
             return ("%s -> |cffff4040err|r %s"):format(label, tostring(d):sub(1, 90))
         end
-        if type(d) ~= "table" then
+        if not IsObject(d) then
             return ("%s -> %s"):format(label, type(d))
         end
-        local okm, has = pcall(function() return d.EvaluateRemainingDuration ~= nil end)
-        if okm and has then
+        if UsableDuration(d) then
             -- Worth printing once: the object's own methods say what else it
             -- can answer without ever being read.
             local names = {}
@@ -1269,7 +1276,7 @@ function ns.ApplySoon(frame, rule, durObj)
     local curve = SoonCurve(n, not rule.missing)
     if not curve then return false end
     local ok, col = pcall(durObj.EvaluateRemainingDuration, durObj, curve)
-    if not ok or type(col) ~= "table" or not col.GetRGBA then return false end
+    if not ok or not HasMethod(col, "GetRGBA") then return false end
     local ok2, _, _, _, a = pcall(col.GetRGBA, col)
     if not ok2 then return false end
     -- a may be secret. It is only ever handed to a setter, never looked at.
@@ -1286,7 +1293,7 @@ local function ApplyWarnColor(frame, rule, durObj)
     if not curve then return false, "no C_CurveUtil colour curve" end
     local ok, col = pcall(durObj.EvaluateRemainingDuration, durObj, curve)
     if not ok then return false, "evaluate failed" end
-    if type(col) ~= "table" or not col.GetRGB then return false, "no colour returned" end
+    if not HasMethod(col, "GetRGB") then return false, "no colour returned" end
     local ok2, r, g, b = pcall(col.GetRGB, col)
     if not ok2 then return false, "GetRGB failed" end
     frame:SetArtColor(r, g, b)
