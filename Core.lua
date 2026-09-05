@@ -763,6 +763,14 @@ end
     Every way a button might carry the alert is tried, because there is no one
     supported way and third-party bars roll their own.
 ---------------------------------------------------------------------------]]
+local ALERT_KEYS = {
+    -- Blizzard
+    "SpellActivationAlert", "overlay", "Overlay",
+    -- LibCustomGlow, which is what most third-party bars draw theirs with
+    "_ProcGlow", "_ButtonGlow", "_PixelGlow", "_AutoCastGlow",
+    "__LCG_ProcGlow",
+}
+
 local function HideAlertOn(button)
     if not button then return end
     if button.HideSpellActivationAlert then
@@ -770,7 +778,12 @@ local function HideAlertOn(button)
     end
     local mgr = _G.ActionButtonSpellAlertManager
     if mgr and mgr.HideAlert then pcall(mgr.HideAlert, mgr, button) end
-    for _, key in ipairs({ "SpellActivationAlert", "overlay", "Overlay" }) do
+    -- EllesmereUI's bars draw their proc glow through the same library we
+    -- borrow for our markers. Ours live on the overlay's own wrapper frame,
+    -- never on the button, so stopping the button's glow cannot touch them.
+    local G = ns.EUIGlows and ns.EUIGlows()
+    if G then pcall(G.StopGlow, button) end
+    for _, key in ipairs(ALERT_KEYS) do
         local a = button[key]
         if type(a) == "table" and a.Hide then pcall(a.Hide, a) end
     end

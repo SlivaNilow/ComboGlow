@@ -1206,6 +1206,18 @@ local function Handler(msg)
                                                    or L("no / unknown", "нет / неизвестно")
                 Say("#%d %s -> %s | %s: %s", i, ns.SpellName(r.spell), src,
                     L("lit now", "горит сейчас"), lit)
+                -- The raw fields, not my reading of them. Guessing from a
+                -- formatted line is how two of these bugs stayed hidden.
+                local live = "?"
+                if ns.CostsNothing then
+                    local v = ns.CostsNothing(r)
+                    live = (v == nil) and "?" or (v and L("free", "бесплатен")
+                                                    or L("costs", "стоит"))
+                end
+                Say("   style=%s  baseCost=%s  auraIDs=%d  timer=%s  cost=%s",
+                    tostring(r.style), tostring(r.baseCost),
+                    type(r.auraIDs) == "table" and #r.auraIDs or 0,
+                    tostring(r.timer), live)
                 -- Advice only where there is a choice to get wrong. A cost-
                 -- driven state has none: the game answers it outright.
                 if not ((r.baseCost or 0) > 0 and not r.auraIDs) then
