@@ -464,6 +464,53 @@ end
 local WINDOW = 2.0   -- how long an unconfirmed cast keeps the display flipped
 
 local lastTotals = setmetatable({}, { __mode = "k" })
+
+-- Learned aura lengths, per spell.
+--
+-- Counting down needs something to count from, and the only place a length can
+-- be had is a successful read -- which in combat never happens for a target
+-- debuff. So it is remembered on the rule, where it survives a reload, and
+-- shared across that spell's states: they are all timing the same aura.
+local totalOfSpell = {}
+
+local function LearnTotal(rule, total)
+    if not (total and total > 0 and rule.spell) then return end
+    totalOfSpell[rule.spell] = total
+    rule.lastTotal = total
+end
+
+local function KnownTotal(rule)
+    if not rule.spell then return nil end
+    local t = totalOfSpell[rule.spell]
+    if t then return t end
+    t = tonumber(rule.lastTotal)
+    if t and t > 0 then
+        totalOfSpell[rule.spell] = t
+        return t
+    end
+end
+
+-- When the player's own cast says this aura should run out, per spell.
+local estExpiry = {}
+
+-- True when the estimate puts this aura inside its last `soon` seconds.
+--
+-- An estimate, and called one. In combat nothing will tell us the time: the
+-- aura is secret, the widget's numbers are secret, its countdown text is
+-- secret. What is not secret is that WE cast the spell and how long it lasted
+-- the last time anyone could read it. So the clock runs from the cast.
+--
+-- It is only believed INSIDE the window it can be right about. Once it runs
+-- out it is ignored entirely -- a dot refreshed by something we did not see
+-- would otherwise stay marked as nearly gone for the rest of the fight, and
+-- the real "it is gone" signal arrives on its own anyway.
+function ns.EstimatedNearlyGone(rule, soon)
+    local est = rule.spell and estExpiry[rule.spell]
+    if not est then return false end
+    local now = GetTime()
+    if now >= est then return false end
+    return (est - now) <= soon
+end
 local optimistic = setmetatable({}, { __mode = "k" })
 local castAt     = setmetatable({}, { __mode = "k" })
 local readsWork  = setmetatable({}, { __mode = "k" })
@@ -606,23 +653,88 @@ local function MirrorDuration(itemFrame, rule)
     local ok, durObj = pcall(UA.GetAuraDuration, fallbackUnit, iid)
     if ok and type(durObj) == "table" then return durObj, "ok (rule unit)" end
 
-    local wd = ns.WidgetDuration(itemFrame)
-    if wd then return wd, "ok (cooldown widget)" end
+    -- Caught on its way into the widget. In combat this is the only one there
+    -- is, and it is the very object drawing the countdown on screen.
+    local caught = ns.CaughtDuration(itemFrame)
+    if caught then return caught, "ok (caught)" end
 
     return nil, tried and "GetAuraDuration returned nothing" or "no auraDataUnit"
 end
 
+--[[-------------------------------------------------------------------------
+    Catching the duration object on its way in
+
+    The Cooldown Manager's entries ARE armed with a real duration object --
+    that is what keeps their countdown running in combat, when everything else
+    about the aura has gone secret. Nothing hands it back, though: both getters
+    on the widget answer with a secret NUMBER, which is the one shape that is
+    no use here. A number can be drawn and cannot be compared.
+
+    So it is caught on the way past. A post-hook on the Cooldown metatable sees
+    every object handed to any cooldown in the game, ours included, and keeps
+    the last one per widget. hooksecurefunc is Blizzard's own mechanism: it
+    appends, it does not wrap or replace, and it spreads no taint -- which
+    matters, because these widgets live on frames the secure path touches.
+
+    The idea is tullaCTC's, which hooks the same family of methods to know when
+    any cooldown in the game starts.
+
+    Arming a widget from plain numbers instead invalidates what we hold for it:
+    the object is then no longer what is being drawn, and a stale duration is
+    worse than none -- it answers confidently and wrongly.
+---------------------------------------------------------------------------]]
+local caughtDuration = setmetatable({}, { __mode = "k" })
+local durationHooked
+
+local STALE_ON = { "SetCooldown", "SetCooldownDuration",
+                   "SetCooldownFromExpirationTime", "SetCooldownUNIX", "Clear" }
+
+local function HookCooldownDurations()
+    if durationHooked ~= nil then return durationHooked end
+    local mt = ActionButton1Cooldown and getmetatable(ActionButton1Cooldown)
+    local proto = mt and mt.__index
+    -- No button yet is "not yet", not "never": leave the answer unrecorded so
+    -- the next poll tries again. Only a client that genuinely lacks the method
+    -- is a permanent no.
+    if type(proto) ~= "table" then return false end
+    if not proto.SetCooldownFromDurationObject then
+        durationHooked = false
+        return false
+    end
+    hooksecurefunc(proto, "SetCooldownFromDurationObject", function(cd, durObj)
+        caughtDuration[cd] = durObj
+    end)
+    for _, m in ipairs(STALE_ON) do
+        if proto[m] then
+            hooksecurefunc(proto, m, function(cd) caughtDuration[cd] = nil end)
+        end
+    end
+    durationHooked = true
+    return true
+end
+ns.HookCooldownDurations = HookCooldownDurations
+
+-- What we caught for this entry, if it is still a usable object.
+function ns.CaughtDuration(itemFrame)
+    HookCooldownDurations()
+    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
+    local d = cd and caughtDuration[cd]
+    if type(d) ~= "table" then return nil end
+    local ok, has = pcall(function() return d.EvaluateRemainingDuration ~= nil end)
+    if ok and has then return d end
+    return nil
+end
+
 -- The entry's own cooldown widget, asked for a duration OBJECT.
 --
--- This is the last place left to look, and the one that works in combat. The
--- widget is visibly drawing a countdown, so it was armed with something; the
--- legacy number pair comes back secret and cannot be compared in Lua, but the
--- object can be handed to a curve and compared by the engine. Which is the
--- whole trick: we never learn the time, we only get an answer about it.
+-- Kept for the probe only, and NOT on the polling path: on 12.1 both getters
+-- answer with a secret NUMBER, which is the one shape that is no use to us.
+-- A number can be drawn and cannot be compared; an object could have been
+-- compared without ever being read. Left here so the next client that changes
+-- this is a one-line change rather than a rediscovery.
 --
--- Only a table with EvaluateRemainingDuration is accepted. The same method
--- names have historically returned a plain number, and a number here would
--- silently be the wrong kind of right.
+-- Only a table with EvaluateRemainingDuration counts. A number here would be
+-- the wrong kind of right: accepted, then silently useless.
 local durationGetters = { "GetCooldownDuration", "GetCooldownDisplayDuration" }
 function ns.WidgetDuration(itemFrame)
     local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
@@ -755,8 +867,9 @@ function ns.SoonReport(mf, rule)
     end
 
     local n = ns.SoonSeconds(rule)
-    return ("early-gone: soon=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
+    return ("early-gone: soon=%s caught=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
         n and ("%ds"):format(n) or "off",
+        ns.CaughtDuration(mf) and "|cff40ff40yes|r" or "|cffff4040no|r",
         left and ("%.1fs"):format(left) or "|cffff4040none|r",
         why or "?", rawS, rawD, textWhat,
         #carriers > 0 and (" | carriers: " .. table.concat(carriers, ", ")) or "")
@@ -1044,8 +1157,11 @@ local function ApplyMirror(frame, rule, itemFrame)
         frame:StartArt()
         return true
     elseif soon then
+        -- Measured if anything will measure it; estimated when nothing will.
         local left = MirrorRemaining(itemFrame)
-        if left and left <= soon then
+        local near = left and left <= soon
+        if not left then near = ns.EstimatedNearlyGone(rule, soon) end
+        if near then
             -- Read, not resolved: the strip may pack this one for real.
             frame._mirroring = nil
             frame:SetAlpha(rule.missing and 1 or 0)
@@ -1054,7 +1170,9 @@ local function ApplyMirror(frame, rule, itemFrame)
             frame:StartArt()
             return true
         end
-    end    local applied = pcall(frame.SetAlphaFromBoolean, frame, flag, shown, hidden)
+    end
+
+    local applied = pcall(frame.SetAlphaFromBoolean, frame, flag, shown, hidden)
     frame._mirroring = applied or nil
     if not applied then
         frame:SetAlpha(1)
@@ -1075,11 +1193,15 @@ function ns.OnPlayerCast(spellID)
     local rules = ns.castMap[spellID]
     if not rules then return false end
     local now = GetTime()
+    local total
     for _, rule in ipairs(rules) do
         optimistic[rule] = now + WINDOW
         castAt[rule] = now
         castGen[rule] = (castGen[rule] or 0) + 1
+        total = total or KnownTotal(rule)
     end
+    -- The cast is the one thing about this aura that is never secret.
+    if total then estExpiry[spellID] = now + total end
     return true
 end
 
@@ -1231,7 +1353,10 @@ function ns.ApplyAuraRule(frame, rule)
         readsWork[rule] = true
         misses[rule] = nil
         optimistic[rule] = nil
-        if total then lastTotals[rule] = total end
+        if total then
+            lastTotals[rule] = total
+            LearnTotal(rule, total)
+        end
     end
 
     local optUntil = optimistic[rule]
