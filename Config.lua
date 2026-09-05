@@ -1266,7 +1266,8 @@ local function Handler(msg)
                 if mf and isAura and ns.CaughtArgs(mf) then target = mf break end
             end
         end
-        ns.FormatterTest(target, Say, tonumber(rest))
+        local live = rest and rest:find("live") ~= nil
+        ns.FormatterTest(target, Say, tonumber((rest or ""):match("%d+")), live)
 
     elseif cmd == "soontest" then
         -- Run OUT OF COMBAT: it checks the duration object against a

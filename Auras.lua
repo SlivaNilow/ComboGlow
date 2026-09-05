@@ -1384,16 +1384,25 @@ end
 ---------------------------------------------------------------------------]]
 local fmtTest
 
-function ns.FormatterTest(mf, say, seconds)
+-- live=false runs the rig on a plain twenty-second countdown of our own. That
+-- has to be tried first: an empty box means either "secret arguments were
+-- refused" or "this rig never renders anything", and only a control with
+-- nothing secret in it can tell those apart.
+function ns.FormatterTest(mf, say, seconds, live)
     if not (C_StringUtil and C_StringUtil.CreateNumericRuleFormatter) then
         say("no CreateNumericRuleFormatter on this client")
         return
     end
-    local args = mf and ns.CaughtArgs(mf)
-    if not args or args.m ~= "SetCooldown" then
-        say(ns.L("no captured SetCooldown for that entry - hit something first",
-                 "по этой записи не пойман SetCooldown — ударь по цели"))
-        return
+    local args
+    if live then
+        args = mf and ns.CaughtArgs(mf)
+        if not args or args.m ~= "SetCooldown" then
+            say(ns.L("no captured SetCooldown for that entry - hit something first",
+                     "по этой записи не пойман SetCooldown — ударь по цели"))
+            return
+        end
+    else
+        args = { a = GetTime(), b = 20 }
     end
 
     if not fmtTest then
@@ -1428,12 +1437,30 @@ function ns.FormatterTest(mf, say, seconds)
     fmtTest.cd:SetCountdownFormatter(formatter)
     fmtTest.cd:SetCooldown(args.a, args.b)
 
-    say(ns.L("armed the test box at the top of the screen: it must read UNDER "
-             .. "only in the last %d seconds of the aura",
-             "тестовая рамка вверху экрана: она должна показать UNDER только "
-             .. "в последние %d с ауры"), n)
-end
+    -- Blizzard's countdown text is off unless this is on, and a box that
+    -- renders nothing because the feature is switched off looks exactly like
+    -- a box that renders nothing because the mechanism does not work.
+    local cvar = GetCVar and GetCVar("countdownForCooldowns")
+    local fs = fmtTest.cd.GetCountdownFontString
+        and fmtTest.cd:GetCountdownFontString()
+    if fs then
+        -- A font string with no font draws nothing at all, silently.
+        local font = fs:GetFont()
+        if not font then
+            fs:SetFont(STANDARD_TEXT_FONT or "Fonts\FRIZQT__.TTF", 22, "OUTLINE")
+        end
+        fs:Show()
+    end
 
+    say(ns.L("test box armed (%s): countdownForCooldowns=%s fontstring=%s font=%s",
+             "тестовая рамка (%s): countdownForCooldowns=%s fontstring=%s шрифт=%s"),
+        live and ns.L("captured, secret", "пойманные, секретные")
+             or ns.L("plain 20s control", "контроль, обычные 20 с"),
+        tostring(cvar), tostring(fs ~= nil),
+        tostring(fs and (fs:GetFont()) or "-"))
+    say(ns.L("it must read 'over' now and 'UNDER' in the last %d seconds",
+             "должно показывать 'over', а в последние %d с — 'UNDER'"), n)
+end
 -- Deliberately terse. This is the one report that has to be read off the
 -- screen mid-fight, so it prints a line per aura rule and nothing else.
 function ns.SoonProbe(rules, say)
