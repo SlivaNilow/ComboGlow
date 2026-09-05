@@ -918,6 +918,7 @@ local function PrintHelp()
         { "/cg blizzglow on|off",      L("the game's own gold proc glow (off by default)", "штатное золотое свечение прока (по умолчанию выключено)") },
         { "/cg auracheck",             L("report what the aura API answers here, with measured lag", "показать ответ aura API и замеренную задержку") },
         { "/cg procs",                 L("what each proc state watches, and whether it is lit", "за чем следит каждое прок-состояние и горит ли оно") },
+        { "/cg why",                   L("what OURS is lit right now, and which rule did it", "что горит именно у нас прямо сейчас и от какого правила") },
         { "/cg del <#>",               L("remove rule", "удалить правило") },
         { "/cg toggle <#>",            L("enable / disable rule", "включить / выключить правило") },
         { "/cg style <#> <name>",      L("glow style (see /cg styles)", "стиль подсветки (список: /cg styles)") },
@@ -1198,6 +1199,41 @@ local function Handler(msg)
 
     elseif cmd == "auracheck" then
         ns.AuraCheck(CG:GetRules(), Say)
+
+    elseif cmd == "why" then
+        -- Everything of OURS that is lit this instant, and which rule is
+        -- doing it. A gold button with nothing listed here is somebody
+        -- else's glow -- the game's, or the action bar's own.
+        local idx = {}
+        for i, r in ipairs(CG:GetRules()) do idx[r] = i end
+        local n = 0
+        local function report(frame)
+            local r = frame.rule
+            if not r or not frame:IsShown() then return end
+            n = n + 1
+            local what
+            if r.kind == "cd" then
+                what = L("burst ready", "бурст готов")
+            elseif r.kind ~= "aura" then
+                what = L("resource", "ресурс") .. " " .. RangeText(r)
+            elseif r.proc then
+                what = L("proc", "прок")
+            elseif r.missing then
+                what = L("gone", "нет")
+            else
+                what = L("up", "висит")
+            end
+            Say("%s #%s %s | %s | %s",
+                frame.isStrip and L("strip", "полоска") or L("bar", "панель"),
+                tostring(idx[r] or "?"), ns.SpellName(r.spell), what,
+                tostring(r.style) .. (r.style2 and ("+" .. r.style2) or ""))
+        end
+        for _, f in ipairs(CG.powerFrames or {}) do report(f) end
+        for _, f in ipairs(CG.auraFrames or {}) do report(f) end
+        if n == 0 then
+            Say(L("nothing of ours is lit - any glow you see is not this addon",
+                  "у нас сейчас не горит ничего — то, что видно, рисует не этот аддон"))
+        end
 
     elseif cmd == "procs" then
         -- What each proc state is actually watching, and whether it reads.

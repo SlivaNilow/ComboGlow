@@ -694,6 +694,7 @@ function CG:Rebuild()
             for i, rule in ipairs(centerRules) do
                 local ic = self.centerPool:Acquire()
                 ic.secondary = nil
+                ic.isStrip = true
                 ic:SetParent(a)
                 ic:Setup(size, ns.SpellIcon(rule.spell))
                 -- Always the plain frame here, whatever the button uses. On a
