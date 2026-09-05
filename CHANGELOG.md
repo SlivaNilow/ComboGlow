@@ -54,6 +54,18 @@ change that caused it.
 gallery to layer a second one on top of the first — a pixel outline plus a proc
 glow reads as one distinct mark. Click it again to remove it.
 
+**The Cooldown Manager dependency is stated up front**, in capitals, at the top
+of every language's getting-started section. The aura states are not "any
+spell": they read Blizzard's Cooldown Manager and cover exactly what it is set
+to track, per specialization. The options window now names a state whose spell
+is missing from it, and `/cg hidecdm` makes the Cooldown Manager invisible while
+it keeps running -- alpha, never Hide(), because a hidden frame is not
+guaranteed to keep updating and the mirror would go with it.
+
+**Aura stack counts** on the marker, read from the aura where that is possible
+and copied as text from the Cooldown Manager where it is not. `/cg stackpos`
+and `/cg stacksize` place and size them.
+
 **Procs join the reminder strip**, alongside missing dots and bursts coming off
 cooldown. All three are things that happen to you rather than because you
 pressed something, which is what the strip is for. `/cg procstrip off` drops

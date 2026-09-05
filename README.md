@@ -60,6 +60,19 @@ so the animated markers match the rest of the interface.
 
 ## Getting started
 
+> ### REQUIRES BLIZZARD'S COOLDOWN MANAGER
+>
+> **The "up" and "gone" states read it, and only cover spells it is set to
+> track.** In 12.1 an addon cannot read an aura on your target at all, so there
+> is no way around this. Its tracked list is configured **per specialization**,
+> in the game's own settings -- the same character can work as one spec and see
+> nothing as another. The addon cannot add to that list: the API is read-only.
+>
+> The options window names any spell that is missing from it, and
+> `/cg hidecdm` makes the Cooldown Manager invisible while it keeps running.
+>
+> Resource, proc and burst states do not depend on it at all.
+
 Nothing to configure. The first time you log in on a specialization the addon
 scans your bars and creates a rule for **every spell that spends the class
 resource**, printing what it added.
@@ -317,6 +330,20 @@ in any amount you like:
 
 ## Быстрый старт
 
+> ### НУЖЕН ШТАТНЫЙ COOLDOWN MANAGER
+>
+> **Состояния «висит» и «нет» читают его и покрывают только те заклинания,
+> которые в нём отмечены.** В 12.1 аддон не может прочитать ауру на цели
+> вообще, так что обойти это нечем. Список отслеживаемого настраивается
+> **отдельно для каждой специализации**, в игровых настройках — один и тот же
+> персонаж может работать в одной спеке и не видеть ничего в другой. Добавлять
+> в этот список аддон не может: API только на чтение.
+>
+> Окно настроек называет заклинание, которого там не хватает, а
+> `/cg hidecdm` делает Cooldown Manager невидимым, не выключая его.
+>
+> Состояния по ресурсу, проку и бурстам от него не зависят вовсе.
+
 Настраивать ничего не нужно. При первом входе на специализацию аддон сам
 сканирует панели и создаёт правило на **каждое заклинание, которое тратит
 классовый ресурс**, и пишет в чат, что добавил.
@@ -558,6 +585,17 @@ MIT, см. [LICENSE](LICENSE).
 > 插件内的界面目前只有英文和俄文。中文界面还没做 —— 如果有需要请提 issue。
 
 ## 开始使用
+
+> ### 需要暴雪自带的冷却管理器
+>
+> **「生效中」和「已消失」状态依赖它，且只覆盖它设置为追踪的法术。** 在 12.1
+> 中插件完全读不到目标身上的光环，没有别的办法。它的追踪列表在游戏设置里
+> **按专精**分别配置 —— 同一个角色可能在一个专精可用、在另一个专精什么都看不到。
+> 插件无法向该列表添加内容：相关 API 只读。
+>
+> 设置窗口会指出缺少的法术，`/cg hidecdm` 可以让冷却管理器隐形但继续运行。
+>
+> 资源、触发和爆发技状态完全不依赖它。
 
 不需要配置。你第一次用某个专精登录时，插件会扫描你的动作条，为**每个消耗职业
 资源的法术**建立规则，并把添加的内容打印到聊天框。
