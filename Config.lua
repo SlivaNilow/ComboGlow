@@ -82,6 +82,15 @@ local function ParseRange(token)
     return nil
 end
 
+-- Pools that refill by themselves. "You have enough" is true most of the time
+-- for these, so it is not a moment worth marking -- the same reason mana,
+-- energy and rage are not auto-detected as resources at all. Runes are, because
+-- their cost still answers "is this cast free right now".
+local CONTINUOUS_POWER = {}
+if Enum and Enum.PowerType and Enum.PowerType.Runes then
+    CONTINUOUS_POWER[Enum.PowerType.Runes] = true
+end
+
 local function RangeText(rule)
     if rule.kind == "cd" then
         return L("burst ready", "бурст готов")
@@ -650,7 +659,14 @@ local function BuildPreset(quiet, intro)
                         if cost == 0 and (knownCost[spellID] or 0) > 0 then
                             cost = knownCost[spellID]
                         end
-                        if not havePower[spellID] then
+                        -- Not for a pool that refills by itself. Runes come
+                        -- back on their own, continuously, so "you have two
+                        -- runes" is true most of the time -- a Frost death
+                        -- knight lit up nearly every button on the bar. Their
+                        -- cost is still read for the proc state below, where
+                        -- zero means a genuinely free cast (Rime, Killing
+                        -- Machine) and that IS a moment.
+                        if not havePower[spellID] and not CONTINUOUS_POWER[pt] then
                             spenders[#spenders + 1] = { spell = spellID, cost = cost }
                         end
                         if not haveProc[spellID] then

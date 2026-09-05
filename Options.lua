@@ -181,12 +181,21 @@ local function RefreshTiles()
         else
             tile:Show()
             tile.icon:SetTexture(ns.SpellIcon(selSpell))
-            tile.overlay:SetStyle(tile.styleKey, r, g, b, tile.defAlpha or alphaSrc, thick)
-            tile.overlay.needSafeStyle = false
-            tile.overlay:Show()
-            tile.overlay:StartArt()
-            tile.sel:SetShown(rule ~= nil and rule.style == tile.styleKey)
-            tile.sel2:SetShown(rule ~= nil and rule.style2 == tile.styleKey)
+            if tile.styleKey == false then
+                -- The "no marker" tile: the icon, and nothing drawn over it.
+                tile.overlay:StopArt()
+                tile.overlay:Hide()
+                tile.sel:SetShown(rule ~= nil and rule.enabled == false)
+                tile.sel2:Hide()
+            else
+                tile.overlay:SetStyle(tile.styleKey, r, g, b, tile.defAlpha or alphaSrc, thick)
+                tile.overlay.needSafeStyle = false
+                tile.overlay:Show()
+                tile.overlay:StartArt()
+                local on = rule ~= nil and rule.enabled ~= false
+                tile.sel:SetShown(on and rule.style == tile.styleKey)
+                tile.sel2:SetShown(on and rule.style2 == tile.styleKey)
+            end
             tile:SetAlpha(rule and 1 or 0.55)
         end
     end
@@ -325,9 +334,6 @@ local function RefreshDetails()
         end
     end
 
-    -- Greyed rather than hidden: the pair keeps its place, so the one you want
-    -- is always in the same spot.
-    UI.del:SetAlpha(rule and 1 or 0.35)
     UI.delSpell:SetAlpha(selSpell and 1 or 0.35)
 end
 
@@ -737,7 +743,10 @@ local function Build()
 
     -- Marker gallery --------------------------------------------------------
     UI.tiles = {}
-    local gallery = {}
+    -- First tile: no marker at all. Turning a state off belongs with choosing
+    -- its look, not behind a delete button -- deleting a state you may want
+    -- back is a worse answer to "I do not want this one lit".
+    local gallery = { { key = false, short = L("none", "без свечения") } }
     for _, style in ipairs(ns.STYLES) do
         if not style.hidden then gallery[#gallery + 1] = style end
     end
@@ -807,6 +816,14 @@ local function Build()
                 rule = ns.AddSlotRule(selSpell, selSlot)
                 if not rule then return end
             end
+            if self.styleKey == false then
+                rule.enabled = false
+                CG:Rebuild()
+                Refresh()
+                return
+            end
+            -- Picking any marker turns the state back on.
+            rule.enabled = true
             -- Shift (or right-click) layers a SECOND marker on the same
             -- state instead of replacing the first. A pixel outline plus a
             -- proc glow reads as one distinct mark, which is how you tell a
@@ -837,9 +854,6 @@ local function Build()
     -- Toggles ---------------------------------------------------------------
     UI.toggles = {}
     local defs = {
-        { key = "enabled", auraOnly = false, label = L("state on", "состояние вкл"),
-          get = function(r) return r.enabled ~= false end,
-          set = function(r) r.enabled = not (r.enabled ~= false) end },
         { key = "timer", auraOnly = true, label = L("timer", "таймер"),
           get = function(r) return r.timer ~= false end,
           set = function(r) r.timer = not (r.timer ~= false) end },
@@ -949,21 +963,9 @@ local function Build()
     end)
     bDot:SetPoint("LEFT", bPreset, "RIGHT", 8, 0)
 
-    -- Two buttons, because they were one and the whole-spell half was
-    -- unreachable: it only appeared when the open state had no rule, so as
-    -- long as any state existed the button removed them one at a time, and
-    -- when the last one went the selection jumped to another spell.
-    UI.del = TextButton(UI, L("Delete state", "Удалить состояние"), 140, 22, function()
-        local rules = CG:GetRules()
-        local rule, idx = CurrentRule()
-        if rule and idx then
-            table.remove(rules, idx)
-            CG:Rebuild()
-            Refresh()
-        end
-    end)
-    UI.del:SetPoint("BOTTOMRIGHT", -12, 10)
-
+    -- Only the whole spell. Removing a single state was never the right
+    -- answer to "do not light this one" -- the gallery's first tile turns a
+    -- state off and keeps it, which is what that actually asks for.
     UI.delSpell = TextButton(UI, L("Delete spell", "Удалить заклинание"), 150, 22, function()
         if not selSpell then return end
         local rules = CG:GetRules()
@@ -974,7 +976,7 @@ local function Build()
         CG:Rebuild()
         Refresh()
     end)
-    UI.delSpell:SetPoint("BOTTOMRIGHT", UI.del, "BOTTOMLEFT", -8, 0)
+    UI.delSpell:SetPoint("BOTTOMRIGHT", -12, 10)
 
     UI:SetScript("OnHide", function()
         for _, tile in ipairs(UI.tiles) do
