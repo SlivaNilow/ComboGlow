@@ -1006,6 +1006,66 @@ function ns.CooldownAPI(say)
     say("canaccessvalue: %s", tostring(_G.canaccessvalue ~= nil))
 end
 
+-- What C_DurationUtil.CreateDuration actually wants, answered by asking it.
+--
+-- Called first with PLAIN numbers, which is the control: if the plain call
+-- fails the same way the secret one does, the signature is wrong and secrecy
+-- has nothing to do with it. Those are opposite problems and they look
+-- identical from a distance, which is how the last few rounds got spent.
+function ns.DurationFactory(say, mf)
+    local CDU = C_DurationUtil
+    if not (CDU and CDU.CreateDuration) then
+        say("C_DurationUtil.CreateDuration: absent")
+        return
+    end
+
+    local now = GetTime()
+    local function attempt(label, ...)
+        local ok, d = pcall(CDU.CreateDuration, ...)
+        if not ok then
+            return ("%s -> |cffff4040err|r %s"):format(label, tostring(d):sub(1, 90))
+        end
+        if type(d) ~= "table" then
+            return ("%s -> %s"):format(label, type(d))
+        end
+        local okm, has = pcall(function() return d.EvaluateRemainingDuration ~= nil end)
+        if okm and has then
+            -- Worth printing once: the object's own methods say what else it
+            -- can answer without ever being read.
+            local names = {}
+            pcall(function()
+                for k, v in pairs(getmetatable(d) and getmetatable(d).__index or d) do
+                    if type(k) == "string" and type(v) == "function" then
+                        names[#names + 1] = k
+                    end
+                end
+            end)
+            table.sort(names)
+            return ("%s -> |cff40ff40durObj|r {%s}"):format(label, table.concat(names, ","))
+        end
+        return ("%s -> table, no Evaluate"):format(label)
+    end
+
+    say("|cffffd100plain control:|r")
+    say("  " .. attempt("(now,10)", now, 10))
+    say("  " .. attempt("(10,now)", 10, now))
+    say("  " .. attempt("(10)", 10))
+    say("  " .. attempt("(nowMS,10000)", now * 1000, 10000))
+    say("  " .. attempt("({start,dur})", { startTime = now, duration = 10 }))
+
+    local args = mf and ns.CaughtArgs(mf)
+    if not args then
+        say(ns.L("nothing captured for that entry yet - hit something first",
+                 "по этой записи ещё ничего не поймано — ударь по цели"))
+        return
+    end
+    say("|cffffd100captured %s:|r", tostring(args.m))
+    say("  " .. attempt("(a,b)", args.a, args.b))
+    say("  " .. attempt("(b,a)", args.b, args.a))
+    say("  " .. attempt("(b)", args.b))
+    say("  " .. attempt("(a)", args.a))
+end
+
 -- Deliberately terse. This is the one report that has to be read off the
 -- screen mid-fight, so it prints a line per aura rule and nothing else.
 function ns.SoonProbe(rules, say)

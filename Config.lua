@@ -1255,6 +1255,20 @@ local function Handler(msg)
     elseif cmd == "auracheck" then
         ns.AuraCheck(CG:GetRules(), Say)
 
+    elseif cmd == "mkdur" then
+        -- What the duration factory wants, asked rather than guessed. The
+        -- plain-number control separates a wrong signature from a rejected
+        -- secret; they look identical from a distance.
+        ns.RebuildCDMMap()
+        local target
+        for _, r in ipairs(CG:GetRules()) do
+            if r.kind == "aura" and not r.proc then
+                local mf, isAura = ns.FindMirror(r)
+                if mf and isAura and ns.CaughtArgs(mf) then target = mf break end
+            end
+        end
+        ns.DurationFactory(Say, target)
+
     elseif cmd == "cdapi" then
         -- The whole Cooldown widget API. If an engine-side answer about a
         -- secret remaining time exists, its name is in this list.
