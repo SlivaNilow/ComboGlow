@@ -500,6 +500,11 @@ local function LearnTotal(rule, total)
     rule.lastTotal = total
 end
 
+function ns.KnownTotalFor(rule)
+    if not rule or not rule.spell then return nil end
+    return totalOfSpell[rule.spell] or tonumber(rule.lastTotal)
+end
+
 local function KnownTotal(rule)
     if not rule.spell then return nil end
     local t = totalOfSpell[rule.spell]
@@ -679,9 +684,11 @@ local function MirrorDuration(itemFrame, rule)
     local caught = ns.CaughtDuration(itemFrame)
     if caught then return caught, "ok (caught)" end
 
-    -- Nothing passed an object, but something passed numbers. Build one.
-    local made, form = ns.MadeDuration(itemFrame)
-    if made then return made, "ok (made: " .. tostring(form) .. ")" end
+    -- A duration object built by C_DurationUtil.CreateDuration used to be
+    -- tried here. It is not any more: whatever that factory returns, it is a
+    -- LENGTH and not a running clock -- every argument order and every unit
+    -- answers "nothing left" at any threshold, which is what made every dot
+    -- light permanently. /cgl mkdur still shows the whole table.
 
     return nil, tried and "GetAuraDuration returned nothing" or "no auraDataUnit"
 end
@@ -868,6 +875,68 @@ end
 
 -- For the report: every shape and how it answered, so a failure says which
 -- half it failed rather than just "no".
+--[[-------------------------------------------------------------------------
+    What the curve's x axis is measured in
+
+    A curve point at 5 means five of something, and seconds is only the most
+    obvious guess: milliseconds are just as likely -- the widgets measure time
+    in them -- and so is a fraction of the total duration. All three look
+    identical from outside, which is why a threshold that was simply wrong
+    read for days as an API that was simply missing.
+
+    So it is measured rather than assumed, once, against a case that can only
+    pass under one of them: two seconds left of a hundred must read as under
+    the threshold and sixty must not. Whatever the client means, the addon
+    then speaks it -- including if a later patch changes its mind.
+---------------------------------------------------------------------------]]
+local CURVE_AXES = {
+    { name = "seconds",  x = function(sec, _)     return sec end },
+    { name = "ms",       x = function(sec, _)     return sec * 1000 end },
+    { name = "fraction", x = function(sec, total)
+                                if not (total and total > 0) then return nil end
+                                return sec / total
+                            end },
+}
+
+local curveAxis
+
+local function CalibrateAxis()
+    if curveAxis ~= nil then return curveAxis end
+    local shape = DURATION_SHAPES[1]
+    for _, axis in ipairs(CURVE_AXES) do
+        local t = axis.x(5, 100)
+        if t then
+            local nearly = ShapeSaysUnder(shape, 2, 100, t)
+            local plenty = ShapeSaysUnder(shape, 60, 100, t)
+            if nearly == true and plenty == false then
+                curveAxis = axis
+                return curveAxis
+            end
+        end
+    end
+    curveAxis = false
+    return false
+end
+ns.CalibrateAxis = CalibrateAxis
+
+-- The x value that means `sec` seconds on a curve, in whatever the client
+-- measures.
+--
+-- When the calibration cannot decide, this answers in seconds -- the meaning
+-- everything here has always assumed and which the warning colour has been
+-- built on since the first version. A test that cannot run is not evidence
+-- against what it was testing, and disabling working behaviour on the
+-- strength of an inconclusive measurement is its own kind of wrong.
+function ns.CurveX(sec, total)
+    local axis = CalibrateAxis()
+    if not axis then return sec end
+    return axis.x(sec, total) or sec
+end
+function ns.CurveAxisName()
+    local axis = CalibrateAxis()
+    return axis and axis.name or "unknown"
+end
+
 -- What the curve's x axis is measured in.
 --
 -- Every shape failing BOTH halves the same way says the argument order is not
@@ -1396,9 +1465,11 @@ end
 local warnCurves = setmetatable({}, { __mode = "k" })
 
 local function WarnCurve(rule)
-    local sig = ("%s|%s|%s|%s|%s|%s|%s"):format(rule.warn or 0,
+    local x = ns.CurveX(rule.warn or 0, ns.KnownTotalFor(rule))
+    if not x then return nil end
+    local sig = ("%s|%s|%s|%s|%s|%s|%s|%s"):format(x,
         rule.r or 0, rule.g or 0, rule.b or 0,
-        rule.wr or 1, rule.wg or 0, rule.wb or 0)
+        rule.wr or 1, rule.wg or 0, rule.wb or 0, ns.CurveAxisName())
     local cached = warnCurves[rule]
     if cached and cached.sig == sig then return cached.curve end
     if not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then return nil end
@@ -1408,8 +1479,7 @@ local function WarnCurve(rule)
         curve:SetType(Enum.LuaCurveType.Step)
     end
     curve:AddPoint(0, CreateColor(rule.wr or 1, rule.wg or 0, rule.wb or 0, 1))
-    curve:AddPoint(rule.warn, CreateColor(rule.r or 0, rule.g or 1, rule.b or 0, 1))
-    warnCurves[rule] = { sig = sig, curve = curve }
+    curve:AddPoint(x, CreateColor(rule.r or 0, rule.g or 1, rule.b or 0, 1))    warnCurves[rule] = { sig = sig, curve = curve }
     return curve
 end
 
@@ -1458,8 +1528,10 @@ end
 -- Two curves per threshold, one the mirror image of the other: the "gone"
 -- state wants to be visible inside the window and the "up" state wants to be
 -- gone from it, and that is the whole difference between them.
-local function SoonCurve(n, standDown)
-    local key = standDown and (-n) or n
+local function SoonCurve(n, standDown, total)
+    local x = ns.CurveX(n, total)
+    if not x then return nil end
+    local key = ("%s|%s|%s"):format(x, standDown and 1 or 0, ns.CurveAxisName())
     local cached = soonCurves[key]
     if cached then return cached end
     if not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then return nil end
@@ -1471,11 +1543,10 @@ local function SoonCurve(n, standDown)
     local inside, outside = 1, 0
     if standDown then inside, outside = 0, 1 end
     curve:AddPoint(0, CreateColor(1, 1, 1, inside))
-    curve:AddPoint(n, CreateColor(1, 1, 1, outside))
+    curve:AddPoint(x, CreateColor(1, 1, 1, outside))
     soonCurves[key] = curve
     return curve
 end
-
 -- True when it took over the frame's alpha. False means "nothing to measure
 -- against", and the caller carries on as it would have: the marker then lights
 -- when the aura is actually gone, which is the old behaviour and a fine thing
@@ -1486,7 +1557,7 @@ function ns.ApplySoon(frame, rule, durObj)
     if not n then return false end
 
     if not (durObj and durObj.EvaluateRemainingDuration) then return false end
-    local curve = SoonCurve(n, not rule.missing)
+    local curve = SoonCurve(n, not rule.missing, ns.KnownTotalFor(rule))
     if not curve then return false end
     local ok, col = pcall(durObj.EvaluateRemainingDuration, durObj, curve)
     if not ok or not HasMethod(col, "GetRGBA") then return false end
