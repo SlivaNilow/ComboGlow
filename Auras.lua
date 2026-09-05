@@ -1564,6 +1564,31 @@ function ns.FormatterTest(mf, say, seconds, live)
         say(ns.L("forwarding armed: recast the spell, the box follows the real aura",
                  "переадресация включена: перекастуй заклинание, рамка пойдёт "
                  .. "за настоящей аурой"))
+        -- Watch it for half a minute and report only when something changes.
+        -- In combat the text is secret, so "secret" is the good answer here:
+        -- it means the engine rendered something. nil means it did not.
+        if fmtTest.watch then fmtTest.watch:Cancel() end
+        local last
+        fmtTest.watch = C_Timer.NewTicker(1, function()
+            local f = fmtTest.cd.GetCountdownFontString
+                and fmtTest.cd:GetCountdownFontString()
+            local ok, txt = pcall(f.GetText, f)
+            local now = (not ok) and "err"
+                or (txt == nil and "nil"
+                    or (IsSecret(txt) and "secret" or ("%q"):format(tostring(txt))))
+            local st, sd = "-", "-"
+            local okb, x, y = pcall(fmtTest.cd.GetCooldownTimes, fmtTest.cd)
+            if okb then
+                st = IsSecret(x) and "secret" or tostring(x)
+                sd = IsSecret(y) and "secret" or tostring(y)
+            end
+            local line = ("%s | %s/%s"):format(now, st, sd)
+            if line ~= last then
+                last = line
+                say(ns.L("box: text=%s times=%s/%s", "рамка: текст=%s время=%s/%s"),
+                    now, st, sd)
+            end
+        end, 30)
     end
     say(ns.L("it must read 'over' now and 'UNDER' in the last %d seconds",
              "должно показывать 'over', а в последние %d с — 'UNDER'"), n)
