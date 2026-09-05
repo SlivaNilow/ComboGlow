@@ -774,6 +774,17 @@ ns.forwardStats = { subscribed = 0, armings = 0, fired = 0, lastErr = nil }
 -- has to be put back.
 local armCount = setmetatable({}, { __mode = "k" })
 
+-- WHEN each widget was last armed. The numbers in that call are secret and
+-- always will be; the moment it happened is not, and the moment is most of
+-- what we were missing. Every refresh and every extension re-arms the entry,
+-- so this is the aura's real start time, arriving by the only door left open.
+local armedAt = setmetatable({}, { __mode = "k" })
+
+function ns.EntryArmedAt(itemFrame)
+    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
+    return cd and armedAt[cd] or nil
+end
+
 --[[-------------------------------------------------------------------------
     Asking the engine to mark the last seconds, on its own widget
 
@@ -892,6 +903,9 @@ local function HookCooldownDurations()
                 if m == "SetCooldown" then
                     st.armings = st.armings + 1
                     armCount[cd] = (armCount[cd] or 0) + 1
+                    armedAt[cd] = GetTime()
+                elseif m == "Clear" then
+                    armedAt[cd] = nil
                 end
                 local set = forwardTo[cd]
                 if set then
@@ -1310,11 +1324,13 @@ function ns.SoonReport(mf, rule)
     local _, durWhy = ns.MirrorDurationFor(mf, rule)
 
     local est, learned = ns.EstimateState(rule)
+    local armedAgo = ns.EntryArmedAt(mf)
+    armedAgo = armedAgo and ("%.1fs ago"):format(GetTime() - armedAgo) or "never"
 
     local n = ns.SoonSeconds(rule)
-    return ("early-gone: soon=%s |cffffd100dur=%s est=%s of %s|r caught=%s armed=%s made=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
+    return ("early-gone: soon=%s |cffffd100dur=%s est=%s of %s armed=%s|r caught=%s armed=%s made=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
         n and ("%ds"):format(n) or "off",
-        tostring(durWhy), est, learned,
+        tostring(durWhy), est, learned, armedAgo,
         ns.CaughtDuration(mf) and "|cff40ff40yes|r" or "|cffff4040no|r",
         ns.ArmedBy(mf),
         (function()
@@ -2028,7 +2044,23 @@ local function ApplyMirror(frame, rule, itemFrame)
         -- Measured if anything will measure it; estimated when nothing will.
         local left = MirrorRemaining(itemFrame)
         local near = left and left <= soon
-        if not left then near = ns.EstimatedNearlyGone(rule, soon) end
+        if not left then
+            -- Prefer the entry's own arming moment over our cast. It covers
+            -- refreshes nobody saw us make, and it restarts on an extension --
+            -- so the clock cannot quietly run out while the aura is still up,
+            -- which is what made the marker vanish mid-fight. The LENGTH is
+            -- still the base one, so an extended aura is called gone early:
+            -- the direction this feature is named after, and visible, unlike
+            -- the alternative.
+            local armed = ns.EntryArmedAt(itemFrame)
+            local total = ns.KnownTotalFor(rule)
+            if armed and total then
+                local leftEst = armed + total - GetTime()
+                near = leftEst > 0 and leftEst <= soon
+            else
+                near = ns.EstimatedNearlyGone(rule, soon)
+            end
+        end
         if near then
             -- Read, not resolved: the strip may pack this one for real.
             frame._mirroring = nil
