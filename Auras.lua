@@ -1383,6 +1383,25 @@ function ns.AuraCheck(rules, say)
                         end
                     end)
                     if not okp then carriers[#carriers + 1] = "<pairs blocked>" end
+                    -- And what the viewer's own record holds. Blizzard draws a
+                    -- countdown on this entry in combat, so the time exists
+                    -- somewhere reachable; the question is only under which
+                    -- name, and whether it arrives plain.
+                    if mf.cooldownID and C_CooldownViewer
+                       and C_CooldownViewer.GetCooldownViewerCooldownInfo then
+                        local oki, info = pcall(
+                            C_CooldownViewer.GetCooldownViewerCooldownInfo, mf.cooldownID)
+                        if oki and type(info) == "table" then
+                            for k, v in pairs(info) do
+                                local t = type(v)
+                                if t == "number" or t == "table" then
+                                    local mark = IsSecret(v) and "!" or ""
+                                    carriers[#carriers + 1] =
+                                        ("info.%s=%s%s"):format(tostring(k), t, mark)
+                                end
+                            end
+                        end
+                    end
                     if cdChild then
                         for _, m in ipairs({ "GetCooldownDuration", "GetCooldownTimes",
                                              "GetCooldownDisplayDuration" }) do
