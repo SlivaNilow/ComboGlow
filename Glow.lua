@@ -418,7 +418,9 @@ function ns.SetupTimer(self, w, h)
         end
         local font = self.StackText:GetFont()
         if font then
-            self.StackText:SetFont(font, math.max(8, math.floor(h * 0.34 * scale)), "OUTLINE")
+            -- Bigger than the countdown on purpose: it is a corner glyph read
+            -- out of the corner of the eye, not something you look straight at.
+            self.StackText:SetFont(font, math.max(10, math.floor(h * 0.46 * scale)), "OUTLINE")
         end
         self.StackText:SetTextColor(1, 0.9, 0.4)
     end
