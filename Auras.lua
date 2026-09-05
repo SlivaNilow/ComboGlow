@@ -1441,8 +1441,25 @@ function ns.FormatterTest(mf, say, seconds, live)
     -- Arm first, format second. Cooldown-text addons hook SetCooldown, so a
     -- formatter set before it is replaced by theirs a moment later; set after,
     -- ours is the one that stands.
-    fmtTest.cd:SetCooldown(args.a, args.b)
+    local armed, armErr = pcall(fmtTest.cd.SetCooldown, fmtTest.cd, args.a, args.b)
     fmtTest.cd:SetCountdownFormatter(formatter)
+
+    -- Did the widget actually take them? Reading its own times back answers
+    -- that without reading the values: secret/secret means armed, 0/0 means
+    -- the call was refused and quietly did nothing -- and a refused arming
+    -- looks exactly like a working one from outside.
+    local backS, backD = "-", "-"
+    if fmtTest.cd.GetCooldownTimes then
+        local okb, x, y = pcall(fmtTest.cd.GetCooldownTimes, fmtTest.cd)
+        if okb then
+            backS = IsSecret(x) and "secret" or tostring(x)
+            backD = IsSecret(y) and "secret" or tostring(y)
+        end
+    end
+    say(ns.L("armed=%s%s | our widget reads back %s/%s",
+             "вооружение=%s%s | наш виджет отдаёт %s/%s"),
+        tostring(armed), armed and "" or (" " .. tostring(armErr):sub(1, 80)),
+        backS, backD)
 
     -- Blizzard's countdown text is off unless this is on, and a box that
     -- renders nothing because the feature is switched off looks exactly like
