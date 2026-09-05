@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.3.0
+
+**The countdown warns you itself.** Set a number of seconds on an aura's **up**
+tab and its countdown turns the warning colour and switches to tenths for that
+last stretch — on the action bar and on the reminder strip, during combat, and
+correctly through anything that extends the aura.
+
+That last part is the whole story. In 12.1 nothing will tell an addon how long
+is left on a debuff during a fight: `GetAuraDuration` returns nothing, the
+Cooldown Manager entry's own getters answer with a secret number, its countdown
+text is secret, and the numbers it was armed with cannot be stored, forwarded,
+or rebuilt into anything that runs. Every one of those was tried and each is
+written down, so the next attempt starts after them rather than through them.
+
+What works is not reading the time at all. The engine is handed a rule — a
+numeric rule formatter with a threshold — and it compares that against its own
+secret remaining time and draws the answer. The colour lives inside the format
+string; the number never comes out. It is the same mechanism tullaCTC uses to
+colour cooldown text, applied to the Cooldown Manager's entries, whose text
+this addon already mirrors onto the marker.
+
+An estimate was tried first and removed. A clock started by your own cast is
+wrong in a different direction depending on what just happened: too early after
+an extension, too late after a refresh, silent once it runs past zero. A
+smaller promise kept beats a larger one that fails quietly at the moment it
+matters. `/cgl entryfmt off` if it fights with another cooldown-text addon.
+
+**A duration object is userdata, not a table.** Every check in the addon said
+"table", so every real one was thrown away at the door, including those the API
+had been handing back all along. Out of combat nothing noticed — a plain
+remaining time answered instead — but in combat there is no plain anything, so
+the whole mirrored path went dark and read as a missing API. Sweeps and warning
+colours on mirrored dots should behave rather better now.
+
+
 ## 1.2.1
 
 **Changing specialization stopped the markers.** The Cooldown Manager rebuilds
