@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.2.1
+
+**Changing specialization stopped the markers.** The Cooldown Manager rebuilds
+its viewers for the new spec, so every mirror the addon held pointed at the old
+item frames — and the map is only re-read when the addon rebuilds, which
+happened first, before the new viewers existed. A second `/reload` fixed it
+because by then they did. The viewer's own `Layout` fires at exactly that
+moment, so it now marks the addon dirty as well, with two delayed passes
+backing it up: a viewer can lay itself out before its entries have any data.
+
+**Hiding the Cooldown Manager no longer blinks.** It was hidden by alpha, and
+Blizzard fades the viewer in when its contents change — a fade drives alpha, so
+whatever was set got overwritten a moment later. That is the blink every few
+seconds; reapplying sooner only made the fight faster. It is hidden by scale
+now, which is not animated: half a pixel across, still laid out, still ticking,
+still readable. `Hide()` is what the addons dedicated to this use and is not
+open to us — a hidden frame stops updating, and the aura states read the
+countdown text off these very frames.
+
+The scale the viewer had before is remembered and restored, and it is never
+hidden while Edit Mode is open, which is where it gets configured.
+
 ## 1.2.0
 
 **The reminder strip closes its gaps.** It reserved a slot for every state
