@@ -1366,6 +1366,71 @@ function ns.SoonTest(rules, say)
     end
 end
 
+--[[-------------------------------------------------------------------------
+    The one door that is still open
+
+    Nothing will TELL us how long is left on a debuff in combat. But the engine
+    will DRAW an answer: a numeric rule formatter is a set of breakpoints, and
+    the engine picks between them by evaluating the secret remaining time
+    itself. tullaCTC colours its countdowns this way and never learns a number
+    either -- the colour lives inside the format string.
+
+    A format string is just text, so it can hold anything a font string can
+    render, an inline texture among them. Which turns "colour the digits" into
+    "draw this icon, but only under N seconds" -- an answer we can put on
+    screen without ever being allowed to see it.
+
+    This is the test rig, not the feature. It proves the mechanism or kills it.
+---------------------------------------------------------------------------]]
+local fmtTest
+
+function ns.FormatterTest(mf, say, seconds)
+    if not (C_StringUtil and C_StringUtil.CreateNumericRuleFormatter) then
+        say("no CreateNumericRuleFormatter on this client")
+        return
+    end
+    local args = mf and ns.CaughtArgs(mf)
+    if not args or args.m ~= "SetCooldown" then
+        say(ns.L("no captured SetCooldown for that entry - hit something first",
+                 "по этой записи не пойман SetCooldown — ударь по цели"))
+        return
+    end
+
+    if not fmtTest then
+        fmtTest = CreateFrame("Frame", nil, UIParent)
+        fmtTest:SetSize(96, 96)
+        fmtTest:SetPoint("CENTER", 0, 220)
+        fmtTest.bg = fmtTest:CreateTexture(nil, "BACKGROUND")
+        fmtTest.bg:SetAllPoints()
+        fmtTest.bg:SetColorTexture(0, 0, 0, 0.35)
+        fmtTest.cd = CreateFrame("Cooldown", nil, fmtTest, "CooldownFrameTemplate")
+        fmtTest.cd:SetAllPoints()
+        fmtTest.cd:SetDrawSwipe(false)
+        fmtTest.cd:SetDrawEdge(false)
+        fmtTest.cd:SetDrawBling(false)
+        fmtTest.cd:SetHideCountdownNumbers(false)
+    end
+    fmtTest:Show()
+
+    local n = seconds or 5
+    local formatter = C_StringUtil.CreateNumericRuleFormatter()
+    local rounding = Enum.NumericRuleFormatRounding
+        and Enum.NumericRuleFormatRounding.Nearest or nil
+    -- Below the threshold: a marker. Above it: nothing at all. The engine
+    -- decides which, by looking at a number we may not.
+    formatter:SetBreakpoints({
+        { threshold = 0, format = "|cffff2020UNDER|r", step = 1, rounding = rounding },
+        { threshold = n, format = "", step = 1, rounding = rounding },
+    })
+    fmtTest.cd:SetCountdownFormatter(formatter)
+    fmtTest.cd:SetCooldown(args.a, args.b)
+
+    say(ns.L("armed the test box at the top of the screen: it must read UNDER "
+             .. "only in the last %d seconds of the aura",
+             "тестовая рамка вверху экрана: она должна показать UNDER только "
+             .. "в последние %d с ауры"), n)
+end
+
 -- Deliberately terse. This is the one report that has to be read off the
 -- screen mid-fight, so it prints a line per aura rule and nothing else.
 function ns.SoonProbe(rules, say)

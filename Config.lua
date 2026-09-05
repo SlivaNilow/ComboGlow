@@ -1255,6 +1255,19 @@ local function Handler(msg)
     elseif cmd == "auracheck" then
         ns.AuraCheck(CG:GetRules(), Say)
 
+    elseif cmd == "fmttest" then
+        -- Proves or kills the formatter route: the engine draws an answer
+        -- about a value we are not allowed to read.
+        ns.RebuildCDMMap()
+        local target
+        for _, r in ipairs(CG:GetRules()) do
+            if r.kind == "aura" and not r.proc then
+                local mf, isAura = ns.FindMirror(r)
+                if mf and isAura and ns.CaughtArgs(mf) then target = mf break end
+            end
+        end
+        ns.FormatterTest(target, Say, tonumber(rest))
+
     elseif cmd == "soontest" then
         -- Run OUT OF COMBAT: it checks the duration object against a
         -- remaining time that can still be read.
