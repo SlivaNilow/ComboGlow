@@ -788,25 +788,67 @@ local function UsableDuration(d)
     return HasMethod(d, "EvaluateRemainingDuration")
 end
 
+-- Which argument order CreateDuration wants, settled by asking it about a
+-- duration whose answer we already know.
+--
+-- Both plausible orders hand back a perfectly valid object, so trying them in
+-- turn and taking the first that works picks a coin toss and then trusts it.
+-- The test is asymmetric instead: ten seconds long with eight already gone,
+-- and a curve asked whether under five remain. Built from PLAIN numbers, so
+-- for once the answer comes back plain and can simply be read.
+--
+-- false means no order passed, and then no object is built at all. A duration
+-- that lies is worse than none: it lights everything, always, confidently.
+local durationShape
+
+local function CalibrateDuration()
+    if durationShape ~= nil then return durationShape end
+    local CDU = C_DurationUtil
+    if not (CDU and CDU.CreateDuration and C_CurveUtil
+            and C_CurveUtil.CreateColorCurve and CreateColor) then
+        durationShape = false
+        return false
+    end
+
+    local curve = C_CurveUtil.CreateColorCurve()
+    if curve.SetType and Enum and Enum.LuaCurveType then
+        curve:SetType(Enum.LuaCurveType.Step)
+    end
+    curve:AddPoint(0, CreateColor(1, 1, 1, 1))
+    curve:AddPoint(5, CreateColor(1, 1, 1, 0))
+
+    local now = GetTime()
+    for _, sh in ipairs({ { "start,dur", now - 8, 10 },
+                          { "dur,start", 10, now - 8 } }) do
+        local ok, d = pcall(CDU.CreateDuration, sh[2], sh[3])
+        if ok and UsableDuration(d) then
+            local ok2, col = pcall(d.EvaluateRemainingDuration, d, curve)
+            if ok2 and HasMethod(col, "GetRGBA") then
+                local ok3, _, _, _, a = pcall(col.GetRGBA, col)
+                if ok3 and type(a) == "number" and not IsSecret(a) and a > 0.5 then
+                    durationShape = sh[1]
+                    return durationShape
+                end
+            end
+        end
+    end
+    durationShape = false
+    return false
+end
+ns.CalibrateDuration = CalibrateDuration
+
 local function MakeDuration(cd, args)
     local cached = madeDuration[cd]
     if cached and cached.args == args then return cached.obj, cached.form end
-    local CDU = C_DurationUtil
-    if not (CDU and CDU.CreateDuration) then return nil, "no factory" end
+    local shape = CalibrateDuration()
+    if not shape then return nil, "uncalibrated" end
 
-    local obj, form
-    local shapes = { { "start,dur", args.a, args.b },
-                     { "dur", args.b },
-                     { "start", args.a } }
-    for _, shape in ipairs(shapes) do
-        local ok, d = pcall(CDU.CreateDuration, shape[2], shape[3])
-        if ok and UsableDuration(d) then
-            obj, form = d, shape[1]
-            break
-        end
-    end
-    madeDuration[cd] = { args = args, obj = obj, form = form or "none worked" }
-    return obj, form or "none worked"
+    local x, y = args.a, args.b
+    if shape == "dur,start" then x, y = args.b, args.a end
+    local ok, d = pcall(C_DurationUtil.CreateDuration, x, y)
+    local obj = (ok and UsableDuration(d)) and d or nil
+    madeDuration[cd] = { args = args, obj = obj, form = obj and shape or "build failed" }
+    return obj, obj and shape or "build failed"
 end
 
 -- A duration object built from what this entry was armed with, or nil.
@@ -1053,6 +1095,7 @@ function ns.DurationFactory(say, mf)
         return ("%s -> table, no Evaluate"):format(label)
     end
 
+    say("calibrated shape: |cffffd100%s|r", tostring(ns.CalibrateDuration()))
     say("|cffffd100plain control:|r")
     say("  " .. attempt("(now,10)", now, 10))
     say("  " .. attempt("(10,now)", 10, now))
