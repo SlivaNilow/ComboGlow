@@ -868,6 +868,31 @@ end
 
 -- For the report: every shape and how it answered, so a failure says which
 -- half it failed rather than just "no".
+-- What the curve's x axis is measured in.
+--
+-- Every shape failing BOTH halves the same way says the argument order is not
+-- the problem: the object is fine and we are asking the question in the wrong
+-- units. A curve whose points sit at 0 and 5 means "five" of something, and
+-- seconds is only the most obvious guess -- a fraction of the total and
+-- milliseconds are just as plausible, and all three look identical until a
+-- case is built that can only pass under one of them.
+--
+-- 2 seconds left of 100 must read as under the threshold, 60 must not. Only
+-- the right unit separates those.
+function ns.CurveAxisReport(say)
+    local shape = DURATION_SHAPES[1]
+    for _, t in ipairs({ { 5, "seconds" }, { 0.05, "fraction of total" },
+                         { 0.5, "fraction, half" }, { 5000, "milliseconds" } }) do
+        local nearly = ShapeSaysUnder(shape, 2, 100, t[1])
+        local plenty = ShapeSaysUnder(shape, 60, 100, t[1])
+        say("  %-9s (%s): 2s -> %s | 60s -> %s   %s",
+            tostring(t[1]), t[2],
+            nearly == nil and "?" or (nearly and "UNDER" or "over"),
+            plenty == nil and "?" or (plenty and "UNDER" or "over"),
+            (nearly == true and plenty == false) and "|cff40ff40PASS|r" or "no")
+    end
+end
+
 function ns.DurationShapeReport(say)
     for _, shape in ipairs(DURATION_SHAPES) do
         local nearly = ShapeSaysUnder(shape, 2, 100, 5)
@@ -1146,6 +1171,8 @@ function ns.DurationFactory(say, mf)
     end
 
     say("calibrated shape: |cffffd100%s|r", tostring(ns.CalibrateDuration()))
+    say("|cffffd100curve axis (what does 5 on the curve mean?):|r")
+    ns.CurveAxisReport(say)
     say("|cffffd100shape test (both halves must pass):|r")
     ns.DurationShapeReport(say)
     say("|cffffd100plain control:|r")
