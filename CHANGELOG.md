@@ -10,33 +10,29 @@ bar ask for different decisions. Each spell now has four states:
 - **up** — your aura is on the unit
 - **gone** — the aura is missing
 - **ready** — the resource threshold is met, or a burst came off cooldown
-- **proc** — the spell lit up on its own; this cast is free
+- **proc** — this cast currently costs nothing
 
 Gold means you saved up for it, cyan means it is free. A lit proc outranks the
 resource: while the free cast is up, the gold marker stands down, so the button
 never shows two marks saying "press me".
 
-**Procs are found from the buff, not the alert API.** Only some procs light
-Blizzard's spell alert; plenty are a plain buff and light nothing — Starweaver's
-Warp says "your next Starfall costs no Astral Power" and never touches the
-overlay API, so the proc state stayed dark.
+**A proc is detected from the cost, not from a buff.** GetSpellPowerCost
+reports what a cast costs RIGHT NOW, with every modifier applied, so a proc
+that removes the cost shows up as a zero. Nothing to identify, nothing to
+parse, nothing to keep up with patches -- and right for every class at once.
+The baseline is learned by watching: the highest cost ever seen, so a talent
+that changes it is absorbed and a spell that simply never costs anything cannot
+read as permanently free.
 
-Which buff belongs to which spell is not something to hardcode: it differs per
-class, per talent build, and moves with patches. The game already says it, in
-the buff's own description, and Blizzard regenerates that description every
-patch — so the buffs the Cooldown Manager tracks are searched for ones that name
-the spell. **All** matches count, not one: Starweaver's Warp frees the next
-Starfall, Starweaver's Haze frees the next Starsurge, and Touch the Cosmos frees
-whichever of the two you press, so one spell can have several buffs behind it
-and each state watches the lot.
+Reading the buff description was tried first and abandoned. It says which
+spells a buff is ABOUT, not which it makes free: Starsurge came back with five
+buffs "naming" it, Starlord and Starweaver among them, because Starsurge
+TRIGGERS those. A mention is not a promise.
 
-Rescanning tops existing states up rather than only filling empty ones, so a
-talent that adds a proc is picked up, and a buff that no longer exists is
-dropped instead of leaving the state quietly dark. The **free while:** row lists
-every tracked player buff with checkboxes, marks the ones whose description
-names the selected spell, and warns when none of the chosen ones do — two buffs
-a word apart can free two different spells. A proc pointed at a buff also gets a
-real countdown on the icon.
+Buffs remain the fallback where cost cannot answer -- a proc that makes a spell
+instant rather than free, say. The **free while:** row lists every player buff
+the Cooldown Manager tracks, with the game's own tooltip on hover, and a proc
+pointed at one takes its countdown from it.
 
 Run `/cg preset` again to pick up proc states for your spenders, or click the
 fourth pip on any spell in the options window.
@@ -57,6 +53,12 @@ change that caused it.
 **Two markers on one state.** Shift-click (or right-click) a marker in the
 gallery to layer a second one on top of the first — a pixel outline plus a proc
 glow reads as one distinct mark. Click it again to remove it.
+
+**Two diagnostics**, because guessing whose glow is whose from a screenshot is
+not a debugging method. `/cg why` lists every marker of ours that is lit right
+now with its rule, state, style and colour — a glowing button missing from that
+list is somebody else's glow. `/cg procs` shows what each proc state is keyed
+to and what the cost API answers for it this instant.
 
 **The resource threshold is set with buttons again.** The slider made it fiddly
 to land on an exact number; it is `-` and `+` now, one per click and ten with
