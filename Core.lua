@@ -258,7 +258,7 @@ local CDM_ALL_VIEWERS = {
     Re-applied on every map rebuild: Blizzard's own code sets these back when
     the viewers are rebuilt, on a spec change among other things.
 ---------------------------------------------------------------------------]]
-local cdmHooked, cdmPending = {}, false
+local cdmHooked, cdmPending, cdmDirtyAt = {}, false, 0
 
 local function ScheduleCDMVisibility()
     -- Next frame, not now: Blizzard's Layout is still running and would put
@@ -269,19 +269,25 @@ local function ScheduleCDMVisibility()
     C_Timer.After(0, function()
         cdmPending = false
         ns.ApplyCDMVisibility()
-        -- A viewer laying itself out again means its item frames were
-        -- rebuilt, and every mirror we hold points at the old ones. That is
-        -- what a specialization change does, and why the markers only came
-        -- back after a SECOND reload: the first one read the map before the
-        -- viewers existed, and nothing asked it to look again.
-        if CG.initialized then CG:MarkDirty() end
+
+        -- A viewer laying itself out again means its item frames were rebuilt,
+        -- and every mirror we hold points at the old ones. That is what a
+        -- specialization change does, and why the markers only came back after
+        -- a SECOND reload: the first read the map before the viewers existed.
+        --
+        -- Throttled, because Layout also fires as entries come and go, and a
+        -- rebuild walks every action slot on the bars.
+        local now = GetTime()
+        if CG.initialized and now - cdmDirtyAt > 2 then
+            cdmDirtyAt = now
+            CG:MarkDirty()
+        end
     end)
 end
 
 function ns.ApplyCDMVisibility()
     -- Never hidden while Edit Mode is open: that is where the Cooldown Manager
-    -- is configured, and an invisible frame cannot be configured. Forgetting
-    -- this would have made the addon's own "open the settings" button useless.
+    -- is configured, and an invisible frame cannot be configured.
     local em = _G.EditModeManagerFrame
     local editing = em and em.IsEditModeActive and em:IsEditModeActive()
     local hide = CG.db and CG.db.hideCDM and not editing
@@ -293,14 +299,22 @@ function ns.ApplyCDMVisibility()
 
             if not cdmHooked[f] then
                 cdmHooked[f] = true
-                -- Layout is what Blizzard calls when it rebuilds a viewer, and
-                -- it is the moment the alpha came back. A one-second sweep
-                -- caught it eventually; this catches it immediately.
                 if f.Layout then
                     pcall(hooksecurefunc, f, "Layout", ScheduleCDMVisibility)
                 end
+                -- OnShow applies at once, not next frame. Blizzard restores
+                -- the alpha as it shows the viewer, so a deferred reapply left
+                -- exactly one frame of it visible -- which, with "hide when
+                -- inactive" on, is every time an entry comes back and reads as
+                -- the thing flickering on and off.
                 if f.HookScript then
-                    pcall(f.HookScript, f, "OnShow", ScheduleCDMVisibility)
+                    pcall(f.HookScript, f, "OnShow", function(self)
+                        local e = _G.EditModeManagerFrame
+                        local ed = e and e.IsEditModeActive and e:IsEditModeActive()
+                        if CG.db and CG.db.hideCDM and not ed then
+                            pcall(self.SetAlpha, self, 0)
+                        end
+                    end)
                 end
             end
         end
