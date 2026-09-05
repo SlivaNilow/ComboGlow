@@ -690,6 +690,14 @@ local durationHooked
 -- it is here because "no object was caught" has two readings -- nobody passed
 -- one, or we were not listening -- and they need opposite fixes.
 local armedBy = setmetatable({}, { __mode = "k" })
+local caughtArgs = setmetatable({}, { __mode = "k" })
+
+-- The arguments the game armed this widget with, to be passed straight on to
+-- one of ours. Never read, only forwarded.
+function ns.CaughtArgs(itemFrame)
+    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
+    return cd and caughtArgs[cd] or nil
+end
 
 local STALE_ON = { "SetCooldown", "SetCooldownDuration",
                    "SetCooldownFromExpirationTime", "SetCooldownUNIX", "Clear" }
@@ -712,10 +720,18 @@ local function HookCooldownDurations()
     end)
     for _, m in ipairs(STALE_ON) do
         if proto[m] then
-            hooksecurefunc(proto, m, function(cd, a)
+            hooksecurefunc(proto, m, function(cd, a, b)
                 caughtDuration[cd] = nil
                 armedBy[cd] = m .. "(" .. type(a)
                     .. (IsSecret(a) and "!" or "") .. ")"
+                -- Kept, never inspected. A secret can still be handed to
+                -- another setter, which is enough to arm a widget of ours
+                -- with exactly what the game armed this one with.
+                if m == "Clear" then
+                    caughtArgs[cd] = nil
+                else
+                    caughtArgs[cd] = { m = m, a = a, b = b }
+                end
             end)
         end
     end
@@ -892,6 +908,39 @@ function ns.SoonReport(mf, rule)
         left and ("%.1fs"):format(left) or "|cffff4040none|r",
         why or "?", rawS, rawD, textWhat,
         #carriers > 0 and (" | carriers: " .. table.concat(carriers, ", ")) or "")
+end
+
+-- Every method a Cooldown widget has, sorted, with the ones that mention time
+-- called out first. The engine answers questions about secret values through
+-- methods like these -- SetAlphaFromBoolean, SetCountdownFormatter -- so if
+-- there is a way to ask "is this nearly over" without ever reading a number,
+-- its name is somewhere in this list.
+function ns.CooldownAPI(say)
+    local mt = ActionButton1Cooldown and getmetatable(ActionButton1Cooldown)
+    local proto = mt and mt.__index
+    if type(proto) ~= "table" then
+        say("no Cooldown metatable")
+        return
+    end
+    local hot, rest = {}, {}
+    for k, v in pairs(proto) do
+        if type(v) == "function" and type(k) == "string" then
+            local t = k:find("Duration") or k:find("Remain") or k:find("Expir")
+                or k:find("Countdown") or k:find("Boolean") or k:find("Curve")
+                or k:find("Formatter") or k:find("Time")
+            if t then hot[#hot + 1] = k else rest[#rest + 1] = k end
+        end
+    end
+    table.sort(hot)
+    table.sort(rest)
+    say("|cff40ff40Cooldown, time-related (%d):|r %s", #hot, table.concat(hot, ", "))
+    say("Cooldown, the rest (%d): %s", #rest, table.concat(rest, ", "))
+
+    -- And the two helpers tullaCTC leans on, which are the shape of answer we
+    -- are looking for: a rule the engine evaluates against a secret value.
+    say("C_StringUtil.CreateNumericRuleFormatter: %s",
+        tostring(C_StringUtil and C_StringUtil.CreateNumericRuleFormatter ~= nil))
+    say("canaccessvalue: %s", tostring(_G.canaccessvalue ~= nil))
 end
 
 -- Deliberately terse. This is the one report that has to be read off the

@@ -1255,6 +1255,11 @@ local function Handler(msg)
     elseif cmd == "auracheck" then
         ns.AuraCheck(CG:GetRules(), Say)
 
+    elseif cmd == "cdapi" then
+        -- The whole Cooldown widget API. If an engine-side answer about a
+        -- secret remaining time exists, its name is in this list.
+        ns.CooldownAPI(Say)
+
     elseif cmd == "probe" then
         -- The early-gone question, and only that. It has to be asked IN
         -- COMBAT, where the full report scrolls off before it can be read.
