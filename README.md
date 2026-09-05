@@ -1,8 +1,9 @@
 # ComboGlow
 
-Marks action bar buttons by class-resource count, proc, and your own aura —
+Marks action bar buttons by class-resource count, proc, and aura state —
 for World of Warcraft 12.1 (Midnight), where the aura APIs are largely closed
-to addons.
+to addons. The aura states are read through Blizzard's own Cooldown Manager,
+so they only cover spells it is set to track.
 
 **[English](#english) · [Русский](#русский) · [简体中文](#简体中文)**
 
@@ -18,6 +19,16 @@ Highlights an action bar button on four states per spell:
 | **gone** | the aura is missing | red colour wash |
 | **ready** | the resource threshold is met, or a burst came off cooldown | gold glow |
 | **proc** | the cast currently costs nothing | cyan wash |
+
+> **Aura states need Blizzard's Cooldown Manager.** In 12.1 an aura on your
+> target cannot be read by an addon at all, and your own buffs only sometimes.
+> **up** and **gone** therefore work through the Cooldown Manager, which knows
+> the state engine-side -- so a spell it does not track is a spell nothing here
+> can see. Its tracked list is configured per **specialization**, so the same
+> character can work as one spec and be blind as another. `/cg auracheck` names
+> the rules that have no fallback.
+>
+> The resource, proc and burst states do not depend on it.
 
 Works for combo points, holy power, chi, soul shards, arcane charges, essence,
 astral power, insanity, maelstrom, runes -- every class. The resource is
@@ -264,6 +275,17 @@ in any amount you like:
 | **готово** | набран ресурс или бурст вышел из кулдауна | золотое свечение |
 | **прок** | каст прямо сейчас ничего не стоит | голубая заливка |
 
+> **Состояния по аурам требуют штатного Cooldown Manager.** В 12.1 ауру на цели
+> аддон прочитать не может вообще, а свои баффы — только иногда. Поэтому
+> **висит** и **нет** работают через Cooldown Manager, который знает состояние
+> на стороне движка: заклинание, которого в нём нет, здесь не увидит никто.
+> Его список отслеживаемого настраивается **отдельно для каждой
+> специализации** — поэтому один и тот же персонаж может работать в одной
+> специализации и быть слепым в другой. `/cg auracheck` называет правила, у
+> которых запасного пути нет.
+>
+> Состояния по ресурсу, проку и бурстам от него не зависят.
+
 Работает с комбо-очками, святой силой, ци, осколками души, чародейскими
 зарядами, сущностью, силой звёзд, безумием, маэльстромом, рунами — со всеми
 классами. Ресурс определяется по самому персонажу, а не по таблице спеков,
@@ -508,6 +530,14 @@ MIT, см. [LICENSE](LICENSE).
 | **已消失** | 光环不在了 | 红色色块覆盖 |
 | **就绪** | 资源达到阈值，或爆发技冷却结束 | 金色光效 |
 | **触发** | 这一次施放当前不消耗资源 | 青色色块 |
+
+> **光环相关状态依赖暴雪自带的冷却管理器。** 在 12.1 中，插件完全读不到目标身上
+> 的光环，自己身上的增益也只是有时能读到。因此**生效中**和**已消失**通过冷却
+> 管理器工作 —— 它在引擎侧知道状态，所以它没有追踪的法术，这里也看不见。
+> 它的追踪列表是**按专精**分别设置的，同一个角色可能在一个专精可用、在另一个
+> 专精完全失明。`/cg auracheck` 会列出没有后备路径的规则。
+>
+> 资源、触发和爆发技状态不依赖它。
 
 适用于连击点、神圣能量、真气、灵魂碎片、奥术充能、精华等等。
 
