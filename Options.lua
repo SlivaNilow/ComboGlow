@@ -290,8 +290,10 @@ local function RefreshDetails()
         UI.soonRow:Show()
         local n = tonumber(soonRule.soon) or 0
         UI.soonRow.label:SetText(n > 0
-            and L("count as gone %ds early", "считать, что нет, за %d с до конца"):format(n)
-            or L("count as gone only when it is", "считать, что нет, только когда нет"))
+            and L("strip shows \"gone\" %ds early",
+                  "над ресурсом «нет» за %d с"):format(n)
+            or L("strip shows \"gone\" on time",
+                 "над ресурсом «нет» вовремя"))
     else
         UI.soonRow:Hide()
     end

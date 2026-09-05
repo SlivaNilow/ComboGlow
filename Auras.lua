@@ -1737,8 +1737,13 @@ local function ApplyMirror(frame, rule, itemFrame)
     -- the target, the widget's plain numbers are compared here. With neither,
     -- the presence gate below still lights the marker once the aura actually
     -- goes: the old behaviour, and a fine thing to land on.
-    local soon = ns.SoonSeconds(rule)
-    if ns.ApplySoon(frame, rule, durObj) then
+    -- Only above the resource. On the button the countdown is the point --
+    -- you look there to see exactly how long is left -- and a marker that
+    -- flips to "gone" while the number is still ticking takes that away to
+    -- say something the strip is already saying. The strip is the reminder;
+    -- the button is the instrument.
+    local soon = frame.isStrip and ns.SoonSeconds(rule) or nil
+    if soon and ns.ApplySoon(frame, rule, durObj) then
         frame._mirroring = true
         if not frame:IsShown() then frame:Show() end
         frame.needSafeStyle = false
@@ -1990,7 +1995,7 @@ function ns.ApplyAuraRule(frame, rule)
     -- plain number the comparison happens here rather than in a curve, and the
     -- "up" state has to stand down in the same window the "gone" state lights
     -- in -- otherwise both are on at once, saying opposite things.
-    if present and not rule.missing then
+    if present and not rule.missing and frame.isStrip then
         local soon = ns.SoonSeconds(rule)
         if soon and found == true and type(remaining) == "number"
            and not IsSecret(remaining) and remaining <= soon then
@@ -2044,7 +2049,7 @@ function ns.ApplyAuraRule(frame, rule)
         glow = (found == false) and not optActive and readsWork[rule] == true
         -- Counted gone early: still up, but not for long. Only where the time
         -- can actually be read; where it cannot, the curve above did it.
-        local soon = ns.SoonSeconds(rule)
+        local soon = frame.isStrip and ns.SoonSeconds(rule) or nil
         if not glow and soon and found == true
            and type(remaining) == "number" and not IsSecret(remaining)
            and remaining <= soon then
