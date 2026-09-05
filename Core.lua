@@ -1227,13 +1227,20 @@ function CG:PackStrip()
     -- off nothing is ever hidden, nothing is inferred, and the layout falls
     -- back to reserving a slot. Conservative in the only direction that
     -- matters -- it never packs away an icon that might be lit.
-    local trustShown = false
-    for _, f in pairs(ns.cdmAuraFrames or {}) do
-        if f.IsShown and not f:IsShown() then
-            trustShown = true
-            break
+    -- Remembered once seen, not re-derived every pass. The setting cannot
+    -- change mid-session, but the EVIDENCE for it comes and goes: the moment
+    -- every tracked aura happens to be active, nothing is hidden, the flag
+    -- flips back to false and the gaps reappear -- during a fight, which is
+    -- when the row is being looked at. Seeing it once is enough.
+    if not self._trustShown then
+        for _, f in pairs(ns.cdmAuraFrames or {}) do
+            if f.IsShown and not f:IsShown() then
+                self._trustShown = true
+                break
+            end
         end
     end
+    local trustShown = self._trustShown or false
 
     -- Two passes, and the order matters. What we can read packs first;
     -- anything still unknowable goes last, so a gap that cannot be closed
