@@ -1259,6 +1259,38 @@ local function Handler(msg)
             end
         end
 
+    elseif cmd == "cdmdump" then
+        -- Every category the Cooldown Manager knows and what is in it. We read
+        -- four viewer frames; if a spell is tracked in a category none of them
+        -- shows, that is a gap on our side rather than a missing setting -- and
+        -- this is the only way to tell the two apart.
+        if type(C_CooldownViewer) ~= "table"
+           or not C_CooldownViewer.GetCooldownViewerCategorySet then
+            Say(L("no category API on this client", "API категорий на этом клиенте нет"))
+        else
+            local cats = Enum and Enum.CooldownViewerCategory
+            if type(cats) ~= "table" then
+                Say(L("Enum.CooldownViewerCategory is missing",
+                      "Enum.CooldownViewerCategory отсутствует"))
+            else
+                for name, value in pairs(cats) do
+                    local ok, set = pcall(C_CooldownViewer.GetCooldownViewerCategorySet, value)
+                    local n = (ok and type(set) == "table") and #set or -1
+                    Say("%s (%s): %s", tostring(name), tostring(value),
+                        n < 0 and L("error", "ошибка") or tostring(n))
+                    if ok and type(set) == "table" then
+                        for _, cdID in ipairs(set) do
+                            local ok2, info =
+                                pcall(C_CooldownViewer.GetCooldownViewerCooldownInfo, cdID)
+                            if ok2 and type(info) == "table" and info.spellID then
+                                Say("    %s", ns.SpellName(info.spellID))
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
     elseif cmd == "cdmapi" then
         -- Everything the client exposes on C_CooldownViewer, so "can the addon
         -- add spells to the Cooldown Manager itself" is answered by looking
