@@ -33,6 +33,10 @@ Rip's own icon already reports, and choosing to use it is a decision, not a
 reminder. `/cg move` to drag the strip elsewhere, `/cg centeroff` to turn it
 off, `/cg center <#>` to force something in.
 
+Bursts coming off cooldown and procs go there too -- both are things that
+happen to you rather than because you pressed something, which is what the
+strip is for. `/cg procstrip off` drops the procs.
+
 > **Only one spec is actually verified.** Everything here was built and used on
 > a **Feral druid** with the EllesmereUI suite, ruRU client, 12.1. Holy paladin
 > is partly checked. Other specs and other action bar addons (Blizzard's own,
@@ -274,6 +278,10 @@ in any amount you like:
 `/cg move` — перетащить, `/cg centeroff` — выключить, `/cg center <№>` —
 затащить что-то принудительно.
 
+Туда же попадают бурсты, вышедшие из кулдауна, и проки: и то и другое
+случается само, а не потому что ты что-то нажал, — для этого полоса и нужна.
+`/cg procstrip off` убирает проки.
+
 > **По-настоящему проверена одна специализация.** Всё писалось и обкатывалось
 > на **друиде-феральном** с сюитой EllesmereUI, клиент ruRU, 12.1. Пал-хил
 > проверен частично. Остальные спеки и другие аддоны панелей (стандартные
@@ -507,6 +515,9 @@ MIT, см. [LICENSE](LICENSE).
 被重定向到别的法术光环的状态不会进入提醒条 —— 「原始狂怪」的「割裂不在」和
 割裂自己的图标说的是同一件事，而是否使用范围终结技是玩家的判断，不是提醒。
 `/cg move` 拖动位置，`/cg centeroff` 关闭。
+
+爆发技冷却结束和触发也会出现在这里：两者都是自己发生的，而不是你按了什么，
+这正是提醒条的用途。`/cg procstrip off` 可以去掉触发。
 
 > **只有一个专精真正验证过。** 全部内容是在 **野性德鲁伊** 上写成和使用的，
 > 配合 EllesmereUI 套件，ruRU 客户端，12.1。神圣圣骑士只部分验证。其他专精和

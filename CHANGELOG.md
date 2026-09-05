@@ -54,6 +54,11 @@ change that caused it.
 gallery to layer a second one on top of the first — a pixel outline plus a proc
 glow reads as one distinct mark. Click it again to remove it.
 
+**Procs join the reminder strip**, alongside missing dots and bursts coming off
+cooldown. All three are things that happen to you rather than because you
+pressed something, which is what the strip is for. `/cg procstrip off` drops
+just the procs.
+
 **Two diagnostics**, because guessing whose glow is whose from a screenshot is
 not a debugging method. `/cg why` lists every marker of ours that is lit right
 now with its rule, state, style and colour — a glowing button missing from that
