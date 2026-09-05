@@ -362,7 +362,10 @@ ns.RefreshOptions = Refresh
 ---------------------------------------------------------------------------]]
 local function Build()
     UI = Panel(UIParent, 0.05, 0.05, 0.06, 0.96)
-    UI:SetSize(680, 444)
+    -- Taller than it started: the state panel grew a "watching" row, a warning
+    -- line and an expiry threshold above the gallery, and they were landing on
+    -- the tiles.
+    UI:SetSize(680, 500)
     UI:SetPoint("CENTER")
     UI:SetMovable(true)
     UI:EnableMouse(true)
@@ -801,7 +804,7 @@ local function Build()
 
         local tile = CreateFrame("Button", nil, UI)
         tile:SetSize(TILE + 26, TILE + 26)
-        tile:SetPoint("TOPLEFT", 264 + col * TILE_PAD_X, -130 - rowN * TILE_PAD_Y)
+        tile:SetPoint("TOPLEFT", 264 + col * TILE_PAD_X, -176 - rowN * TILE_PAD_Y)
         tile.styleKey = style.key
         tile.defAlpha = style.defAlpha
 
@@ -929,7 +932,7 @@ local function Build()
         local t = CreateFrame("Button", nil, UI)
         t:SetSize(170, 18)
         t:SetPoint("TOPLEFT", 264 + ((i - 1) % 2) * 190,
-                   -130 - 2 * TILE_PAD_Y - 10 - math.floor((i - 1) / 2) * 22)
+                   -176 - 2 * TILE_PAD_Y - 10 - math.floor((i - 1) / 2) * 22)
         t.auraOnly = def.auraOnly
         t.hide = def.hide
         t.get = def.get
