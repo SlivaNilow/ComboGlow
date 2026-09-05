@@ -259,6 +259,48 @@ local function FindStackFS(itemFrame)
     return found
 end
 
+-- Diagnostic: every font string on a Cooldown Manager item frame and what it
+-- says. Picking the right one has been guesswork twice now; this makes it a
+-- lookup. Text may be secret, so it is never formatted -- only reported as
+-- present.
+function ns.DumpFontStrings(frame, say, prefix)
+    prefix = prefix or "  "
+    local function Text(rgn)
+        local ok, txt = pcall(rgn.GetText, rgn)
+        if not ok then return "<err>" end
+        if txt == nil then return "<nil>" end
+        if IsSecret(txt) then return "<secret>" end
+        if type(txt) ~= "string" then return "<" .. type(txt) .. ">" end
+        return '"' .. txt .. '"'
+    end
+
+    local n = 0
+    if frame.GetRegions then
+        for _, rgn in pairs({ frame:GetRegions() }) do
+            if rgn and rgn.GetObjectType and rgn:GetObjectType() == "FontString" then
+                n = n + 1
+                say("%sfs#%d shown=%s %s", prefix, n, tostring(rgn:IsShown()), Text(rgn))
+            end
+        end
+    end
+    if n == 0 then say("%sno font strings directly on the frame", prefix) end
+
+    if frame.GetChildren then
+        for _, child in pairs({ frame:GetChildren() }) do
+            if child and child.GetRegions then
+                local m = 0
+                for _, rgn in pairs({ child:GetRegions() }) do
+                    if rgn and rgn.GetObjectType and rgn:GetObjectType() == "FontString" then
+                        m = m + 1
+                        say("%schild fs#%d shown=%s %s", prefix, m,
+                            tostring(rgn:IsShown()), Text(rgn))
+                    end
+                end
+            end
+        end
+    end
+end
+
 local function MirrorStackText(frame, rule, itemFrame)
     if rule.stacks == false or rule.missing or frame.secondary then return false end
     if not frame.StackText then return false end

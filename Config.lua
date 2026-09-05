@@ -1228,6 +1228,23 @@ local function Handler(msg)
     elseif cmd == "auracheck" then
         ns.AuraCheck(CG:GetRules(), Say)
 
+    elseif cmd == "stacks" then
+        -- Where a stack count could come from, per aura rule: what our own
+        -- read answers, and what the Cooldown Manager's frame actually holds.
+        ns.RebuildCDMMap()
+        for i, r in ipairs(CG:GetRules()) do
+            if r.kind == "aura" and not r.missing and not r.proc then
+                local _, _, _, _, apps = ns.QueryAura(r)
+                local mf, isAuraEntry = ns.FindMirror(r)
+                Say("#%d %s | applications=%s | mirror=%s", i, ns.SpellName(r.spell),
+                    tostring(apps),
+                    mf and (isAuraEntry and L("aura entry", "запись ауры")
+                                        or L("cooldown entry", "запись кулдауна"))
+                       or L("none", "нет"))
+                if mf then ns.DumpFontStrings(mf, Say, "     ") end
+            end
+        end
+
     elseif cmd == "cdmapi" then
         -- Everything the client exposes on C_CooldownViewer, so "can the addon
         -- add spells to the Cooldown Manager itself" is answered by looking
