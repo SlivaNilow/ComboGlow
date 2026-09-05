@@ -780,6 +780,21 @@ function ns.SoonProbe(rules, say)
                 tostring(durObj ~= nil),
                 mf and (isAuraEntry and "aura" or "cd-entry") or "none")
             if mf then say("   " .. ns.SoonReport(mf, rule)) end
+            -- What the marker on the bar is running on THIS instant. The
+            -- countdown that ticks and the digit that reddens are the readable
+            -- path's own local clock, not a read -- and if that clock is
+            -- running here, it can answer "nearly gone" with no duration
+            -- object involved at all.
+            for _, fr in ipairs((ns.CG and ns.CG.auraFrames) or {}) do
+                if fr.rule == rule then
+                    say("   frame%s: shown=%s mirroring=%s expiresIn=%s pandemic=%s",
+                        fr.isStrip and "(strip)" or "(bar)",
+                        tostring(fr:IsShown()),
+                        tostring(fr._mirroring and true or false),
+                        fr.expiresAt and ("%.1fs"):format(fr.expiresAt - GetTime()) or "-",
+                        tostring(fr.pandemicOn and true or false))
+                end
+            end
         end
     end
     if n == 0 then say(ns.L("no aura rules on this spec", "нет правил-аур на этом спеке")) end
