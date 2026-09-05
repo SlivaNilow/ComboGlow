@@ -271,15 +271,15 @@ local function RefreshDetails()
         UI.countRow:Hide()
     end
 
-    -- Warning before this aura runs out: strip only, and only for a state that
-    -- means "it is up". Zero is off.
-    if rule and rule.kind == "aura" and not rule.proc and not rule.missing then
+    -- How early to call the aura gone. Belongs to the "gone" state: that is
+    -- the one whose job is "refresh this", and firing it early is the whole
+    -- point. Zero is off.
+    if rule and rule.kind == "aura" and rule.missing then
         UI.soonRow:Show()
         local n = tonumber(rule.soon) or 0
         UI.soonRow.label:SetText(n > 0
-            and L("warn above the resource: %ds left",
-                  "предупреждать над ресурсом: за %d с"):format(n)
-            or L("warn above the resource: off", "над ресурсом не показывать"))
+            and L("count as gone %ds early", "считать, что нет, за %d с до конца"):format(n)
+            or L("count as gone only when it is", "считать, что нет, только когда нет"))
     else
         UI.soonRow:Hide()
     end

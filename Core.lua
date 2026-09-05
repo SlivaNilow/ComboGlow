@@ -984,12 +984,6 @@ function ns.AutoStrip(rule)
     if rule.kind == "aura" and rule.proc then return c.autoProc ~= false end
     if c.autoMissing == false then return false end
     if rule.kind == "cd" then return true end
-    -- An "up" state joins the strip when it is there to warn that the aura is
-    -- about to run out; without that it is just a second icon saying what the
-    -- button already says.
-    if rule.kind == "aura" and not rule.missing and not rule.proc then
-        return (ns.SoonSeconds and ns.SoonSeconds(rule)) ~= nil
-    end
     -- Debuffs only. A personal cooldown is missing most of the time, so a
     -- buff's "gone" state on the strip would be a permanent icon that means
     -- nothing -- on the button it costs nothing, here it costs the strip.

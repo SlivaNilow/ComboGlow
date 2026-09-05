@@ -678,29 +678,32 @@ local function WarnCurve(rule)
 end
 
 --[[-------------------------------------------------------------------------
-    "About to fall off"
+    Counting an aura as gone before it is
 
-    The reminder strip shows a dot that is GONE. By then you are already late.
-    This adds the other half: the icon appears while the aura is still up but
-    has less than N seconds left, so the reminder arrives in time to act on.
+    "Gone" is the moment you are already late. This lets a "gone" state fire a
+    few seconds early instead: the marker lights while the dot is still up but
+    running out, which is when the reminder is worth acting on.
 
-    The remaining time is usually unreadable -- for a target debuff it always
-    is -- so the threshold is never compared in Lua. It is expressed as a curve
-    and handed to the duration object, which evaluates it engine-side and hands
-    back a colour; its alpha is the answer. Exactly the trick the warning
-    colour already uses, asked a different question.
+    It belongs to the "gone" state rather than to "up" -- the state whose whole
+    job is to say "refresh this" -- so the bar and the strip agree, instead of
+    the strip having a rule of its own.
 
-    Only strip icons are driven this way. On the bar the marker means "this is
-    up", and turning that off for the first part of its life would be a
-    different feature, and a worse one.
+    The remaining time is usually unreadable, and for a target debuff it always
+    is, so the threshold is never compared in Lua. It goes to the duration
+    object as a curve whose ALPHA is the answer: opaque below the threshold,
+    clear above. The two halves compose without ever being combined -- a
+    duration object exists only while the aura is up, so when there is none the
+    ordinary presence gate already says "gone", and when there is one the curve
+    says "nearly gone". Exactly the trick the warning colour uses.
 ---------------------------------------------------------------------------]]
 local soonCurves = setmetatable({}, { __mode = "k" })
 
 -- Per state, and zero is off. One number rather than a number and a switch
--- that can disagree with it: there is no useful reading of "warn me zero
--- seconds before". Unset means off too -- a state that has never been asked
--- for a warning should not start giving one.
+-- that can disagree with it: there is no useful reading of "count it gone zero
+-- seconds early". Unset is off too -- a state nobody has asked this of should
+-- not start doing it.
 function ns.SoonSeconds(rule)
+    if not rule.missing then return nil end
     local n = tonumber(rule.soon) or 0
     if n <= 0 then return nil end
     return n
@@ -721,24 +724,14 @@ local function SoonCurve(n)
     return curve
 end
 
--- Is this frame here ONLY to warn that an aura is running out? A strip icon
--- for an "up" state is: on the bar the same state means "it is up", and only
--- the strip copy was given the narrower job.
-function ns.SoonWanted(frame, rule)
-    if not frame.isStrip or rule.missing or rule.proc then return false end
-    return ns.SoonSeconds(rule) ~= nil
-end
-
--- Returns true when it took over the frame's alpha.
-function ns.ApplySoon(frame, rule, durObj, remaining)
-    if not ns.SoonWanted(frame, rule) then return false end
+-- True when it took over the frame's alpha. False means "nothing to measure
+-- against", and the caller carries on as it would have: the marker then lights
+-- when the aura is actually gone, which is the old behaviour and a fine thing
+-- to fall back to. The readable case is not handled here -- there the remaining
+-- time is a plain number and the answer belongs in the glow test, not in alpha.
+function ns.ApplySoon(frame, rule, durObj)
     local n = ns.SoonSeconds(rule)
-
-    -- Readable case: a plain number, a plain comparison.
-    if type(remaining) == "number" and not IsSecret(remaining) then
-        frame:SetAlpha(remaining <= n and 1 or 0)
-        return true
-    end
+    if not n then return false end
 
     if not (durObj and durObj.EvaluateRemainingDuration) then return false end
     local curve = SoonCurve(n)
@@ -832,20 +825,14 @@ local function ApplyMirror(frame, rule, itemFrame)
     -- A strip icon that is asking "is it about to fall off" answers that
     -- instead: the curve already means "up AND running out", because a
     -- duration object only exists while the aura is up.
-    if ns.SoonWanted(frame, rule) then
-        if ns.ApplySoon(frame, rule, durObj) then
-            frame._mirroring = true
-            if not frame:IsShown() then frame:Show() end
-            frame.needSafeStyle = false
-            frame:StartArt()
-            return true
-        end
-        -- No duration to measure against, so the warning cannot be given. An
-        -- icon that cannot do its one job is worse than no icon: left visible
-        -- it just sits there permanently, which is what it did.
-        ns.ClearTimer(frame)
-        frame:StopArt()
-        frame:Hide()
+    -- Counting it gone early, when there is a duration to measure. When there
+    -- is not, the presence gate below still lights it once the aura actually
+    -- goes -- the old behaviour, and a fine thing to fall back to.
+    if ns.ApplySoon(frame, rule, durObj) then
+        frame._mirroring = true
+        if not frame:IsShown() then frame:Show() end
+        frame.needSafeStyle = false
+        frame:StartArt()
         return true
     end
     local applied = pcall(frame.SetAlphaFromBoolean, frame, flag, shown, hidden)
@@ -1086,13 +1073,6 @@ function ns.ApplyAuraRule(frame, rule)
     -- The timer is independent of the glow. While the aura is up you want to
     -- see the time left even in "glow when missing" mode -- there the icon
     -- carries a quiet countdown and only lights up once it runs out.
-    if ns.SoonWanted(frame, rule) and not ns.ApplySoon(frame, rule, durObj, remaining) then
-        ns.ClearTimer(frame)
-        frame:StopArt()
-        frame:Hide()
-        return false
-    end
-
     if present and rule.timer ~= false then
         if found == true then
             frame._optStamp = nil
@@ -1119,6 +1099,14 @@ function ns.ApplyAuraRule(frame, rule)
         -- Reads must have worked for this rule at least once; otherwise the
         -- mirror above owns this state, or nothing does.
         glow = (found == false) and not optActive and readsWork[rule] == true
+        -- Counted gone early: still up, but not for long. Only where the time
+        -- can actually be read; where it cannot, the curve above did it.
+        local soon = ns.SoonSeconds(rule)
+        if not glow and soon and found == true
+           and type(remaining) == "number" and not IsSecret(remaining)
+           and remaining <= soon then
+            glow = true
+        end
         if glow and rule.unit ~= "player"
            and not UnitCanAttack("player", rule.unit or "target") then
             glow = false   -- do not nag about something you cannot hit
