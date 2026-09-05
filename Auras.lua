@@ -606,7 +606,39 @@ local function MirrorDuration(itemFrame, rule)
     local ok, durObj = pcall(UA.GetAuraDuration, fallbackUnit, iid)
     if ok and type(durObj) == "table" then return durObj, "ok (rule unit)" end
 
+    local wd = ns.WidgetDuration(itemFrame)
+    if wd then return wd, "ok (cooldown widget)" end
+
     return nil, tried and "GetAuraDuration returned nothing" or "no auraDataUnit"
+end
+
+-- The entry's own cooldown widget, asked for a duration OBJECT.
+--
+-- This is the last place left to look, and the one that works in combat. The
+-- widget is visibly drawing a countdown, so it was armed with something; the
+-- legacy number pair comes back secret and cannot be compared in Lua, but the
+-- object can be handed to a curve and compared by the engine. Which is the
+-- whole trick: we never learn the time, we only get an answer about it.
+--
+-- Only a table with EvaluateRemainingDuration is accepted. The same method
+-- names have historically returned a plain number, and a number here would
+-- silently be the wrong kind of right.
+local durationGetters = { "GetCooldownDuration", "GetCooldownDisplayDuration" }
+function ns.WidgetDuration(itemFrame)
+    local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
+    if not cd then return nil end
+    for _, m in ipairs(durationGetters) do
+        if cd[m] then
+            local ok, d = pcall(cd[m], cd)
+            if ok and type(d) == "table" then
+                local okm, has = pcall(function()
+                    return d.EvaluateRemainingDuration ~= nil
+                end)
+                if okm and has then return d end
+            end
+        end
+    end
+    return nil
 end
 
 -- Plain seconds left, off the Cooldown Manager's own cooldown widget.
@@ -638,6 +670,104 @@ local function MirrorRemaining(itemFrame)
     local left = (startMS + durMS) / 1000 - GetTime()
     if left <= 0 then return nil, "expired" end
     return left, "ok"
+end
+
+-- One line saying where the early-gone threshold could get a time from for
+-- this entry, and what stopped it. Shared by /cgl auracheck and /cgl probe:
+-- the compact command exists because this question has to be asked IN COMBAT,
+-- where the full report is too long to read and half of it is beside the point.
+function ns.SoonReport(mf, rule)
+    local left, why = MirrorRemaining(mf)
+    local cdChild = mf and (mf.Cooldown or mf.cooldown)
+    local rawS, rawD = "-", "-"
+    if cdChild and cdChild.GetCooldownTimes then
+        local okc, x, y = pcall(cdChild.GetCooldownTimes, cdChild)
+        if okc then
+            rawS = IsSecret(x) and "secret" or tostring(x)
+            rawD = IsSecret(y) and "secret" or tostring(y)
+        end
+    end
+
+    -- Both known sources came up empty, so ask the entry what it is holding.
+    -- Blizzard draws a live countdown here in combat, which means the time is
+    -- reachable from somewhere; the question is under which name, and whether
+    -- it arrives plain.
+    local carriers = {}
+    if not left and mf then
+        local okp = pcall(function()
+            for k, v in pairs(mf) do
+                if type(v) == "table" then
+                    local okm = pcall(function()
+                        if v.EvaluateRemainingDuration or v.GetRemainingDuration then
+                            carriers[#carriers + 1] = tostring(k)
+                        end
+                    end)
+                    if not okm then carriers[#carriers + 1] = tostring(k) .. "?" end
+                end
+            end
+        end)
+        if not okp then carriers[#carriers + 1] = "<pairs blocked>" end
+        if mf.cooldownID and C_CooldownViewer
+           and C_CooldownViewer.GetCooldownViewerCooldownInfo then
+            local oki, info = pcall(
+                C_CooldownViewer.GetCooldownViewerCooldownInfo, mf.cooldownID)
+            if oki and type(info) == "table" then
+                for k, v in pairs(info) do
+                    local t = type(v)
+                    if t == "number" or t == "table" then
+                        carriers[#carriers + 1] = ("info.%s=%s%s"):format(
+                            tostring(k), t, IsSecret(v) and "!" or "")
+                    end
+                end
+            end
+        end
+        if cdChild then
+            for _, m in ipairs(durationGetters) do
+                if cdChild[m] then
+                    local okd, d = pcall(cdChild[m], cdChild)
+                    local what = not okd and "err" or type(d)
+                    if okd and type(d) == "table" then
+                        local okm, has = pcall(function()
+                            return d.EvaluateRemainingDuration ~= nil
+                        end)
+                        what = (okm and has) and "|cff40ff40durObj|r" or "table"
+                    elseif okd and IsSecret(d) then
+                        what = what .. "!"
+                    end
+                    carriers[#carriers + 1] = ("CD:%s->%s"):format(m, what)
+                end
+            end
+        end    end
+
+    local n = ns.SoonSeconds(rule)
+    return ("early-gone: soon=%s widgetLeft=%s (%s) raw=%s/%s%s"):format(
+        n and ("%ds"):format(n) or "off",
+        left and ("%.1fs"):format(left) or "|cffff4040none|r",
+        why or "?", rawS, rawD,
+        #carriers > 0 and (" | carriers: " .. table.concat(carriers, ", ")) or "")
+end
+
+-- Deliberately terse. This is the one report that has to be read off the
+-- screen mid-fight, so it prints a line per aura rule and nothing else.
+function ns.SoonProbe(rules, say)
+    say(ns.L("--- early-gone probe (%s) ---", "--- зонд «нет заранее» (%s) ---"),
+        InCombatLockdown and InCombatLockdown()
+            and ns.L("in combat", "в бою") or ns.L("out of combat", "вне боя"))
+    local n = 0
+    for _, rule in ipairs(rules) do
+        if rule.enabled ~= false and rule.kind == "aura" and not rule.proc then
+            n = n + 1
+            local name = (C_Spell.GetSpellInfo(rule.spell) or {}).name or rule.spell
+            local mf, isAuraEntry = ns.FindMirror(rule)
+            local _, _, _, durObj = ns.QueryAura(rule)
+            say("%s [%s] durObj=%s mirror=%s", name,
+                rule.missing and ns.L("gone", "нет") or ns.L("up", "висит"),
+                tostring(durObj ~= nil),
+                mf and (isAuraEntry and "aura" or "cd-entry") or "none")
+            if mf then say("   " .. ns.SoonReport(mf, rule)) end
+        end
+    end
+    if n == 0 then say(ns.L("no aura rules on this spec", "нет правил-аур на этом спеке")) end
 end
 
 -- The sweep is asked for either by the toggle or by picking a time-shaped
@@ -1350,71 +1480,11 @@ function ns.AuraCheck(rules, say)
                     tostring(ns.cdmViewerOf and ns.cdmViewerOf[mf] or "?"),
                     tostring(mf.IsActive ~= nil),
                     tostring(isAuraEntry and usable or false))
-                local dUnit = type(mf.auraDataUnit) ~= "nil"
-                local dIID  = type(mf.auraInstanceID) ~= "nil"
-                local left, leftWhy = MirrorRemaining(mf)
-                local cdChild = mf.Cooldown or mf.cooldown
-                local rawS, rawD = "-", "-"
-                if cdChild and cdChild.GetCooldownTimes then
-                    local okc, a, b = pcall(cdChild.GetCooldownTimes, cdChild)
-                    if okc then
-                        rawS = IsSecret(a) and "secret" or tostring(a)
-                        rawD = IsSecret(b) and "secret" or tostring(b)
-                    end
-                end
                 say("     aura link: auraDataUnit=%s auraInstanceID=%s | %s",
-                    tostring(dUnit), tostring(dIID),
+                    tostring(type(mf.auraDataUnit) ~= "nil"),
+                    tostring(type(mf.auraInstanceID) ~= "nil"),
                     ns.DebugWarnColor(nil, rule, mf))
-                -- Both known sources came back empty for this entry, so ask
-                -- the entry itself what it is holding: whatever draws its
-                -- countdown has to be reachable from somewhere on the frame.
-                local carriers = {}
-                if not left then
-                    local okp = pcall(function()
-                        for k, v in pairs(mf) do
-                            if type(v) == "table" then
-                                local okm = pcall(function()
-                                    if v.EvaluateRemainingDuration or v.GetRemainingDuration then
-                                        carriers[#carriers + 1] = tostring(k)
-                                    end
-                                end)
-                                if not okm then carriers[#carriers + 1] = tostring(k) .. "?" end
-                            end
-                        end
-                    end)
-                    if not okp then carriers[#carriers + 1] = "<pairs blocked>" end
-                    -- And what the viewer's own record holds. Blizzard draws a
-                    -- countdown on this entry in combat, so the time exists
-                    -- somewhere reachable; the question is only under which
-                    -- name, and whether it arrives plain.
-                    if mf.cooldownID and C_CooldownViewer
-                       and C_CooldownViewer.GetCooldownViewerCooldownInfo then
-                        local oki, info = pcall(
-                            C_CooldownViewer.GetCooldownViewerCooldownInfo, mf.cooldownID)
-                        if oki and type(info) == "table" then
-                            for k, v in pairs(info) do
-                                local t = type(v)
-                                if t == "number" or t == "table" then
-                                    local mark = IsSecret(v) and "!" or ""
-                                    carriers[#carriers + 1] =
-                                        ("info.%s=%s%s"):format(tostring(k), t, mark)
-                                end
-                            end
-                        end
-                    end
-                    if cdChild then
-                        for _, m in ipairs({ "GetCooldownDuration", "GetCooldownTimes",
-                                             "GetCooldownDisplayDuration" }) do
-                            if cdChild[m] then carriers[#carriers + 1] = "CD:" .. m end
-                        end
-                    end
-                end
-                say("     early-gone: soon=%s widgetLeft=%s (%s) raw=%s/%s%s",
-                    ns.SoonSeconds(rule) and ("%ds"):format(ns.SoonSeconds(rule))
-                        or "off",
-                    left and ("%.1fs"):format(left) or "|cffff4040none|r",
-                    leftWhy or "?", rawS, rawD,
-                    #carriers > 0 and (" | carriers: " .. table.concat(carriers, ", ")) or "")
+                say("     " .. ns.SoonReport(mf, rule))
             else
                 blind[#blind + 1] = name
                 say("     cdm mirror: |cffff4040none|r%s", ns.L(

@@ -1255,6 +1255,11 @@ local function Handler(msg)
     elseif cmd == "auracheck" then
         ns.AuraCheck(CG:GetRules(), Say)
 
+    elseif cmd == "probe" then
+        -- The early-gone question, and only that. It has to be asked IN
+        -- COMBAT, where the full report scrolls off before it can be read.
+        ns.SoonProbe(CG:GetRules(), Say)
+
     elseif cmd == "stacks" then
         -- Where a stack count could come from, per aura rule: what our own
         -- read answers, and what the Cooldown Manager's frame actually holds.
