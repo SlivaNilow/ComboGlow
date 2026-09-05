@@ -258,41 +258,46 @@ local CDM_ALL_VIEWERS = {
     Re-applied on every map rebuild: Blizzard's own code sets these back when
     the viewers are rebuilt, on a spec change among other things.
 ---------------------------------------------------------------------------]]
-local cdmHooked, cdmTicker = {}, nil
+local cdmHooked, cdmPending = {}, false
+
+local function ScheduleCDMVisibility()
+    -- Next frame, not now: Blizzard's Layout is still running and would put
+    -- the alpha straight back. Borrowed from Clean Cooldown Manager, which
+    -- fights the same rebuild.
+    if cdmPending then return end
+    cdmPending = true
+    C_Timer.After(0, function()
+        cdmPending = false
+        ns.ApplyCDMVisibility()
+    end)
+end
 
 function ns.ApplyCDMVisibility()
-    local hide = CG.db and CG.db.hideCDM
+    -- Never hidden while Edit Mode is open: that is where the Cooldown Manager
+    -- is configured, and an invisible frame cannot be configured. Forgetting
+    -- this would have made the addon's own "open the settings" button useless.
+    local em = _G.EditModeManagerFrame
+    local editing = em and em.IsEditModeActive and em:IsEditModeActive()
+    local hide = CG.db and CG.db.hideCDM and not editing
+
     for _, name in ipairs(CDM_ALL_VIEWERS) do
         local f = _G[name]
         if f and f.SetAlpha then
             pcall(f.SetAlpha, f, hide and 0 or 1)
-            -- Blizzard puts the alpha back on its own schedule -- a viewer
-            -- being shown again is one of the moments, and rebuilding the map
-            -- does not happen at all of them. Cheap to catch here.
-            if not cdmHooked[f] and f.HookScript then
-                cdmHooked[f] = true
-                pcall(f.HookScript, f, "OnShow", ns.ApplyCDMVisibility)
-            end
-        end
-    end
 
-    -- And a slow sweep for the moments neither of those covers. Four frames
-    -- once a second, and only while it is meant to be hidden: the alternative
-    -- is hunting for every event Blizzard restores it on, which is a list that
-    -- changes with the patch.
-    if hide and not cdmTicker then
-        cdmTicker = C_Timer.NewTicker(1, function()
-            if not (CG.db and CG.db.hideCDM) then return end
-            for _, name in ipairs(CDM_ALL_VIEWERS) do
-                local f = _G[name]
-                if f and f.GetAlpha and f:GetAlpha() > 0 then
-                    pcall(f.SetAlpha, f, 0)
+            if not cdmHooked[f] then
+                cdmHooked[f] = true
+                -- Layout is what Blizzard calls when it rebuilds a viewer, and
+                -- it is the moment the alpha came back. A one-second sweep
+                -- caught it eventually; this catches it immediately.
+                if f.Layout then
+                    pcall(hooksecurefunc, f, "Layout", ScheduleCDMVisibility)
+                end
+                if f.HookScript then
+                    pcall(f.HookScript, f, "OnShow", ScheduleCDMVisibility)
                 end
             end
-        end)
-    elseif not hide and cdmTicker then
-        cdmTicker:Cancel()
-        cdmTicker = nil
+        end
     end
 end
 
@@ -1462,6 +1467,9 @@ function CG:Initialize()
         pcall(self.RegisterEvent, self, ev)
     end
     self:RegisterEvent("PLAYER_ENTERING_WORLD")
+    -- Entering or leaving Edit Mode changes whether the Cooldown Manager may
+    -- be hidden at all, and the layout it rebuilds on the way out.
+    pcall(self.RegisterEvent, self, "EDIT_MODE_LAYOUTS_UPDATED")
     self:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
     self:RegisterEvent("PLAYER_REGEN_ENABLED")
     self:RegisterEvent("PLAYER_REGEN_DISABLED")
@@ -1609,6 +1617,8 @@ CG:SetScript("OnEvent", function(self, event, ...)
     elseif event == "PLAYER_ENTERING_WORLD" then
         self:RefreshSpec()
         self:MarkDirty()
+    elseif event == "EDIT_MODE_LAYOUTS_UPDATED" then
+        ns.ApplyCDMVisibility()
     elseif event == "ACTIONBAR_SLOT_CHANGED" then
         -- This fires constantly (assisted combat, spell overrides). Rebuilding
         -- on every one of them restarts every glow animation and throws away
