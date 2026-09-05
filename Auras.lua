@@ -486,15 +486,6 @@ local WINDOW = 2.0   -- how long an unconfirmed cast keeps the display flipped
 
 local lastTotals = setmetatable({}, { __mode = "k" })
 
--- Learned aura lengths, per spell.
---
--- Counting down needs something to count from, and the only place a length can
--- be had is a successful read -- which in combat never happens for a target
--- debuff. So it is remembered on the rule, where it survives a reload, and
--- shared across that spell's states: they are all timing the same aura.
-
-
-
 
 -- When the player's own cast says this aura should run out, per spell.
 
@@ -680,9 +671,6 @@ end
 local caughtDuration = setmetatable({}, { __mode = "k" })
 local durationHooked
 
--- Which method last armed each widget, and with what. Nothing depends on it;
--- it is here because "no object was caught" has two readings -- nobody passed
--- one, or we were not listening -- and they need opposite fixes.
 
 --[[-------------------------------------------------------------------------
     Pass-through arming
@@ -710,11 +698,6 @@ local durationHooked
 -- cooldown-text addons re-apply their own formatter, so it is also when ours
 -- has to be put back.
 local armCount = setmetatable({}, { __mode = "k" })
-
--- WHEN each widget was last armed. The numbers in that call are secret and
--- always will be; the moment it happened is not, and the moment is most of
--- what we were missing. Every refresh and every extension re-arms the entry,
--- so this is the aura's real start time, arriving by the only door left open.
 
 
 --[[-------------------------------------------------------------------------
@@ -811,8 +794,6 @@ function ns.ApplyEntryFormatter(itemFrame, rule)
 end
 
 
-
-
 local STALE_ON = { "SetCooldown", "SetCooldownDuration",
                    "SetCooldownFromExpirationTime", "SetCooldownUNIX", "Clear" }
 
@@ -871,34 +852,6 @@ local function UsableDuration(d)
 end
 
 
-
-
-
--- For the report: every shape and how it answered, so a failure says which
--- half it failed rather than just "no".
---[[-------------------------------------------------------------------------
-    What the curve's x axis is measured in
-
-    A curve point at 5 means five of something, and seconds is only the most
-    obvious guess: milliseconds are just as likely -- the widgets measure time
-    in them -- and so is a fraction of the total duration. All three look
-    identical from outside, which is why a threshold that was simply wrong
-    read for days as an API that was simply missing.
-
-    So it is measured rather than assumed, once, against a case that can only
-    pass under one of them: two seconds left of a hundred must read as under
-    the threshold and sixty must not. Whatever the client means, the addon
-    then speaks it -- including if a later patch changes its mind.
-
-
-
-
-
-
-
-
-
--- What we caught for this entry, if it is still a usable object.
 function ns.CaughtDuration(itemFrame)
     HookCooldownDurations()
     local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
@@ -906,42 +859,6 @@ function ns.CaughtDuration(itemFrame)
     if UsableDuration(d) then return d end
     return nil
 end
-
--- The entry's own cooldown widget, asked for a duration OBJECT.
---
--- Kept for the probe only, and NOT on the polling path: on 12.1 both getters
--- answer with a secret NUMBER, which is the one shape that is no use to us.
--- A number can be drawn and cannot be compared; an object could have been
--- compared without ever being read. Left here so the next client that changes
--- this is a one-line change rather than a rediscovery.
---
--- Only a table with EvaluateRemainingDuration counts. A number here would be
--- the wrong kind of right: accepted, then silently useless.
-
-
-
-
-
-
---[[-------------------------------------------------------------------------
-    The one door that is still open
-
-    Nothing will TELL us how long is left on a debuff in combat. But the engine
-    will DRAW an answer: a numeric rule formatter is a set of breakpoints, and
-    the engine picks between them by evaluating the secret remaining time
-    itself. tullaCTC colours its countdowns this way and never learns a number
-    either -- the colour lives inside the format string.
-
-    A format string is just text, so it can hold anything a font string can
-    render, an inline texture among them. Which turns "colour the digits" into
-    "draw this icon, but only under N seconds" -- an answer we can put on
-    screen without ever being allowed to see it.
-
-    This is the test rig, not the feature. It proves the mechanism or kills it.
----------------------------------------------------------------------------]]
-
-
-
 -- The sweep is asked for either by the toggle or by picking a time-shaped
 -- marker, where the duration IS the marker.
 function ns.WantsSweep(rule)
