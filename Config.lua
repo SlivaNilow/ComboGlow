@@ -769,6 +769,13 @@ local function BuildPreset(quiet, intro)
         if not quiet then
             Say(L("nothing to set up from your bars - use /cg add or /cg dot",
                   "по панелям нечего настроить — используй /cg add или /cg dot"))
+            -- Say what there was to work with. "Nothing found" and "nothing to
+            -- look at" are different problems and read the same.
+            local nAura = 0
+            for _ in pairs(ns.cdmAuraSpells or {}) do nAura = nAura + 1 end
+            Say(L("(%d buttons scanned, %d auras tracked in the Cooldown Manager)",
+                  "(кнопок просканировано: %d, аур в Cooldown Manager: %d)"),
+                ns.scannedButtons or 0, nAura)
         end
         return 0
     end
@@ -960,20 +967,30 @@ end
 
 local function PrintList()
     local rules = CG:GetRules()
-    if #rules == 0 then
-        Say(L("no rules for this spec yet. Example: /cg add max Eviscerate",
-              "для этой специализации правил нет. Пример: /cg add max Потрошение"))
-        return
-    end
+
+    -- What the scan had to work with, printed BEFORE the "no rules" exit. An
+    -- empty Cooldown Manager is the usual reason a spec comes up with nothing,
+    -- and this used to be reported only when there was already something to
+    -- report -- silent in the one case it was written for.
     local nAura, nEss = 0, 0
     for _ in pairs(ns.cdmAuraSpells or {}) do nAura = nAura + 1 end
     for _ in pairs(ns.cdmEssentialSpells or {}) do nEss = nEss + 1 end
     Say(L("rules (spec %d, %d buttons scanned):", "правила (спек %d, кнопок просканировано: %d):"),
         CG.specID or 0, ns.scannedButtons or 0)
-    -- What the scan had to work with. An empty Cooldown Manager is the usual
-    -- reason a spec comes up with nothing, and it is invisible otherwise.
     Say(L("  Cooldown Manager: %d tracked auras, %d essential cooldowns",
           "  Cooldown Manager: аур отслеживается %d, бурстов %d"), nAura, nEss)
+    if nAura == 0 then
+        Say(L("  |cffff4040no tracked auras for this spec|r - nothing can see a dot here",
+              "  |cffff4040отслеживаемых аур нет|r — доты здесь увидеть нечем"))
+        Say(L("  add them under Options - Cooldown Manager, then /cg preset",
+              "  добавь их в Настройки — Cooldown Manager, потом /cg preset"))
+    end
+
+    if #rules == 0 then
+        Say(L("no rules for this spec yet. Example: /cg add max Eviscerate",
+              "для этой специализации правил нет. Пример: /cg add max Потрошение"))
+        return
+    end
     for i, rule in ipairs(rules) do
         local flags = {}
         if rule.enabled == false then flags[#flags + 1] = L("off", "выкл") end
