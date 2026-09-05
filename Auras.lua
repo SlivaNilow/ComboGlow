@@ -1675,8 +1675,15 @@ ns.DebugWarnColor = function(frame, rule, itemFrame)
     return ("duration: %s | warn colour: %s"):format(why, applied and "ok" or why2)
 end
 
-local function MirrorTimerText(frame, rule, itemFrame)
-    if rule.timer == false or rule.missing or frame.secondary then return false end
+-- allowMissing: a "gone" icon normally carries no countdown, because there is
+-- nothing to count. In the early window there is -- the aura is still up, we
+-- have simply decided to stop calling it that -- and the number is the reason
+-- to look. The frame says "refresh this", the digits say how long you have.
+-- Once the aura really goes the entry's own text goes with it, so this needs
+-- no unwinding: it empties itself.
+local function MirrorTimerText(frame, rule, itemFrame, allowMissing)
+    if rule.timer == false or frame.secondary then return false end
+    if rule.missing and not allowMissing then return false end
     local fs = FindTimerFS(itemFrame)
     if not fs then return false end
     local ok, txt = pcall(fs.GetText, fs)
@@ -1694,6 +1701,12 @@ local function ApplyMirror(frame, rule, itemFrame)
     -- standing: it is invisible exactly when the aura is gone.
     frame.expiresAt = nil
     frame.totalDur = nil
+    -- Only above the resource. On the button the countdown is the point --
+    -- you look there to see exactly how long is left -- and a marker that
+    -- flips to "gone" while the number is still ticking takes that away to
+    -- say something the strip is already saying. The strip is the reminder;
+    -- the button is the instrument.
+    local soon = frame.isStrip and ns.SoonSeconds(rule) or nil
     local durObj = MirrorDuration(itemFrame, rule)
     -- Optional cooldown sweep, driven by the real aura duration object.
     local wantsSweep = ns.WantsSweep(rule)
@@ -1707,7 +1720,7 @@ local function ApplyMirror(frame, rule, itemFrame)
     -- A time-shaped marker with no time to draw would leave the button blank,
     -- so it degrades to the plain frame instead of disappearing.
     frame.sweepFailed = (wantsSweep and not swept) or nil
-    if not MirrorTimerText(frame, rule, itemFrame) then
+    if not MirrorTimerText(frame, rule, itemFrame, soon ~= nil) then
         frame.TimerText:SetText("")
         frame.TimerText:Hide()
     end
@@ -1737,12 +1750,6 @@ local function ApplyMirror(frame, rule, itemFrame)
     -- the target, the widget's plain numbers are compared here. With neither,
     -- the presence gate below still lights the marker once the aura actually
     -- goes: the old behaviour, and a fine thing to land on.
-    -- Only above the resource. On the button the countdown is the point --
-    -- you look there to see exactly how long is left -- and a marker that
-    -- flips to "gone" while the number is still ticking takes that away to
-    -- say something the strip is already saying. The strip is the reminder;
-    -- the button is the instrument.
-    local soon = frame.isStrip and ns.SoonSeconds(rule) or nil
     if soon and ns.ApplySoon(frame, rule, durObj) then
         frame._mirroring = true
         if not frame:IsShown() then frame:Show() end
