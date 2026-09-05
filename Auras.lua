@@ -1152,9 +1152,14 @@ function ns.SoonReport(mf, rule)
         else textWhat = type(txt) end
     end
 
+    -- The verdict that actually decides this feature, in the short report
+    -- rather than buried in the long one.
+    local _, durWhy = ns.MirrorDurationFor(mf, rule)
+
     local n = ns.SoonSeconds(rule)
-    return ("early-gone: soon=%s caught=%s armed=%s made=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
+    return ("early-gone: soon=%s |cffffd100dur=%s|r caught=%s armed=%s made=%s widgetLeft=%s (%s) raw=%s/%s text=%s%s"):format(
         n and ("%ds"):format(n) or "off",
+        tostring(durWhy),
         ns.CaughtDuration(mf) and "|cff40ff40yes|r" or "|cffff4040no|r",
         ns.ArmedBy(mf),
         (function()
@@ -1353,9 +1358,13 @@ end
 -- Deliberately terse. This is the one report that has to be read off the
 -- screen mid-fight, so it prints a line per aura rule and nothing else.
 function ns.SoonProbe(rules, say)
-    say(ns.L("--- early-gone probe (%s) ---", "--- зонд «нет заранее» (%s) ---"),
-        InCombatLockdown and InCombatLockdown()
-            and ns.L("in combat", "в бою") or ns.L("out of combat", "вне боя"))
+    -- Combat is not the question; secrecy is. They usually coincide and the
+    -- one time they do not is the run that proves nothing.
+    say(ns.L("--- early-gone probe (combat=%s, auras secret=%s) ---",
+             "--- зонд «нет заранее» (бой=%s, ауры закрыты=%s) ---"),
+        tostring(InCombatLockdown and InCombatLockdown() or false),
+        tostring(C_Secrets and C_Secrets.ShouldAurasBeSecret
+                 and C_Secrets.ShouldAurasBeSecret() or false))
     -- Anything in the API that MAKES a duration object. If the entries turn
     -- out to be armed with secret numbers, a factory taking numbers is the
     -- only way back to something a curve can evaluate -- so it is worth
