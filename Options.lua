@@ -1131,6 +1131,16 @@ local function Build()
     end)
     UI.onCDM:SetPoint("BOTTOMLEFT", UI.onBars, "TOPLEFT", 0, 4)
 
+    -- Rules that cannot ever fire, with the count on the button. Shown only
+    -- when there are any: a permanent "clean up (0)" is an invitation to
+    -- worry about nothing.
+    UI.tidy = TextButton(UI, "", 190, 22, function()
+        local gone = ns.TidyRules()
+        ns.Say(L("removed %d dead rules", "убрано мёртвых правил: %d"), gone)
+        if ns.ShowPage then ns.ShowPage() end
+    end)
+    UI.tidy:SetPoint("BOTTOMLEFT", UI.onCDM, "TOPLEFT", 0, 4)
+
     -- Per state, not one number for everything: how much warning a dot needs
     -- depends on the dot. Sits at -128, under the "watching" row, on the line
     -- the gallery starts below.
@@ -1219,7 +1229,7 @@ local function Build()
     -- the second page. It had all accumulated in the bottom-left corner of the
     -- spell editor, and six global buttons stacked in a corner is a corner
     -- that has quietly become a second window.
-    OnPage("settings", UI.onBars, UI.onCDM, UI.source)
+    OnPage("settings", UI.onBars, UI.onCDM, UI.source, UI.tidy)
     for _, b in ipairs(UI.viewerBtns or {}) do OnPage("settings", b) end
 
     OnPage("spells", UI.hint, UI.warn, UI.empty, UI.title, UI.titleIcon,
@@ -1250,6 +1260,14 @@ local function Build()
     end
 
     function ns.ShowPage()
+        -- Counted here rather than in Refresh, which returns early
+        -- off the spell page and would never reach this.
+        if UI.tidy then
+            local n = ns.CountDeadRules and ns.CountDeadRules() or 0
+            UI.tidy.text:SetText(L("clear dead rules (%d)",
+                                  "очистить мёртвые правила (%d)"):format(n))
+            pageOf[UI.tidy] = (n > 0) and "settings" or "none"
+        end
         for w, which in pairs(pageOf) do
             if which == page then w:Show() else w:Hide() end
         end

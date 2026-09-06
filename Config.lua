@@ -323,6 +323,45 @@ end
     a different marker for each, and a slot nobody configures simply does not
     exist and draws nothing.
 ---------------------------------------------------------------------------]]
+-- A rule that cannot ever fire: switched off, on no button, and tracked by
+-- nothing. There is nothing for it to read and nowhere for it to draw, so it
+-- is not a setting anyone chose -- it is sediment from repeated scans.
+--
+-- Anything still enabled is spared however useless it looks, and so is
+-- anything with a button or a Cooldown Manager entry: those come back to life
+-- the moment a bar is rearranged, and removing them would be removing work.
+function ns.IsDeadRule(r)
+    if r.enabled ~= false then return false end
+    if (ns.buttonCount[r] or 0) > 0 then return false end
+    if r.spell and ns.FindMirror(r) then return false end
+    return true
+end
+
+function ns.CountDeadRules()
+    local n = 0
+    for _, r in ipairs(CG:GetRules()) do
+        if ns.IsDeadRule(r) then n = n + 1 end
+    end
+    return n
+end
+
+function ns.TidyRules()
+    ns.RebuildCDMMap()
+    local rules = CG:GetRules()
+    local gone, kept = 0, 0
+    for i = #rules, 1, -1 do
+        if ns.IsDeadRule(rules[i]) then
+            table.remove(rules, i)
+            gone = gone + 1
+        else
+            kept = kept + 1
+        end
+    end
+    CG.lastSig = nil
+    CG:Rebuild()
+    if ns.RefreshOptions then ns.RefreshOptions() end
+    return gone, kept
+end
 function ns.FindSlotRule(spellID, slot)
     for i, r in ipairs(CG:GetRules()) do
         if r.spell == spellID then
@@ -1826,31 +1865,7 @@ local function Handler(msg)
         end
         if n == 0 then Say(L("no macros on the bars", "макросов на панелях нет")) end
     elseif cmd == "tidy" then
-        -- Removes only what cannot ever do anything: switched off, on no
-        -- button, and tracked by nothing. A rule in that state has no way back
-        -- -- there is nothing for it to read and nowhere for it to draw -- so
-        -- it is not a setting, it is sediment from repeated scans.
-        --
-        -- Anything still enabled is left alone however useless it looks, and
-        -- so is anything with a button or a Cooldown Manager entry: those can
-        -- come back to life the moment a bar is rearranged.
-        ns.RebuildCDMMap()
-        local rules = CG:GetRules()
-        local gone, kept = 0, 0
-        for i = #rules, 1, -1 do
-            local r = rules[i]
-            local mf = r.spell and ns.FindMirror(r)
-            local onBar = (ns.buttonCount[r] or 0) > 0
-            if r.enabled == false and not onBar and not mf then
-                table.remove(rules, i)
-                gone = gone + 1
-            else
-                kept = kept + 1
-            end
-        end
-        CG.lastSig = nil
-        CG:Rebuild()
-        if ns.RefreshOptions then ns.RefreshOptions() end
+        local gone, kept = ns.TidyRules()
         Say(L("removed %d dead rules, kept %d",
               "убрано мёртвых правил: %d, осталось: %d"), gone, kept)
     elseif cmd == "combat" then
