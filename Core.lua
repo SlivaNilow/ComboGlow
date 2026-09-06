@@ -222,6 +222,69 @@ local function SpellVariants(spellID, out)
     return out
 end
 
+--[[-------------------------------------------------------------------------
+    What a button casts
+
+    GetMacroSpell answers "what would this cast right now", conditionals and
+    all -- which is the wrong answer for a druid, whose macros routinely open
+    with a form change. In cat form the first line of
+
+        /cast [stance:3] Cat Form
+        /cast [nocombat] Prowl
+
+    is true, so the macro reports Cat Form and Prowl is never seen, even though
+    Prowl is the entire point of the button.
+
+    So the body is read as well and every spell named in a /cast line is
+    collected. A macro that can cast three tracked things gets marked for all
+    three, which is honest: the button really can do all three, and which one
+    depends on a condition we are not going to re-implement.
+---------------------------------------------------------------------------]]
+local macroSpells = {}
+
+local function MacroSpellList(macroID)
+    wipe(macroSpells)
+    local body = _G.GetMacroBody and GetMacroBody(macroID)
+    if type(body) ~= "string" then return macroSpells end
+    local seen = {}
+    for line in body:gmatch("[^\r\n]+") do
+        -- #showtooltip names the spell the button is ABOUT, which is usually
+        -- the one worth marking -- and it is written even in macros whose
+        -- first castable line is a form change. Misspelt variants included:
+        -- the game ignores "#showtooltips", and so would we, but the player's
+        -- intent is legible either way.
+        local shown = line:match("^%s*#show%a*%s+(.+)$")
+        if shown then
+            local name = shown:gsub("%b[]", ""):gsub("%b()", ""):match("^%s*(.-)%s*$")
+            if name and name ~= "" and not seen[name] then
+                seen[name] = true
+                local info = ns.SpellInfo(name)
+                if info and info.spellID then
+                    macroSpells[#macroSpells + 1] = info.spellID
+                end
+            end
+        end
+
+        local cmd, args = line:match("^%s*/(%a+)%s+(.+)$")
+        if cmd and (cmd == "cast" or cmd == "use" or cmd == "castsequence") then
+            -- Strip conditionals, then take each ; or , separated candidate.
+            args = args:gsub("%b[]", "")
+            for part in args:gmatch("[^;,]+") do
+                -- "Spell(Rank)" and trailing rank text are not part of a name.
+                local name = part:gsub("%b()", ""):match("^%s*(.-)%s*$")
+                if name and name ~= "" and not seen[name] then
+                    seen[name] = true
+                    local info = ns.SpellInfo(name)
+                    if info and info.spellID then
+                        macroSpells[#macroSpells + 1] = info.spellID
+                    end
+                end
+            end
+        end
+    end
+    return macroSpells
+end
+
 local function ActionSpellID(slot)
     if not slot then return nil end
     local actionType, id = GetActionInfo(slot)
@@ -231,9 +294,9 @@ local function ActionSpellID(slot)
         local s = _G.GetMacroSpell and GetMacroSpell(id)
         if type(s) == "string" then
             local info = ns.SpellInfo(s)
-            return info and info.spellID
+            s = info and info.spellID
         end
-        return s
+        return s, MacroSpellList(id)
     end
     return nil
 end
@@ -449,11 +512,20 @@ local MAX_ACTION_SLOT = 180
 local function ForEachActionButton(fn)
     local seen = {}
     ns.scannedButtons = 0
-    local function visit(b, spellID)
+    -- A macro can name several spells we track; each gets the button offered
+    -- to it. The button really can cast all of them, and which one depends on
+    -- a condition we are not going to re-implement -- so the honest answer is
+    -- to mark it for every one it could.
+    local function visit(b, spellID, extras)
         if not b or seen[b] then return end
         seen[b] = true
         ns.scannedButtons = ns.scannedButtons + 1
         fn(b, spellID)
+        if extras then
+            for _, id in ipairs(extras) do
+                if id ~= spellID then fn(b, id) end
+            end
+        end
     end
 
     -- EllesmereUIActionBars builds its OWN buttons (EABButton<slot>) and then
