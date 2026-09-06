@@ -816,6 +816,13 @@ function CG:Rebuild()
     end
     self.lastSig = sig
 
+    -- Learned here because a rebuild is the one moment we are reliably
+    -- out of combat with nothing empowering anything: at login, on a
+    -- spec change, after editing a rule. Asked for lazily instead, the
+    -- first answer could easily be an empowered icon, and then nothing
+    -- would ever differ from the baseline again.
+    if ns.LearnBaseIcons then ns.LearnBaseIcons(self:GetRules()) end
+
     self:Teardown()
     wipe(ns.castMap)
     for id, list in pairs(castMap) do ns.castMap[id] = list end

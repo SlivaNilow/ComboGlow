@@ -1106,33 +1106,49 @@ function ns.CastEmpowerment(spellID)
     return empoweredCast[spellID]
 end
 
-function ns.NoteCastEmpowerment(spellID)
-    if not spellID then return end
-    local GOS = C_Spell and C_Spell.GetOverrideSpell
-    if not GOS then return end
+--[[-------------------------------------------------------------------------
+    Reading the empowerment off the spell's own icon
 
-    -- Two ways this arrives, and only one of them was handled. Cast the base
-    -- spell while the buff is up and the override answers with the empowered
-    -- form -- that is the button art changing. But the cast can also be
-    -- reported AS the empowered form, and then there is nothing to look up:
-    -- being handed the empowered id IS the answer, and it belongs to whichever
-    -- tracked spell overrides to it.
-    local ok, o = pcall(GOS, spellID)
-    if ok and type(o) == "number" and o ~= spellID then
-        empoweredCast[spellID] = true
-        return
-    end
+    GetOverrideSpell says nothing about these -- it answers "same" with Tiger's
+    Fury up -- but GetSpellInfo quietly follows the override anyway: Rake reads
+    as icon 7195159 while the buff is up and 132122 while it is not. Plain
+    numbers, no aura involved, so this is a fact we are allowed to have.
 
-    for base in pairs(ns.castMap or {}) do
-        if base ~= spellID then
-            local ok2, ob = pcall(GOS, base)
-            if ok2 and ob == spellID then
-                empoweredCast[base] = true
-                return
-            end
+    It describes the CAST, not the target, which is the right question anyway:
+    what is on the target cannot be known, but what we sent at it can, and it
+    stays true until we send something weaker.
+
+    The base icon has to be learned when nothing is empowering it, so it is
+    only ever recorded OUT OF COMBAT. Learning it lazily was the bug that made
+    this look dead: first asked mid-fight with the buff up, the empowered icon
+    became the baseline and nothing ever differed from it again.
+---------------------------------------------------------------------------]]
+local function CurrentIcon(spellID)
+    if not (C_Spell and C_Spell.GetSpellInfo and spellID) then return nil end
+    local ok, info = pcall(C_Spell.GetSpellInfo, spellID)
+    if not ok or type(info) ~= "table" then return nil end
+    local icon = info.iconID
+    if type(icon) ~= "number" or IsSecret(icon) then return nil end
+    return icon
+end
+
+function ns.LearnBaseIcons(rules)
+    if InCombatLockdown and InCombatLockdown() then return end
+    for _, rule in ipairs(rules or {}) do
+        if rule.spell then
+            local icon = CurrentIcon(rule.spell)
+            if icon then baseIcon[rule.spell] = icon end
         end
     end
-    empoweredCast[spellID] = nil
+end
+
+function ns.NoteCastEmpowerment(spellID)
+    if not spellID then return end
+    local icon = CurrentIcon(spellID)
+    local base = baseIcon[spellID]
+    if icon and base then
+        empoweredCast[spellID] = (icon ~= base) or nil
+    end
 end
 
 local function EntryEmpowered(itemFrame, rule)
