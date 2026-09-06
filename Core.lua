@@ -1569,6 +1569,7 @@ function CG:Initialize()
     -- into ours unread. On by default because it is the only way the
     -- empowered art reaches the button at all.
     ns.showEntryIcon = self.db.entryIcon ~= false
+    ns.entryIconScale = tonumber(self.db.entryIconScale) or 75
 
     self.initialized = true
     if ns.CreateMinimapButton then ns.CreateMinimapButton() end

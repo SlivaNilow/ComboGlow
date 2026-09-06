@@ -1156,13 +1156,18 @@ local function EntryBadge(frame, rule, itemFrame)
     local tex = frame.EntryIcon
     if not tex then
         tex = frame:CreateTexture(nil, "OVERLAY", nil, 7)
-        local w = (frame.artW or 40) * 0.45
-        tex:SetSize(w, w)
-        tex:SetPoint("BOTTOMRIGHT", frame, "CENTER", (frame.artW or 40) * 0.5,
-                     -(frame.artH or 40) * 0.5)
         tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         frame.EntryIcon = tex
     end
+
+    -- Sized every time rather than at creation: the scale is a setting, and a
+    -- setting that only takes effect after a rebuild is a setting people think
+    -- is broken.
+    local base = frame.artW or 40
+    local w = base * ((ns.entryIconScale or 75) / 100)
+    tex:SetSize(w, w)
+    tex:ClearAllPoints()
+    tex:SetPoint("BOTTOMRIGHT", frame, "CENTER", base * 0.5, -(frame.artH or base) * 0.5)
 
     local ok, art = pcall(src.GetTexture, src)
     if not ok or art == nil then return false end
