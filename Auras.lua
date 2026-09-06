@@ -1452,7 +1452,8 @@ end
 --
 -- This only finds out whether the icon changes. Nothing is built on it yet.
 function ns.IconProbe(rules, say)
-    say(ns.L("--- entry icons ---", "--- иконки записей ---"))
+    say(ns.L("--- entry icons (%d rules) ---", "--- иконки записей (правил: %d) ---"),
+        #rules)
     local seen = {}
     for _, rule in ipairs(rules) do
         if rule.kind == "aura" and not rule.proc and rule.spell and not seen[rule.spell] then
@@ -1500,9 +1501,10 @@ function ns.IconProbe(rules, say)
                 end
             end
 
-            say("%s: spell icon %s | override %s | entry %s", name, tostring(base),
-                override, #shown > 0 and table.concat(shown, ", ") or "no mirror")
-        end
+            local ok = pcall(say, "%s: spell icon %s | override %s | entry %s",
+                name, tostring(base), override,
+                #shown > 0 and table.concat(shown, ", ") or "no mirror")
+            if not ok then say("%s: report failed", tostring(name)) end
     end
 end
 ---------------------------------------------------------------------------]]
