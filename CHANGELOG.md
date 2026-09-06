@@ -2,22 +2,48 @@
 
 ## 1.4.0
 
-**An empowered aura is marked in its own colour.** Feral empowers Rake and Rip
-while Tiger's Fury is up and the empowerment lasts the dot's whole duration --
-but the button reverts the moment the buff does, so a stronger dot gets
-overwritten with a weaker one and nothing says a word about it.
+**Macros work.** They never have. `GetActionInfo` hands back the SPELL a macro
+resolves to rather than a macro index, and that number was being passed to
+`GetMacroSpell` as an index all along -- so the game answered honestly about a
+macro numbered 1822, which does not exist, and every macro on every bar was
+silently skipped. A macro slot now resolves exactly like a spell slot. The
+macro body is read as a fallback, so a client where that id really is an index
+still finds every spell named in a `/cast`, `/use`, `/castsequence` or
+`#showtooltip` line.
 
-What is on the target still cannot be read. The Cooldown Manager keeps tracking
-the empowered version, though, and draws the empowered ICON while it does --
-and a texture id is an ordinary number. So the "up" marker turns violet
-whenever the entry is drawing something other than the spell's own icon.
+**Marks can go in the Cooldown Manager**, on the bars, or both -- two switches
+on the new Settings page. The tracker is the one place that draws the empowered
+art for a dot, so marking state there and leaving the buttons clean is a
+coherent way to run this.
 
-Nothing about it is Feral-specific: any aura whose empowered form carries its
-own art is marked the same way, and one whose form does not simply never
-reports empowered. It outranks the "running out" colour, because "do not
-overwrite this" matters more than "it is nearly gone", and the countdown is on
-the icon regardless.
+**The Cooldown Manager hides per viewer.** Essential, utility, tracked buffs
+and buff bars are four displays answering four questions, and wanting one
+without the others is ordinary. By scale rather than `Hide()`, as before: the
+aura states read those frames.
 
+**Debuffs are quiet outside combat.** A dot missing from a training dummy, or
+from whatever you last targeted in a city, is not news, and the row of red
+marks it produced is the kind of noise that teaches you to stop reading the
+markers at all. Bursts have been combat-only since the first version; auras on
+another unit now follow. `/cg peace <#>` shows one anyway.
+
+**Two checkboxes per aura state:** which unit it is looked for on, and whether
+it is a buff or a debuff. A scan still pairs them sensibly; after that they are
+yours. A harmful aura you carry and a buff you watch on the target are both
+real things.
+
+**A settings page**, because six global buttons stacked in the corner of a
+per-spell editor is a corner that has become a second window. The spell list
+fills the window and shows that it scrolls.
+
+**"Tracked as a cooldown, not as a buff"** is now said as such. A spell sitting
+in the utility row and a spell nowhere in the tracker used to read identically,
+and they need completely different actions -- the first is the confusing one,
+because the spell is plainly there on screen, just in a list that answers when
+the ability comes back rather than whether its buff is on you.
+
+`/cg tidy` removes rules that are switched off, on no button and tracked by
+nothing -- sediment from repeated scans, and nothing else.
 ## 1.3.2
 
 **The countdown colouring is off by default now, and opt-in.** It works by
