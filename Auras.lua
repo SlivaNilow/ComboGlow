@@ -770,7 +770,21 @@ end
 -- doing it from either is enough -- and the "gone" rule holds the threshold
 -- itself, which spares the sibling lookup on every poll of every frame.
 function ns.ApplyEntryFormatter(itemFrame, rule)
-    if ns.entryFormat == false or not rule.missing then return false end
+    -- OFF unless asked for.
+    --
+    -- This sets a formatter on Blizzard's own Cooldown Manager entries, and
+    -- the hook it needs sits on the shared Cooldown metatable -- both are
+    -- insecure code touching frames the secure path owns. With them on, chat
+    -- stopped accepting Enter: the edit box kept the text and nothing
+    -- happened, with no error and nothing pointing here. Taint surfaces far
+    -- from its cause, which is exactly why the rest of this addon stays off
+    -- that path.
+    --
+    -- It is worth keeping as an opt-in, because it is the only way to get an
+    -- honest "about to fall off" during a fight. It is not worth being on by
+    -- default at that price.
+    if not ns.entryFormat or not rule.missing then return false end
+    if not ns.HookCooldownDurations() then return false end
     local n = tonumber(rule.soon) or 0
     if n <= 0 then return false end
     local cd = itemFrame and (itemFrame.Cooldown or itemFrame.cooldown)
@@ -1593,6 +1607,3 @@ function ns.AuraCheck(rules, say)
     end
 end
 
--- Hooked as early as the client allows; the lazy path retries if this is
--- too early for the action bars to exist yet.
-HookCooldownDurations()

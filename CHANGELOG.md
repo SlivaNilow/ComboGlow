@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.3.2
+
+**The countdown colouring is off by default now, and opt-in.** It works by
+putting a formatter on Blizzard's own Cooldown Manager entries, which is
+insecure code reaching into frames the secure path owns. With it on, the chat
+box stopped accepting Enter — the text stayed, nothing happened, no error, and
+nothing pointing at this addon. Taint surfaces far from its cause, which is why
+everything else here stays off that path.
+
+It is still the only honest way to know a dot is about to fall off during a
+fight, so it stays available: `/cg entryfmt on`, remembered between sessions.
+If anything odd starts happening, that is the first thing to turn back off.
+
 ## 1.3.1
 
 **Every free slash prefix is registered, not just the first one.** `/cg` is the

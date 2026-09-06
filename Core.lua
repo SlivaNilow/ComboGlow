@@ -1552,6 +1552,11 @@ function CG:Initialize()
     self:PositionAnchor()
     self:SetAnchorLocked(self.db.center.locked ~= false)
 
+    -- Opt-in, and remembered. It puts a formatter on Blizzard's own Cooldown
+    -- Manager entries, which is insecure code touching frames the secure path
+    -- owns -- so it is never on because nobody said otherwise.
+    ns.entryFormat = self.db.entryFormat and true or false
+
     self.initialized = true
     if ns.CreateMinimapButton then ns.CreateMinimapButton() end
 

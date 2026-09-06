@@ -197,8 +197,8 @@ when you log in.
 | `/cg unit <#> <unit>` | player, target, focus, mouseover, pet |
 | `/cg aura <#> <name\|id>` | watch a different aura than the spell itself |
 | `/cg warn <#> <seconds>` | marker turns red this long before it ends |
-| `/cg soon <#> <seconds>` | countdown turns the warning colour this early |
-| `/cg entryfmt on/off` | that colouring, off if another addon fights it |
+| `/cg soon <#> <seconds>` | countdown turns the warning colour this early (needs `/cg entryfmt on`) |
+| `/cg entryfmt on/off` | that colouring; off by default, it touches Blizzard's frames |
 | `/cg style <#\|all> <key>` | marker |
 | `/cg color <#> r g b` | colour, 0–255 |
 | `/cg alpha <#\|all> <0-100>` \| `/cg thick <#\|all> <1-10>` | brightness, frame thickness |
@@ -503,8 +503,8 @@ Cooldown Manager»** делает его невидимым, не выключа
 | `/cg unit <№> <юнит>` | player, target, focus, mouseover, pet |
 | `/cg aura <№> <имя\|id>` | следить за другой аурой, а не за самим заклинанием |
 | `/cg warn <№> <секунд>` | отметка краснеет за столько до конца |
-| `/cg soon <№> <секунд>` | отсчёт краснеет за столько до конца |
-| `/cg entryfmt on/off` | это окрашивание; off, если мешает другой аддон |
+| `/cg soon <№> <секунд>` | отсчёт краснеет за столько до конца (нужен `/cg entryfmt on`) |
+| `/cg entryfmt on/off` | это окрашивание; по умолчанию выключено, лезет в кадры Blizzard |
 | `/cg style <№\|all> <ключ>` | отметка |
 | `/cg color <№> r g b` | цвет, 0–255 |
 | `/cg alpha <№\|all> <0-100>` \| `/cg thick <№\|all> <1-10>` | яркость, толщина рамки |

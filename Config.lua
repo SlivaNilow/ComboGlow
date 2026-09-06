@@ -1271,10 +1271,20 @@ local function Handler(msg)
     elseif cmd == "entryfmt" then
         -- Kill switch: we and other cooldown-text addons set formatters on
         -- the same widgets, and last writer wins.
+        -- Off by default and remembered when turned on: it touches Blizzard's
+        -- own frames, so it is a deliberate choice rather than something you
+        -- inherit. See the note on ApplyEntryFormatter.
         ns.entryFormat = not (rest and rest:lower():find("off"))
+        CG.db.entryFormat = ns.entryFormat or nil
         Say(ns.entryFormat and L("entry formatter on", "форматтер записи включён")
             or L("entry formatter off - /reload to restore",
                  "форматтер записи выключен — /reload вернёт как было"))
+        if ns.entryFormat then
+            Say(L("it sets a formatter on Blizzard's own entries; turn it off "
+                  .. "if anything odd starts happening",
+                  "он ставит форматтер на кадры Blizzard; выключи, если начнутся "
+                  .. "странности"))
+        end
 
     elseif cmd == "stacks" then
         -- Where a stack count could come from, per aura rule: what our own
