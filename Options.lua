@@ -1178,7 +1178,6 @@ local function Build()
                      "не удалось открыть — Меню игры, Режим редактирования, Cooldown Manager"))
         end
     end)
-    UI.openCDM:SetPoint("BOTTOMLEFT", UI.onCDM, "TOPLEFT", 0, 4)
 
     local bDot = TextButton(UI, L("Add last cast", "Добавить последний каст"), 160, 22, function()
         if not CG.lastCast then
@@ -1191,6 +1190,11 @@ local function Build()
         Refresh()
     end)
     bDot:SetPoint("LEFT", bPreset, "RIGHT", 8, 0)
+
+    -- With the other doing-things buttons rather than among the
+    -- switches: it opens something, it does not set anything.
+    UI.openCDM:ClearAllPoints()
+    UI.openCDM:SetPoint("LEFT", bDot, "RIGHT", 8, 0)
 
     -- Only the whole spell. Removing a single state was never the right
     -- answer to "do not light this one" -- the gallery's first tile turns a
@@ -1213,12 +1217,12 @@ local function Build()
     -- the second page. It had all accumulated in the bottom-left corner of the
     -- spell editor, and six global buttons stacked in a corner is a corner
     -- that has quietly become a second window.
-    OnPage("settings", UI.onBars, UI.onCDM, UI.openCDM, UI.source)
+    OnPage("settings", UI.onBars, UI.onCDM, UI.source)
     for _, b in ipairs(UI.viewerBtns or {}) do OnPage("settings", b) end
 
     OnPage("spells", UI.hint, UI.warn, UI.empty, UI.title, UI.titleIcon,
            UI.auraRow, UI.auraList, UI.countRow, UI.soonRow, UI.delSpell,
-           bPreset, bDot, UI.scroll)
+           bPreset, bDot, UI.openCDM, UI.scroll)
     for _, w in ipairs(UI.rows or {}) do OnPage("spells", w) end
     for _, w in ipairs(UI.slots or {}) do OnPage("spells", w) end
     for _, w in ipairs(UI.tiles or {}) do OnPage("spells", w) end
