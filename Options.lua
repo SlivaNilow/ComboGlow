@@ -24,6 +24,22 @@ local TILE_PAD_Y = 74
 local COLS       = 4
 
 local UI, offset = nil, 0
+
+-- Two pages in one window. The spell page is what this always was;
+-- everything that applies to the addon rather than to a spell moved off
+-- it, because six global buttons stacked in a corner of a per-spell
+-- editor is a sign the corner has become a second window.
+--
+-- Widgets are not reparented, only listed: they keep their anchors and
+-- a page change shows one list and hides the other.
+local page = "spells"
+local pageOf = {}
+local function OnPage(which, ...)
+    for i = 1, select("#", ...) do
+        local w = select(i, ...)
+        if w then pageOf[w] = which end
+    end
+end
 local selSpell, selSlot = nil, "active"
 
 local function L(en, ru) return ns.L(en, ru) end
@@ -373,6 +389,11 @@ end
 
 local function Refresh()
     if not UI or not UI:IsShown() then return end
+    -- The spell half is not merely hidden on the settings page, it is not
+    -- computed: RefreshRows walks every rule and RefreshTiles drives live
+    -- previews, and neither has anything to say about a page that shows
+    -- neither spells nor states.
+    if page ~= "spells" then return end
     local list = Normalise()
     RefreshRows(list)
     RefreshTiles()
@@ -1129,6 +1150,49 @@ local function Build()
     end)
     UI.delSpell:SetPoint("BOTTOMRIGHT", -12, 10)
 
+    -- Pages -----------------------------------------------------------------
+    --
+    -- Everything that is about the addon rather than about a spell lives on
+    -- the second page. It had all accumulated in the bottom-left corner of the
+    -- spell editor, and six global buttons stacked in a corner is a corner
+    -- that has quietly become a second window.
+    OnPage("settings", UI.onBars, UI.onCDM, UI.openCDM, UI.source)
+    for _, b in ipairs(UI.viewerBtns or {}) do OnPage("settings", b) end
+
+    OnPage("spells", UI.hint, UI.warn, UI.empty, UI.title, UI.titleIcon,
+           UI.auraRow, UI.auraList, UI.countRow, UI.soonRow, UI.delSpell,
+           bPreset, bDot)
+    for _, w in ipairs(UI.rows or {}) do OnPage("spells", w) end
+    for _, w in ipairs(UI.slots or {}) do OnPage("spells", w) end
+    for _, w in ipairs(UI.tiles or {}) do OnPage("spells", w) end
+    for _, w in ipairs(UI.toggles or {}) do OnPage("spells", w) end
+
+    UI.pageTabs = {}
+    local pageDefs = {
+        { key = "spells",   label = L("Spells", "Заклинания") },
+        { key = "settings", label = L("Settings", "Настройки") },
+    }
+    for i, d in ipairs(pageDefs) do
+        local t = TextButton(UI, d.label, 110, 20, function()
+            page = d.key
+            ns.ShowPage()
+        end)
+        t:SetPoint("TOPLEFT", 12 + (i - 1) * 114, -34)
+        t.pageKey = d.key
+        UI.pageTabs[i] = t
+    end
+
+    function ns.ShowPage()
+        for w, which in pairs(pageOf) do
+            if which == page then w:Show() else w:Hide() end
+        end
+        for _, t in ipairs(UI.pageTabs) do
+            t.text:SetTextColor(t.pageKey == page and 1 or 0.6,
+                                t.pageKey == page and 0.82 or 0.6,
+                                t.pageKey == page and 0.2 or 0.6)
+        end
+        Refresh()
+    end
     UI:SetScript("OnHide", function()
         for _, tile in ipairs(UI.tiles) do
             if tile.overlay then tile.overlay:StopArt() end
@@ -1142,6 +1206,7 @@ function ns.ToggleOptions()
         UI:Hide()
     else
         UI:Show()
+        if ns.ShowPage then ns.ShowPage() end
         Refresh()
     end
 end
