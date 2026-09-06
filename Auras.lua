@@ -1101,6 +1101,11 @@ end
 -- lit by then anyway.
 local empoweredCast = {}
 
+-- For the report: what a cast recorded, if anything.
+function ns.CastEmpowerment(spellID)
+    return empoweredCast[spellID]
+end
+
 function ns.NoteCastEmpowerment(spellID)
     if not spellID then return end
     local GOS = C_Spell and C_Spell.GetOverrideSpell
@@ -1734,9 +1739,24 @@ function ns.AuraCheck(rules, say)
                 end
                 local info = C_Spell and C_Spell.GetSpellInfo
                     and C_Spell.GetSpellInfo(rule.spell)
-                say("     icon: spell %s | entry %s | empowered=%s",
+                -- What the override answers right now, and what a cast of this
+                -- spell last recorded. Between them: whether the empowered
+                -- form is visible to us at all, and whether we ever saw it go.
+                local ovr = "-"
+                if C_Spell and C_Spell.GetOverrideSpell then
+                    local oko, o = pcall(C_Spell.GetOverrideSpell, rule.spell)
+                    if oko and type(o) == "number" then
+                        ovr = (o == rule.spell) and "same" or tostring(o)
+                    elseif oko then
+                        ovr = type(o)
+                    else
+                        ovr = "err"
+                    end
+                end
+                say("     icon: spell %s | entry %s | empowered=%s | override=%s | noted=%s",
                     tostring(info and info.iconID or "?"), drawn,
-                    tostring(EntryEmpowered(mf, rule)))
+                    tostring(EntryEmpowered(mf, rule)), ovr,
+                    tostring(ns.CastEmpowerment(rule.spell)))
                 say("     aura link: auraDataUnit=%s auraInstanceID=%s | %s",
                     tostring(type(mf.auraDataUnit) ~= "nil"),
                     tostring(type(mf.auraInstanceID) ~= "nil"),
