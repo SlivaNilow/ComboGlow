@@ -1166,7 +1166,8 @@ ns.badgeOK = nil
     ordering below the sweep costs nothing to maintain.
 ---------------------------------------------------------------------------]]
 local function EntryBadge(frame, rule, itemFrame)
-    if not ns.showEntryIcon or rule.missing or frame.secondary then return false end
+    if not ns.showEntryIcon or rule.badge == false then return false end
+    if rule.missing or frame.secondary then return false end
 
     -- The BUFF entry first, whatever kind of rule this is. A cooldown entry
     -- draws the ability as it sits on the bar -- always looking available --

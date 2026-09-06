@@ -915,6 +915,14 @@ local function Build()
         { key = "stacks", auraOnly = true, label = L("stacks", "стаки"),
           get = function(r) return r.stacks ~= false end,
           set = function(r) r.stacks = not (r.stacks ~= false) end },
+        -- Per state, because it is worth it on some and clutter on others: a
+        -- dot wants the tracker's art laid over the button (that is where the
+        -- empowered form appears, and nowhere else), while a cooldown you can
+        -- already read at a glance does not.
+        { key = "badge", auraOnly = false,
+          label = L("tracker icon over the button", "иконка трекера поверх кнопки"),
+          get = function(r) return r.badge ~= false end,
+          set = function(r) r.badge = not (r.badge ~= false) end },
         -- Only offered where it can do anything: an aura state has no resource
         -- to be ready for, and a spell with its own "proc" state has already
         -- answered the question -- the proc belongs to that marker.
