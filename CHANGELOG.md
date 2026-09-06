@@ -2,48 +2,37 @@
 
 ## 1.4.0
 
-**Macros work.** They never have. `GetActionInfo` hands back the SPELL a macro
-resolves to rather than a macro index, and that number was being passed to
-`GetMacroSpell` as an index all along -- so the game answered honestly about a
-macro numbered 1822, which does not exist, and every macro on every bar was
-silently skipped. A macro slot now resolves exactly like a spell slot. The
-macro body is read as a fallback, so a client where that id really is an index
-still finds every spell named in a `/cast`, `/use`, `/castsequence` or
-`#showtooltip` line.
+**Macros work.** A spell on a macro button is marked the same as one on a plain
+button. It never was before -- macros were skipped entirely, on every bar.
 
-**Marks can go in the Cooldown Manager**, on the bars, or both -- two switches
-on the new Settings page. The tracker is the one place that draws the empowered
-art for a dot, so marking state there and leaving the buttons clean is a
-coherent way to run this.
+**Marks can go in the Cooldown Manager.** Two switches on the new Settings
+page: the action bars, the Cooldown Manager, or both. The tracker draws things
+the bars do not -- an empowered dot keeps its own icon there -- so marking
+state next to it and leaving the buttons clean is a reasonable way to play.
 
-**The Cooldown Manager hides per viewer.** Essential, utility, tracked buffs
-and buff bars are four displays answering four questions, and wanting one
-without the others is ordinary. By scale rather than `Hide()`, as before: the
-aura states read those frames.
+**The Cooldown Manager hides in parts.** Essential, utility, tracked buffs and
+buff bars have a switch each, instead of one for all four. It keeps running
+either way; the aura states need it.
 
-**Debuffs are quiet outside combat.** A dot missing from a training dummy, or
-from whatever you last targeted in a city, is not news, and the row of red
-marks it produced is the kind of noise that teaches you to stop reading the
-markers at all. Bursts have been combat-only since the first version; auras on
-another unit now follow. `/cg peace <#>` shows one anyway.
+**Debuff markers keep quiet outside combat**, the way burst markers always
+have. A dot missing from a target dummy is not news. `/cg peace <#>` brings one
+back if you want it.
 
-**Two checkboxes per aura state:** which unit it is looked for on, and whether
-it is a buff or a debuff. A scan still pairs them sensibly; after that they are
-yours. A harmful aura you carry and a buff you watch on the target are both
-real things.
+**Two checkboxes per aura state:** which unit the aura is looked for on, and
+whether it is a buff or a debuff. A scan sets them sensibly; after that they
+are yours.
 
-**A settings page**, because six global buttons stacked in the corner of a
-per-spell editor is a corner that has become a second window. The spell list
-fills the window and shows that it scrolls.
+**A Settings page.** The spell list fills the window now and shows that it
+scrolls.
 
-**"Tracked as a cooldown, not as a buff"** is now said as such. A spell sitting
-in the utility row and a spell nowhere in the tracker used to read identically,
-and they need completely different actions -- the first is the confusing one,
-because the spell is plainly there on screen, just in a list that answers when
-the ability comes back rather than whether its buff is on you.
+**"Tracked as a cooldown, not as a buff"** is said as such, instead of "no
+source". The spell is in the Cooldown Manager, just in the list that tracks
+when it comes back rather than whether it is on you -- and an aura state needs
+the second one.
 
-`/cg tidy` removes rules that are switched off, on no button and tracked by
-nothing -- sediment from repeated scans, and nothing else.
+**Clear dead rules** -- a button on the Settings page with the count on it, or
+`/cg tidy`. Rules that are switched off, on no button and tracked by nothing:
+leftovers from repeated scans that can never do anything.
 ## 1.3.2
 
 **The countdown colouring is off by default now, and opt-in.** It works by
