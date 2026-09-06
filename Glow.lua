@@ -446,8 +446,17 @@ function ComboGlowOverlayMixin:Attach(button)
     self:ClearAllPoints()
     self:SetPoint("CENTER", button, "CENTER", 0, 0)
     self:SetSize(W, H)
-    self:SetFrameStrata(button:GetFrameStrata())
-    self:SetFrameLevel((button:GetFrameLevel() or 1) + 6)
+    -- Cooldown Manager entries come with a heavy border and a lit background
+    -- of their own, and a marker sitting six levels up still reads as part of
+    -- them. Identified by cooldownID, which only those frames carry, and lifted
+    -- clear of their art rather than merely above their frame.
+    if button.cooldownID ~= nil then
+        self:SetFrameStrata("HIGH")
+        self:SetFrameLevel(20)
+    else
+        self:SetFrameStrata(button:GetFrameStrata())
+        self:SetFrameLevel((button:GetFrameLevel() or 1) + 6)
+    end
 
     self.artW, self.artH = w, h
     if self.gateH then
