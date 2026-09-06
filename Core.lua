@@ -484,6 +484,7 @@ ns.ActionSpellID = ActionSpellID
 -- seen at all. A rule that matches nothing is the most common reason for
 -- "it says it added it but nothing glows", so /cg list reports both.
 ns.buttonCount = setmetatable({}, { __mode = "k" })
+ns.hotkeyOf = {}
 ns.scannedButtons = 0
 
 local function ForEachCooldownViewerFrame(fn)
@@ -732,6 +733,15 @@ function CG:Rebuild()
         local list = spellID and wanted[spellID]
         if not list then return end
         if button.action then watched[button.action] = true end
+        -- The key that casts it, taken off the button that carries it.
+        -- Ordinary text on a frame of theirs that we only read, and the
+        -- only place the binding is written down in a form we can show.
+        if button.HotKey and button.HotKey.GetText then
+            local okk, txt = pcall(button.HotKey.GetText, button.HotKey)
+            if okk and type(txt) == "string" and txt ~= "" then
+                ns.hotkeyOf[spellID] = txt
+            end
+        end
         for _, rule in ipairs(list) do
             place(button, rule, rule.style)
             -- A second marker for the same state. One frame carries one style,
@@ -814,6 +824,7 @@ function CG:Rebuild()
     self.wantedSpells = wanted
     self.watchedSlots = watched
     wipe(ns.buttonCount)
+    wipe(ns.hotkeyOf)
 
     local function register(frame, rule)
         frame.rule = rule
@@ -1572,7 +1583,7 @@ function CG:Initialize()
     -- into ours unread. On by default because it is the only way the
     -- empowered art reaches the button at all.
     ns.showEntryIcon = self.db.entryIcon ~= false
-    ns.entryIconScale = tonumber(self.db.entryIconScale) or 75
+    ns.entryIconScale = tonumber(self.db.entryIconScale) or 100
 
     self.initialized = true
     if ns.CreateMinimapButton then ns.CreateMinimapButton() end

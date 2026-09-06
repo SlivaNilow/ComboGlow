@@ -1148,6 +1148,23 @@ ns.EntryEmpowered = EntryEmpowered
 ---------------------------------------------------------------------------]]
 ns.badgeOK = nil
 
+--[[-------------------------------------------------------------------------
+    The stack, from the button up
+
+        the button          Blizzard's, untouched
+        borrowed icon       the tracker's art, passed to us unread
+        our marking         whatever style the rule chose
+        the sweep           what is left of the cooldown
+        text                the countdown, and the key that casts it
+
+    Each layer says something the one below it cannot, so the order is fixed
+    rather than incidental: art is covered by a mark, a mark is qualified by a
+    sweep, and text goes on top because it is read rather than glanced at.
+
+    The borrowed icon is a texture on the overlay itself, which puts it under
+    Art -- a child frame is always above its parent's textures -- so the
+    ordering below the sweep costs nothing to maintain.
+---------------------------------------------------------------------------]]
 local function EntryBadge(frame, rule, itemFrame)
     if not ns.showEntryIcon or rule.missing or frame.secondary then return false end
 
@@ -1161,19 +1178,19 @@ local function EntryBadge(frame, rule, itemFrame)
 
     local tex = frame.EntryIcon
     if not tex then
-        tex = frame:CreateTexture(nil, "OVERLAY", nil, 7)
+        tex = frame:CreateTexture(nil, "ARTWORK")
         tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         frame.EntryIcon = tex
     end
 
-    -- Sized every time rather than at creation: the scale is a setting, and a
-    -- setting that only takes effect after a rebuild is a setting people think
-    -- is broken.
+    -- Sized every pass: the scale is a setting, and one that waits for a
+    -- rebuild is a setting people report as broken. 100 covers the button,
+    -- which is the point -- the borrowed art is meant to be read, not noticed.
     local base = frame.artW or 40
-    local w = base * ((ns.entryIconScale or 75) / 100)
+    local w = base * ((ns.entryIconScale or 100) / 100)
     tex:SetSize(w, w)
     tex:ClearAllPoints()
-    tex:SetPoint("BOTTOMRIGHT", frame, "CENTER", base * 0.5, -(frame.artH or base) * 0.5)
+    tex:SetPoint("CENTER", frame, "CENTER", 0, 0)
 
     local ok, art = pcall(src.GetTexture, src)
     if not ok or art == nil then return false end
@@ -1186,22 +1203,24 @@ local function EntryBadge(frame, rule, itemFrame)
     end
     tex:Show()
 
-    -- And the sweep, so a borrowed icon cannot read as "ready" while the
-    -- ability is still coming back. A spell's own cooldown is the player's own
-    -- business and comes back as plain numbers -- nothing secret is involved,
-    -- and nothing of Blizzard's is touched: this is a cooldown of ours drawn
-    -- over a texture of ours.
+    -- The sweep, above our marking: a borrowed icon must not read as ready
+    -- while the ability is still coming back. A spell's own cooldown is the
+    -- player's own business and arrives as plain numbers -- nothing secret,
+    -- and nothing of Blizzard's touched: our cooldown over our texture.
     local cd = frame.EntryCD
     if not cd then
         cd = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
         cd:SetHideCountdownNumbers(true)
         cd:SetDrawBling(false)
         cd:SetDrawEdge(false)
+        cd.noCooldownCount = true
         frame.EntryCD = cd
     end
     cd:ClearAllPoints()
     cd:SetAllPoints(tex)
-    cd:SetFrameLevel(frame:GetFrameLevel() + 1)
+    local artLevel = frame.Art and frame.Art.GetFrameLevel
+        and frame.Art:GetFrameLevel() or frame:GetFrameLevel()
+    cd:SetFrameLevel(artLevel + 1)
 
     local start, dur = 0, 0
     if C_Spell and C_Spell.GetSpellCooldown then
@@ -1218,6 +1237,24 @@ local function EntryBadge(frame, rule, itemFrame)
     else
         cd:Clear()
         cd:Hide()
+    end
+
+    -- The key that casts it, on top of everything. Read off whichever action
+    -- button carries the spell -- ordinary text on a frame of Blizzard's that
+    -- we only look at.
+    local key = ns.hotkeyOf and ns.hotkeyOf[rule.spell]
+    if key and key ~= "" then
+        local fs = frame.EntryKey
+        if not fs then
+            fs = cd:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+            frame.EntryKey = fs
+        end
+        fs:ClearAllPoints()
+        fs:SetPoint("TOPRIGHT", tex, "TOPRIGHT", -1, -1)
+        fs:SetText(key)
+        fs:Show()
+    elseif frame.EntryKey then
+        frame.EntryKey:Hide()
     end
     return true
 end
