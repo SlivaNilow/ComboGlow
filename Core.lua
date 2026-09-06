@@ -240,11 +240,46 @@ end
     three, which is honest: the button really can do all three, and which one
     depends on a condition we are not going to re-implement.
 ---------------------------------------------------------------------------]]
+-- The macro API moved. GetMacroSpell and GetMacroBody are both nil on 12.1,
+-- which is why the macro branch below has been dead since the first version
+-- without ever saying so: it asked, got nothing, and quietly returned nothing.
+-- Both namespaces are tried so this keeps working whichever client it meets.
+local function MacroBody(id)
+    if C_Macro and C_Macro.GetMacroBody then
+        local ok, b = pcall(C_Macro.GetMacroBody, id)
+        if ok and type(b) == "string" then return b end
+    end
+    if _G.GetMacroBody then
+        local ok, b = pcall(_G.GetMacroBody, id)
+        if ok and type(b) == "string" then return b end
+    end
+    if C_Macro and C_Macro.GetMacroInfo then
+        local ok, info = pcall(C_Macro.GetMacroInfo, id)
+        if ok and type(info) == "table" and type(info.body) == "string" then
+            return info.body
+        end
+        if ok and type(info) == "string" then return nil end
+    end
+    return nil
+end
+
+local function MacroSpell(id)
+    if C_Macro and C_Macro.GetMacroSpell then
+        local ok, s = pcall(C_Macro.GetMacroSpell, id)
+        if ok and s ~= nil then return s end
+    end
+    if _G.GetMacroSpell then
+        local ok, s = pcall(_G.GetMacroSpell, id)
+        if ok and s ~= nil then return s end
+    end
+    return nil
+end
+
 local macroSpells = {}
 
 local function MacroSpellList(macroID)
     wipe(macroSpells)
-    local body = _G.GetMacroBody and GetMacroBody(macroID)
+    local body = MacroBody(macroID)
     if type(body) ~= "string" then return macroSpells end
     local seen = {}
     for line in body:gmatch("[^\r\n]+") do
@@ -291,7 +326,7 @@ local function ActionSpellID(slot)
     if actionType == "spell" then
         return id
     elseif actionType == "macro" then
-        local s = _G.GetMacroSpell and GetMacroSpell(id)
+        local s = MacroSpell(id)
         if type(s) == "string" then
             local info = ns.SpellInfo(s)
             s = info and info.spellID
@@ -571,9 +606,17 @@ ns.ActionSpellID = ActionSpellID
 function ns.MacroReport(slot)
     local actionType, id = GetActionInfo(slot)
     if actionType ~= "macro" then return nil end
-    local name = _G.GetMacroInfo and GetMacroInfo(id)
-    local cast = _G.GetMacroSpell and GetMacroSpell(id)
-    local body = _G.GetMacroBody and GetMacroBody(id)
+    local name
+    if C_Macro and C_Macro.GetMacroInfo then
+        local ok, info = pcall(C_Macro.GetMacroInfo, id)
+        if ok then name = (type(info) == "table" and info.name) or info end
+    end
+    if name == nil and _G.GetMacroInfo then
+        local ok, n = pcall(_G.GetMacroInfo, id)
+        if ok then name = n end
+    end
+    local cast = MacroSpell(id)
+    local body = MacroBody(id)
     local list = {}
     for _, sid in ipairs(MacroSpellList(id)) do
         list[#list + 1] = ns.SpellName(sid)
