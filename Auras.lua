@@ -1221,6 +1221,16 @@ local function EntryBadge(frame, rule, itemFrame)
     end
     return true
 end
+-- For the burst path, which never goes near ApplyMirror: same badge, and it
+-- finds its own entry. A major cooldown is exactly the case that needs the
+-- sweep -- without it a marker says "ready" and means "tracked".
+function ns.ShowEntryBadge(frame, rule)
+    if not (frame and rule) then return end
+    if not EntryBadge(frame, rule, nil) and frame.EntryIcon then
+        frame.EntryIcon:Hide()
+        if frame.EntryCD then frame.EntryCD:Hide() end
+    end
+end
 local function ApplyMirror(frame, rule, itemFrame)
     local flag, ok = MirrorFlag(itemFrame)
     if not ok or not frame.SetAlphaFromBoolean then return false end
@@ -1252,6 +1262,7 @@ local function ApplyMirror(frame, rule, itemFrame)
     -- Ask the engine to mark the last seconds in the text we are about to copy.
     ns.ApplyEntryFormatter(itemFrame, rule)
     -- The tracker's own art, borrowed unread.
+
     if not EntryBadge(frame, rule, itemFrame) and frame.EntryIcon then
         frame.EntryIcon:Hide()
         if frame.EntryCD then frame.EntryCD:Hide() end

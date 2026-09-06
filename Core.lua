@@ -1091,6 +1091,9 @@ function CG:UpdatePower()
             -- Burst: ready means off cooldown, not a resource count. Kept to
             -- combat by default -- a major cooldown sitting ready in town is
             -- not something anyone needs reminding of.
+            -- The tracker's own icon, with the sweep on it: a burst
+            -- marker otherwise says "ready" when it means "tracked".
+            if ns.ShowEntryBadge then ns.ShowEntryBadge(frame, rule) end
             local on = CooldownReady(rule.spell)
             if on and rule.combat ~= false and not InCombatLockdown() then
                 on = false
