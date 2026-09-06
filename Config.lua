@@ -1259,7 +1259,7 @@ local function Handler(msg)
             Say(L("timer: %s", "таймер: %s"), rule.timer and L("on", "вкл") or L("off", "выкл"))
         end
 
-    elseif cmd == "icons" then
+    elseif cmd == "iconprobe" then
         -- Does the Cooldown Manager entry keep showing the empowered icon
         -- after the buff that empowered it has gone? That decides whether
         -- "a stronger dot is up" can be known at all.
