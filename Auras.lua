@@ -1055,20 +1055,31 @@ local function EntryIcon(itemFrame)
     local cached = iconOf[itemFrame]
     if cached ~= nil then return cached or nil end
     local found = false
-    for _, key in ipairs({ "Icon", "icon" }) do
-        local t = itemFrame[key]
-        if t and t.GetTexture then found = t break end
-    end
-    if not found then
-        pcall(function()
-            for _, r in ipairs({ itemFrame:GetRegions() }) do
-                if r.GetTexture and r.GetObjectType and r:GetObjectType() == "Texture" then
-                    local ok, tex = pcall(r.GetTexture, r)
-                    if ok and type(tex) == "number" then found = r return end
+
+    -- The numeric one first, and only then the named field. A file ID is how
+    -- a spell icon is set; borders and highlights are set by path or atlas,
+    -- and one of those can perfectly well be sitting under .Icon.
+    pcall(function()
+        for _, r in ipairs({ itemFrame:GetRegions() }) do
+            if r.GetTexture and r.GetObjectType and r:GetObjectType() == "Texture" then
+                local ok, tex = pcall(r.GetTexture, r)
+                if ok and type(tex) == "number" then
+                    found = r
+                    return
                 end
             end
-        end)
+        end
+    end)
+    if not found then
+        for _, key in ipairs({ "Icon", "icon" }) do
+            local t = itemFrame[key]
+            if t and t.GetTexture then
+                found = t
+                break
+            end
+        end
     end
+
     iconOf[itemFrame] = found
     return found or nil
 end
