@@ -13,5 +13,4 @@ release.ps1
 # Built release archives.
 ComboGlow-*.zip
 
-CONTEXT.md
 changelog-*.md
