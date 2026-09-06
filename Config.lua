@@ -1367,7 +1367,16 @@ local function Handler(msg)
                             local ok2, info =
                                 pcall(C_CooldownViewer.GetCooldownViewerCooldownInfo, cdID)
                             if ok2 and type(info) == "table" and info.spellID then
-                                Say("    %s", ns.SpellName(info.spellID))
+                                -- With the id and the icon, not just the name.
+                                -- Feral tracks "Rake" twice: the plain dot and
+                                -- the one Tiger's Fury empowered, same name,
+                                -- different spell -- and the pair is invisible
+                                -- in a list of names.
+                                local si = C_Spell and C_Spell.GetSpellInfo
+                                    and C_Spell.GetSpellInfo(info.spellID)
+                                Say("    %s |cff808080#%d icon %s|r",
+                                    ns.SpellName(info.spellID), info.spellID,
+                                    tostring(si and si.iconID or "?"))
                             end
                         end
                     end
