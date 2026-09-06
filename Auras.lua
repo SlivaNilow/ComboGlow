@@ -1023,156 +1023,6 @@ local function MirrorTimerText(frame, rule, itemFrame, allowMissing)
     return true
 end
 
---[[-------------------------------------------------------------------------
-    A stronger version of the same aura
-
-    Feral empowers Rake and Rip while Tiger's Fury is up, and the empowerment
-    lasts the dot's whole duration -- but the button reverts the moment the
-    buff does. So a stronger dot gets overwritten with a weaker one and nothing
-    on screen says a word about it.
-
-    What is on the target cannot be read. The Cooldown Manager keeps tracking
-    the empowered version though, and it draws the empowered ICON while doing
-    it -- and a texture id is an ordinary number, not a secret. So the question
-    "is the thing up the strong one" is answered by comparing what the entry
-    draws against the spell's own icon.
-
-    Nothing here is Feral-specific: any aura whose empowered form carries its
-    own art answers the same way, and one whose form does not simply never
-    reports empowered.
----------------------------------------------------------------------------]]
-local baseIcon = {}
-
--- The entry's icon texture, found once and kept.
---
--- It is not always under .Icon, and the entry carries border and highlight
--- textures too. The icon is the one drawing a file ID: art set by number
--- rather than by path or atlas, which is how a spell icon is set and how the
--- others are not.
-local iconOf = setmetatable({}, { __mode = "k" })
-
-local function EntryIcon(itemFrame)
-    local cached = iconOf[itemFrame]
-    if cached ~= nil then return cached or nil end
-    local found = false
-
-    -- The numeric one first, and only then the named field. A file ID is how
-    -- a spell icon is set; borders and highlights are set by path or atlas,
-    -- and one of those can perfectly well be sitting under .Icon.
-    pcall(function()
-        for _, r in ipairs({ itemFrame:GetRegions() }) do
-            if r.GetTexture and r.GetObjectType and r:GetObjectType() == "Texture" then
-                local ok, tex = pcall(r.GetTexture, r)
-                if ok and type(tex) == "number" then
-                    found = r
-                    return
-                end
-            end
-        end
-    end)
-    if not found then
-        for _, key in ipairs({ "Icon", "icon" }) do
-            local t = itemFrame[key]
-            if t and t.GetTexture then
-                found = t
-                break
-            end
-        end
-    end
-
-    iconOf[itemFrame] = found
-    return found or nil
-end
-
--- Was the last cast of this spell an empowered one?
---
--- On a target debuff the entry's icon comes back SECRET, so the reading above
--- answers nothing there -- which is the whole 12.1 story again: anything
--- derived from an aura on someone else is closed.
---
--- What is not closed is the override. While Tiger's Fury is up, Rake and Rip
--- are overridden by their empowered forms -- that is why the button art
--- changes -- and GetOverrideSpell is an ordinary call. So the question moves
--- from "what is on the target" to "what did I cast", which is answerable, and
--- is the same answer for as long as nobody recasts.
---
--- It says the last application was empowered, not that it is still up. Those
--- differ only when the dot has expired unnoticed, and the "gone" marker is
--- lit by then anyway.
-local empoweredCast = {}
-
--- For the report: what a cast recorded, if anything.
-function ns.CastEmpowerment(spellID)
-    return empoweredCast[spellID]
-end
-
---[[-------------------------------------------------------------------------
-    Reading the empowerment off the spell's own icon
-
-    GetOverrideSpell says nothing about these -- it answers "same" with Tiger's
-    Fury up -- but GetSpellInfo quietly follows the override anyway: Rake reads
-    as icon 7195159 while the buff is up and 132122 while it is not. Plain
-    numbers, no aura involved, so this is a fact we are allowed to have.
-
-    It describes the CAST, not the target, which is the right question anyway:
-    what is on the target cannot be known, but what we sent at it can, and it
-    stays true until we send something weaker.
-
-    The base icon has to be learned when nothing is empowering it, so it is
-    only ever recorded OUT OF COMBAT. Learning it lazily was the bug that made
-    this look dead: first asked mid-fight with the buff up, the empowered icon
-    became the baseline and nothing ever differed from it again.
----------------------------------------------------------------------------]]
-local function CurrentIcon(spellID)
-    if not (C_Spell and C_Spell.GetSpellInfo and spellID) then return nil end
-    local ok, info = pcall(C_Spell.GetSpellInfo, spellID)
-    if not ok or type(info) ~= "table" then return nil end
-    local icon = info.iconID
-    if type(icon) ~= "number" or IsSecret(icon) then return nil end
-    return icon
-end
-
-function ns.LearnBaseIcons(rules)
-    if InCombatLockdown and InCombatLockdown() then return end
-    for _, rule in ipairs(rules or {}) do
-        if rule.spell then
-            local icon = CurrentIcon(rule.spell)
-            if icon then baseIcon[rule.spell] = icon end
-        end
-    end
-end
-
-function ns.NoteCastEmpowerment(spellID)
-    if not spellID then return end
-    local icon = CurrentIcon(spellID)
-    local base = baseIcon[spellID]
-    if icon and base then
-        empoweredCast[spellID] = (icon ~= base) or nil
-    end
-end
-
-local function EntryEmpowered(itemFrame, rule)
-    if not (rule and rule.spell) or rule.empowered == false then return false end
-
-    -- Read it off the entry where the entry will say. Player auras do.
-    local want = baseIcon[rule.spell]
-    if want == nil then
-        local info = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(rule.spell)
-        want = (info and info.iconID) or false
-        baseIcon[rule.spell] = want
-    end
-    local t = want and itemFrame and EntryIcon(itemFrame)
-    if t then
-        local ok, tex = pcall(t.GetTexture, t)
-        if ok and type(tex) == "number" and not IsSecret(tex) then
-            return tex ~= want
-        end
-    end
-
-    -- Otherwise go by what we cast.
-    return empoweredCast[rule.spell] == true
-end
-ns.EntryEmpowered = EntryEmpowered
 local function ApplyMirror(frame, rule, itemFrame)
     local flag, ok = MirrorFlag(itemFrame)
     if not ok or not frame.SetAlphaFromBoolean then return false end
@@ -1220,16 +1070,8 @@ local function ApplyMirror(frame, rule, itemFrame)
     frame:StartArt()
 
     -- Recolour towards the warning colour as the aura runs out.
-    -- Recolour towards the warning colour as the aura runs out; and if what is
-    -- up is the empowered version, say so instead. That one outranks the
-    -- countdown: "do not overwrite this" matters more than "it is running out",
-    -- and the timer is on the icon anyway.
-    if not rule.missing then
-        if EntryEmpowered(itemFrame, rule) then
-            frame:SetArtColor(rule.er or 0.7, rule.eg or 0.4, rule.eb or 1)
-        elseif not ApplyWarnColor(frame, rule, durObj) then
-            frame:SetArtColor(rule.r or 0, rule.g or 1, rule.b or 0)
-        end
+    if not rule.missing and not ApplyWarnColor(frame, rule, durObj) then
+        frame:SetArtColor(rule.r or 0, rule.g or 1, rule.b or 0)
     end
 
     local shown, hidden = 1, 0
@@ -1253,12 +1095,6 @@ local castGen = setmetatable({}, { __mode = "k" })
 function ns.CastGen(rule) return castGen[rule] or 0 end
 
 function ns.OnPlayerCast(spellID)
-    -- Noted BEFORE the early return below. When a spell is cast in its
-    -- empowered form the event arrives under the OVERRIDE's id, which no
-    -- rule is keyed to -- so the one cast that mattered was the one cast
-    -- this function skipped.
-    ns.NoteCastEmpowerment(spellID)
-
     local rules = ns.castMap[spellID]
     if not rules then return false end
     local now = GetTime()
@@ -1743,36 +1579,6 @@ function ns.AuraCheck(rules, say)
                     tostring(ns.cdmViewerOf and ns.cdmViewerOf[mf] or "?"),
                     tostring(mf.IsActive ~= nil),
                     tostring(isAuraEntry and usable or false))
-                -- What the entry is drawing, and whether that makes it the
-                -- empowered version of the aura.
-                local t = EntryIcon(mf)
-                local drawn = "no texture found"
-                if t then
-                    local okt, tex = pcall(t.GetTexture, t)
-                    drawn = (not okt) and "err"
-                        or (tex == nil and "nil"
-                            or (IsSecret(tex) and "secret" or tostring(tex)))
-                end
-                local info = C_Spell and C_Spell.GetSpellInfo
-                    and C_Spell.GetSpellInfo(rule.spell)
-                -- What the override answers right now, and what a cast of this
-                -- spell last recorded. Between them: whether the empowered
-                -- form is visible to us at all, and whether we ever saw it go.
-                local ovr = "-"
-                if C_Spell and C_Spell.GetOverrideSpell then
-                    local oko, o = pcall(C_Spell.GetOverrideSpell, rule.spell)
-                    if oko and type(o) == "number" then
-                        ovr = (o == rule.spell) and "same" or tostring(o)
-                    elseif oko then
-                        ovr = type(o)
-                    else
-                        ovr = "err"
-                    end
-                end
-                say("     icon: spell %s | entry %s | empowered=%s | override=%s | noted=%s",
-                    tostring(info and info.iconID or "?"), drawn,
-                    tostring(EntryEmpowered(mf, rule)), ovr,
-                    tostring(ns.CastEmpowerment(rule.spell)))
                 say("     aura link: auraDataUnit=%s auraInstanceID=%s | %s",
                     tostring(type(mf.auraDataUnit) ~= "nil"),
                     tostring(type(mf.auraInstanceID) ~= "nil"),
