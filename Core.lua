@@ -484,7 +484,6 @@ ns.ActionSpellID = ActionSpellID
 -- seen at all. A rule that matches nothing is the most common reason for
 -- "it says it added it but nothing glows", so /cg list reports both.
 ns.buttonCount = setmetatable({}, { __mode = "k" })
-ns.hotkeyOf = {}
 ns.scannedButtons = 0
 
 local function ForEachCooldownViewerFrame(fn)
@@ -739,7 +738,6 @@ function CG:Rebuild()
         if button.HotKey and button.HotKey.GetText then
             local okk, txt = pcall(button.HotKey.GetText, button.HotKey)
             if okk and type(txt) == "string" and txt ~= "" then
-                ns.hotkeyOf[spellID] = txt
             end
         end
         for _, rule in ipairs(list) do
@@ -824,7 +822,6 @@ function CG:Rebuild()
     self.wantedSpells = wanted
     self.watchedSlots = watched
     wipe(ns.buttonCount)
-    wipe(ns.hotkeyOf)
 
     local function register(frame, rule)
         frame.rule = rule
@@ -1099,12 +1096,6 @@ function CG:UpdatePower()
             Silence(frame)
 
         elseif rule and rule.kind == "cd" then
-            -- Burst: ready means off cooldown, not a resource count. Kept to
-            -- combat by default -- a major cooldown sitting ready in town is
-            -- not something anyone needs reminding of.
-            -- The tracker's own icon, with the sweep on it: a burst
-            -- marker otherwise says "ready" when it means "tracked".
-            if ns.ShowEntryBadge then ns.ShowEntryBadge(frame, rule) end
             local on = CooldownReady(rule.spell)
             if on and rule.combat ~= false and not InCombatLockdown() then
                 on = false
@@ -1582,8 +1573,6 @@ function CG:Initialize()
     -- Purely additive and touches nothing of theirs: their texture goes
     -- into ours unread. On by default because it is the only way the
     -- empowered art reaches the button at all.
-    ns.showEntryIcon = self.db.entryIcon ~= false
-    ns.entryIconScale = tonumber(self.db.entryIconScale) or 100
 
     self.initialized = true
     if ns.CreateMinimapButton then ns.CreateMinimapButton() end

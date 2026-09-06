@@ -1102,9 +1102,32 @@ end
 local empoweredCast = {}
 
 function ns.NoteCastEmpowerment(spellID)
-    if not (C_Spell and C_Spell.GetOverrideSpell and spellID) then return end
-    local ok, o = pcall(C_Spell.GetOverrideSpell, spellID)
-    empoweredCast[spellID] = (ok and type(o) == "number" and o ~= spellID) or nil
+    if not spellID then return end
+    local GOS = C_Spell and C_Spell.GetOverrideSpell
+    if not GOS then return end
+
+    -- Two ways this arrives, and only one of them was handled. Cast the base
+    -- spell while the buff is up and the override answers with the empowered
+    -- form -- that is the button art changing. But the cast can also be
+    -- reported AS the empowered form, and then there is nothing to look up:
+    -- being handed the empowered id IS the answer, and it belongs to whichever
+    -- tracked spell overrides to it.
+    local ok, o = pcall(GOS, spellID)
+    if ok and type(o) == "number" and o ~= spellID then
+        empoweredCast[spellID] = true
+        return
+    end
+
+    for base in pairs(ns.castMap or {}) do
+        if base ~= spellID then
+            local ok2, ob = pcall(GOS, base)
+            if ok2 and ob == spellID then
+                empoweredCast[base] = true
+                return
+            end
+        end
+    end
+    empoweredCast[spellID] = nil
 end
 
 local function EntryEmpowered(itemFrame, rule)
@@ -1129,149 +1152,6 @@ local function EntryEmpowered(itemFrame, rule)
     return empoweredCast[rule.spell] == true
 end
 ns.EntryEmpowered = EntryEmpowered
---[[-------------------------------------------------------------------------
-    Borrowing the entry's own icon
-
-    On a target debuff the entry's icon is a SECRET texture -- we established
-    that by asking, and it is why "is the empowered version up" cannot be
-    answered by comparing icons. But a secret may be PASSED where it may not be
-    read, which is the whole trade this addon runs on.
-
-    So the texture is handed straight from their texture object to one of ours
-    without ever being looked at. We still do not know what it is; the player
-    does, because it is the art they are already looking at in the tracker --
-    the empowered form included, which exists nowhere else.
-
-    Whether a texture setter accepts a secret at all is not a given:
-    SetCooldown refuses one outright. If it is refused here the badge simply
-    never appears, which is the same as not having asked.
----------------------------------------------------------------------------]]
-ns.badgeOK = nil
-
---[[-------------------------------------------------------------------------
-    The stack, from the button up
-
-        the button          Blizzard's, untouched
-        borrowed icon       the tracker's art, passed to us unread
-        our marking         whatever style the rule chose
-        the sweep           what is left of the cooldown
-        text                the countdown, and the key that casts it
-
-    Each layer says something the one below it cannot, so the order is fixed
-    rather than incidental: art is covered by a mark, a mark is qualified by a
-    sweep, and text goes on top because it is read rather than glanced at.
-
-    The borrowed icon is a texture on the overlay itself, which puts it under
-    Art -- a child frame is always above its parent's textures -- so the
-    ordering below the sweep costs nothing to maintain.
----------------------------------------------------------------------------]]
-local function EntryBadge(frame, rule, itemFrame)
-    -- Off unless asked for, per state. It covers the button's own art, which
-    -- is a real trade: worth it on a dot, where the empowered form appears
-    -- nowhere else, and not worth it on everything else.
-    if rule.badge ~= true or not ns.showEntryIcon then return false end
-    if rule.missing or frame.secondary then return false end
-
-    -- The BUFF entry first, whatever kind of rule this is. A cooldown entry
-    -- draws the ability as it sits on the bar -- always looking available --
-    -- while the buff entry draws what is actually on you, which is the
-    -- question worth answering and the only place empowered art appears.
-    local from = (ns.cdmAuraFrames and ns.cdmAuraFrames[rule.spell]) or itemFrame
-    local src = from and EntryIcon(from)
-    if not src then return false end
-
-    local tex = frame.EntryIcon
-    if not tex then
-        tex = frame:CreateTexture(nil, "ARTWORK")
-        tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        frame.EntryIcon = tex
-    end
-
-    -- Sized every pass: the scale is a setting, and one that waits for a
-    -- rebuild is a setting people report as broken. 100 covers the button,
-    -- which is the point -- the borrowed art is meant to be read, not noticed.
-    local base = frame.artW or 40
-    local w = base * ((ns.entryIconScale or 100) / 100)
-    tex:SetSize(w, w)
-    tex:ClearAllPoints()
-    tex:SetPoint("CENTER", frame, "CENTER", 0, 0)
-
-    local ok, art = pcall(src.GetTexture, src)
-    if not ok or art == nil then return false end
-    local ok2 = pcall(tex.SetTexture, tex, art)
-    ns.badgeOK = ok2
-    if not ok2 then
-        tex:Hide()
-        if frame.EntryCD then frame.EntryCD:Hide() end
-        return false
-    end
-    tex:Show()
-
-    -- The sweep, above our marking: a borrowed icon must not read as ready
-    -- while the ability is still coming back. A spell's own cooldown is the
-    -- player's own business and arrives as plain numbers -- nothing secret,
-    -- and nothing of Blizzard's touched: our cooldown over our texture.
-    local cd = frame.EntryCD
-    if not cd then
-        cd = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
-        cd:SetHideCountdownNumbers(true)
-        cd:SetDrawBling(false)
-        cd:SetDrawEdge(false)
-        cd.noCooldownCount = true
-        frame.EntryCD = cd
-    end
-    cd:ClearAllPoints()
-    cd:SetAllPoints(tex)
-    local artLevel = frame.Art and frame.Art.GetFrameLevel
-        and frame.Art:GetFrameLevel() or frame:GetFrameLevel()
-    cd:SetFrameLevel(artLevel + 1)
-
-    local start, dur = 0, 0
-    if C_Spell and C_Spell.GetSpellCooldown then
-        local okc, info = pcall(C_Spell.GetSpellCooldown, rule.spell)
-        if okc and type(info) == "table"
-           and type(info.startTime) == "number" and type(info.duration) == "number"
-           and not IsSecret(info.startTime) and not IsSecret(info.duration) then
-            start, dur = info.startTime, info.duration
-        end
-    end
-    if dur > 1.5 then
-        cd:SetCooldown(start, dur)
-        cd:Show()
-    else
-        cd:Clear()
-        cd:Hide()
-    end
-
-    -- The key that casts it, on top of everything. Read off whichever action
-    -- button carries the spell -- ordinary text on a frame of Blizzard's that
-    -- we only look at.
-    local key = ns.hotkeyOf and ns.hotkeyOf[rule.spell]
-    if key and key ~= "" then
-        local fs = frame.EntryKey
-        if not fs then
-            fs = cd:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-            frame.EntryKey = fs
-        end
-        fs:ClearAllPoints()
-        fs:SetPoint("TOPRIGHT", tex, "TOPRIGHT", -1, -1)
-        fs:SetText(key)
-        fs:Show()
-    elseif frame.EntryKey then
-        frame.EntryKey:Hide()
-    end
-    return true
-end
--- For the burst path, which never goes near ApplyMirror: same badge, and it
--- finds its own entry. A major cooldown is exactly the case that needs the
--- sweep -- without it a marker says "ready" and means "tracked".
-function ns.ShowEntryBadge(frame, rule)
-    if not (frame and rule) then return end
-    if not EntryBadge(frame, rule, nil) and frame.EntryIcon then
-        frame.EntryIcon:Hide()
-        if frame.EntryCD then frame.EntryCD:Hide() end
-    end
-end
 local function ApplyMirror(frame, rule, itemFrame)
     local flag, ok = MirrorFlag(itemFrame)
     if not ok or not frame.SetAlphaFromBoolean then return false end
@@ -1302,12 +1182,6 @@ local function ApplyMirror(frame, rule, itemFrame)
     frame.sweepFailed = (wantsSweep and not swept) or nil
     -- Ask the engine to mark the last seconds in the text we are about to copy.
     ns.ApplyEntryFormatter(itemFrame, rule)
-    -- The tracker's own art, borrowed unread.
-
-    if not EntryBadge(frame, rule, itemFrame) and frame.EntryIcon then
-        frame.EntryIcon:Hide()
-        if frame.EntryCD then frame.EntryCD:Hide() end
-    end
     if not MirrorTimerText(frame, rule, itemFrame, soon ~= nil) then
         frame.TimerText:SetText("")
         frame.TimerText:Hide()
@@ -1358,6 +1232,12 @@ local castGen = setmetatable({}, { __mode = "k" })
 function ns.CastGen(rule) return castGen[rule] or 0 end
 
 function ns.OnPlayerCast(spellID)
+    -- Noted BEFORE the early return below. When a spell is cast in its
+    -- empowered form the event arrives under the OVERRIDE's id, which no
+    -- rule is keyed to -- so the one cast that mattered was the one cast
+    -- this function skipped.
+    ns.NoteCastEmpowerment(spellID)
+
     local rules = ns.castMap[spellID]
     if not rules then return false end
     local now = GetTime()
@@ -1366,7 +1246,6 @@ function ns.OnPlayerCast(spellID)
         castAt[rule] = now
         castGen[rule] = (castGen[rule] or 0) + 1
     end
-    ns.NoteCastEmpowerment(spellID)
     return true
 end
 
@@ -1855,10 +1734,9 @@ function ns.AuraCheck(rules, say)
                 end
                 local info = C_Spell and C_Spell.GetSpellInfo
                     and C_Spell.GetSpellInfo(rule.spell)
-                say("     icon: spell %s | entry %s | empowered=%s | borrowed=%s",
+                say("     icon: spell %s | entry %s | empowered=%s",
                     tostring(info and info.iconID or "?"), drawn,
-                    tostring(EntryEmpowered(mf, rule)),
-                    tostring(ns.badgeOK))
+                    tostring(EntryEmpowered(mf, rule)))
                 say("     aura link: auraDataUnit=%s auraInstanceID=%s | %s",
                     tostring(type(mf.auraDataUnit) ~= "nil"),
                     tostring(type(mf.auraInstanceID) ~= "nil"),

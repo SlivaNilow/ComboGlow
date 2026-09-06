@@ -1767,29 +1767,6 @@ local function Handler(msg)
         else
             Say(L("usage: /cg peace <#>", "формат: /cg peace <№>"))
         end
-    elseif cmd == "badge" then
-        -- The tracker's own icon, copied onto the marker. Percent of the
-        -- button; "off" removes it.
-        local arg = rest:lower()
-        if arg:find("off") then
-            CG.db.entryIcon = false
-            ns.showEntryIcon = false
-            Say(L("tracker icon: off", "иконка из трекера: выкл"))
-        else
-            local n = tonumber(arg)
-            if n then
-                CG.db.entryIcon = nil
-                CG.db.entryIconScale = math.max(10, math.min(150, n))
-                ns.showEntryIcon = true
-                ns.entryIconScale = CG.db.entryIconScale
-                Say(L("tracker icon: %d%% of the button",
-                      "иконка из трекера: %d%% кнопки"), ns.entryIconScale)
-            else
-                Say(L("usage: /cg badge <10-150|off>",
-                      "формат: /cg badge <10-150|off>"))
-            end
-        end
-        CG:UpdateNow()
     elseif cmd == "combat" then
         CG.db.combatOnly = OnOff(rest:lower(), CG.db.combatOnly)
         CG:UpdateNow()
