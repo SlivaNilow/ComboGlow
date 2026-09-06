@@ -1129,6 +1129,52 @@ local function EntryEmpowered(itemFrame, rule)
     return empoweredCast[rule.spell] == true
 end
 ns.EntryEmpowered = EntryEmpowered
+--[[-------------------------------------------------------------------------
+    Borrowing the entry's own icon
+
+    On a target debuff the entry's icon is a SECRET texture -- we established
+    that by asking, and it is why "is the empowered version up" cannot be
+    answered by comparing icons. But a secret may be PASSED where it may not be
+    read, which is the whole trade this addon runs on.
+
+    So the texture is handed straight from their texture object to one of ours
+    without ever being looked at. We still do not know what it is; the player
+    does, because it is the art they are already looking at in the tracker --
+    the empowered form included, which exists nowhere else.
+
+    Whether a texture setter accepts a secret at all is not a given:
+    SetCooldown refuses one outright. If it is refused here the badge simply
+    never appears, which is the same as not having asked.
+---------------------------------------------------------------------------]]
+ns.badgeOK = nil
+
+local function EntryBadge(frame, rule, itemFrame)
+    if not ns.showEntryIcon or rule.missing or frame.secondary then return false end
+    local src = itemFrame and EntryIcon(itemFrame)
+    if not src then return false end
+
+    local tex = frame.EntryIcon
+    if not tex then
+        tex = frame:CreateTexture(nil, "OVERLAY", nil, 7)
+        local w = (frame.artW or 40) * 0.45
+        tex:SetSize(w, w)
+        tex:SetPoint("BOTTOMRIGHT", frame, "CENTER", (frame.artW or 40) * 0.5,
+                     -(frame.artH or 40) * 0.5)
+        tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        frame.EntryIcon = tex
+    end
+
+    local ok, art = pcall(src.GetTexture, src)
+    if not ok or art == nil then return false end
+    local ok2 = pcall(tex.SetTexture, tex, art)
+    ns.badgeOK = ok2
+    if not ok2 then
+        tex:Hide()
+        return false
+    end
+    tex:Show()
+    return true
+end
 local function ApplyMirror(frame, rule, itemFrame)
     local flag, ok = MirrorFlag(itemFrame)
     if not ok or not frame.SetAlphaFromBoolean then return false end
@@ -1159,6 +1205,10 @@ local function ApplyMirror(frame, rule, itemFrame)
     frame.sweepFailed = (wantsSweep and not swept) or nil
     -- Ask the engine to mark the last seconds in the text we are about to copy.
     ns.ApplyEntryFormatter(itemFrame, rule)
+    -- The tracker's own art, borrowed unread.
+    if not EntryBadge(frame, rule, itemFrame) and frame.EntryIcon then
+        frame.EntryIcon:Hide()
+    end
     if not MirrorTimerText(frame, rule, itemFrame, soon ~= nil) then
         frame.TimerText:SetText("")
         frame.TimerText:Hide()
@@ -1706,9 +1756,10 @@ function ns.AuraCheck(rules, say)
                 end
                 local info = C_Spell and C_Spell.GetSpellInfo
                     and C_Spell.GetSpellInfo(rule.spell)
-                say("     icon: spell %s | entry %s | empowered=%s",
+                say("     icon: spell %s | entry %s | empowered=%s | borrowed=%s",
                     tostring(info and info.iconID or "?"), drawn,
-                    tostring(EntryEmpowered(mf, rule)))
+                    tostring(EntryEmpowered(mf, rule)),
+                    tostring(ns.badgeOK))
                 say("     aura link: auraDataUnit=%s auraInstanceID=%s | %s",
                     tostring(type(mf.auraDataUnit) ~= "nil"),
                     tostring(type(mf.auraInstanceID) ~= "nil"),

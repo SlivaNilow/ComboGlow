@@ -1565,6 +1565,11 @@ function CG:Initialize()
     -- owns -- so it is never on because nobody said otherwise.
     ns.entryFormat = self.db.entryFormat and true or false
 
+    -- Purely additive and touches nothing of theirs: their texture goes
+    -- into ours unread. On by default because it is the only way the
+    -- empowered art reaches the button at all.
+    ns.showEntryIcon = self.db.entryIcon ~= false
+
     self.initialized = true
     if ns.CreateMinimapButton then ns.CreateMinimapButton() end
 
