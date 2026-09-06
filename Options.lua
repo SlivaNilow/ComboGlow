@@ -285,17 +285,25 @@ local function RefreshDetails()
     -- the Cooldown Manager does not track cannot work at all on a target
     -- debuff, and there is nothing in the window to hint at that otherwise.
     -- Finding out which spell is missing was the whole chore.
-    local blind = false
-    if rule and rule.kind == "aura" and not rule.proc then
+    -- Three states, not two. "Not tracked at all" and "tracked as a cooldown
+    -- but not as a buff" look identical from inside the addon and need
+    -- completely different actions from the player -- and the second is by far
+    -- the more confusing, because the spell is plainly there in the tracker,
+    -- just in a list that answers a different question.
+    local note = ""
+    if rule and rule.kind == "aura" and not rule.proc and not ns.ReadsWork(rule) then
         local mf, isAuraEntry = ns.FindMirror(rule)
-        blind = not (mf and isAuraEntry) and not ns.ReadsWork(rule)
+        if mf and not isAuraEntry then
+            note = "|cffffd100" .. L(
+                "tracked as a cooldown, not as a buff - add it to tracked buffs",
+                "отслеживается как кулдаун, а не как бафф — добавь в отслеживаемые баффы")
+                .. "|r"
+        elseif not mf then
+            note = "|cffff6060" .. L("not tracked in the Cooldown Manager - add it there",
+                                     "нет в Cooldown Manager — добавь его туда") .. "|r"
+        end
     end
-    if blind then
-        UI.warn:SetText("|cffff6060" .. L("not tracked in the Cooldown Manager - add it there",
-                                          "нет в Cooldown Manager — добавь его туда") .. "|r")
-    else
-        UI.warn:SetText("")
-    end
+    UI.warn:SetText(note)
 
     for _, t in ipairs(UI.toggles) do
         if not rule or (t.auraOnly and rule.kind ~= "aura")

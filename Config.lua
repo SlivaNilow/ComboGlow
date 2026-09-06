@@ -1035,6 +1035,15 @@ local function PrintList()
                 flags[#flags + 1] = L("api", "api")
             elseif mf and isAuraEntry then
                 flags[#flags + 1] = "|cff0cd29f" .. L("cdm", "cdm") .. "|r"
+            elseif mf then
+                -- Tracked, but as a COOLDOWN. That entry knows when the
+                -- ability comes back, not whether its buff is on you, and an
+                -- aura state needs the second thing. Saying "no source" here
+                -- is true and useless: the spell is plainly in the tracker,
+                -- just in the wrong list.
+                flags[#flags + 1] = "|cffffd100"
+                    .. L("cooldown only - add it to tracked buffs",
+                         "только кулдаун — добавь в отслеживаемые баффы") .. "|r"
             else
                 flags[#flags + 1] = "|cffff4040" .. L("NO SOURCE", "НЕТ ИСТОЧНИКА") .. "|r"
             end
