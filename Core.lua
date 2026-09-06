@@ -326,6 +326,16 @@ local function ActionSpellID(slot)
     if actionType == "spell" then
         return id
     elseif actionType == "macro" then
+        -- On 12.1 the id here is the SPELL the macro resolves to, not a macro
+        -- index. Passing it to GetMacroSpell as an index is what made every
+        -- macro come back empty -- the functions were present and answering
+        -- honestly about a macro numbered 1822, which does not exist.
+        --
+        -- The body scan stays behind it for clients where the id really is an
+        -- index, and for macros the game declines to resolve.
+        if ns.SpellInfo(id) then
+            return id, MacroSpellList(id)
+        end
         local s = MacroSpell(id)
         if type(s) == "string" then
             local info = ns.SpellInfo(s)
