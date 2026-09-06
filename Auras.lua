@@ -1043,6 +1043,36 @@ end
 ---------------------------------------------------------------------------]]
 local baseIcon = {}
 
+-- The entry's icon texture, found once and kept.
+--
+-- It is not always under .Icon, and the entry carries border and highlight
+-- textures too. The icon is the one drawing a file ID: art set by number
+-- rather than by path or atlas, which is how a spell icon is set and how the
+-- others are not.
+local iconOf = setmetatable({}, { __mode = "k" })
+
+local function EntryIcon(itemFrame)
+    local cached = iconOf[itemFrame]
+    if cached ~= nil then return cached or nil end
+    local found = false
+    for _, key in ipairs({ "Icon", "icon" }) do
+        local t = itemFrame[key]
+        if t and t.GetTexture then found = t break end
+    end
+    if not found then
+        pcall(function()
+            for _, r in ipairs({ itemFrame:GetRegions() }) do
+                if r.GetTexture and r.GetObjectType and r:GetObjectType() == "Texture" then
+                    local ok, tex = pcall(r.GetTexture, r)
+                    if ok and type(tex) == "number" then found = r return end
+                end
+            end
+        end)
+    end
+    iconOf[itemFrame] = found
+    return found or nil
+end
+
 local function EntryEmpowered(itemFrame, rule)
     if not (rule and rule.spell) or rule.empowered == false then return false end
     local want = baseIcon[rule.spell]
@@ -1052,8 +1082,8 @@ local function EntryEmpowered(itemFrame, rule)
         baseIcon[rule.spell] = want
     end
     if not want then return false end
-    local t = itemFrame and (itemFrame.Icon or itemFrame.icon)
-    if not (t and t.GetTexture) then return false end
+    local t = itemFrame and EntryIcon(itemFrame)
+    if not t then return false end
     local ok, tex = pcall(t.GetTexture, t)
     if not ok or type(tex) ~= "number" or IsSecret(tex) then return false end
     return tex ~= want
@@ -1623,26 +1653,21 @@ function ns.AuraCheck(rules, say)
                     tostring(ns.cdmViewerOf and ns.cdmViewerOf[mf] or "?"),
                     tostring(mf.IsActive ~= nil),
                     tostring(isAuraEntry and usable or false))
-                -- What icon the entry is drawing. Feral's Tiger's Fury
-                -- empowers a dot for its whole duration and the button forgets
-                -- the moment the buff drops, so if the empowered aura keeps
-                -- its own icon here, that is an answer about the target we are
-                -- otherwise not allowed to have.
-                local drawn = {}
-                for _, key in ipairs({ "Icon", "icon", "Texture", "texture" }) do
-                    local t = mf[key]
-                    if t and t.GetTexture then
-                        local okt, tex = pcall(t.GetTexture, t)
-                        if okt and tex ~= nil then
-                            drawn[#drawn + 1] = IsSecret(tex) and "secret" or tostring(tex)
-                        end
-                    end
+                -- What the entry is drawing, and whether that makes it the
+                -- empowered version of the aura.
+                local t = EntryIcon(mf)
+                local drawn = "no texture found"
+                if t then
+                    local okt, tex = pcall(t.GetTexture, t)
+                    drawn = (not okt) and "err"
+                        or (tex == nil and "nil"
+                            or (IsSecret(tex) and "secret" or tostring(tex)))
                 end
                 local info = C_Spell and C_Spell.GetSpellInfo
                     and C_Spell.GetSpellInfo(rule.spell)
-                say("     icon: spell %s | entry %s",
-                    tostring(info and info.iconID or "?"),
-                    #drawn > 0 and table.concat(drawn, ", ") or "none found")
+                say("     icon: spell %s | entry %s | empowered=%s",
+                    tostring(info and info.iconID or "?"), drawn,
+                    tostring(EntryEmpowered(mf, rule)))
                 say("     aura link: auraDataUnit=%s auraInstanceID=%s | %s",
                     tostring(type(mf.auraDataUnit) ~= "nil"),
                     tostring(type(mf.auraInstanceID) ~= "nil"),
