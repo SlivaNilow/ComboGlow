@@ -1442,6 +1442,69 @@ end
     Diagnostic: /cg auracheck
     Prints what the API actually answers here, so restricted content can be
     diagnosed from a report instead of guessed at.
+-- What icon each tracked entry is showing right now.
+--
+-- Feral's Tiger's Fury empowers a dot for its whole duration, and the button
+-- forgets the moment the buff ends -- but if the empowered aura carries its own
+-- icon, the Cooldown Manager entry keeps showing it for as long as the dot is
+-- up. A texture id is an ordinary value, so that would be an answer about the
+-- target we are otherwise not allowed to have.
+--
+-- This only finds out whether the icon changes. Nothing is built on it yet.
+function ns.IconProbe(rules, say)
+    say(ns.L("--- entry icons ---", "--- иконки записей ---"))
+    local seen = {}
+    for _, rule in ipairs(rules) do
+        if rule.kind == "aura" and not rule.proc and rule.spell and not seen[rule.spell] then
+            seen[rule.spell] = true
+            local name = ns.SpellName and ns.SpellName(rule.spell) or rule.spell
+            local info = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(rule.spell)
+            local base = info and info.iconID or "?"
+
+            local override = "-"
+            if C_Spell and C_Spell.GetOverrideSpell then
+                local ok, o = pcall(C_Spell.GetOverrideSpell, rule.spell)
+                if ok and type(o) == "number" and o ~= rule.spell then
+                    local oi = C_Spell.GetSpellInfo(o)
+                    override = ("%d icon %s"):format(o, oi and oi.iconID or "?")
+                end
+            end
+
+            -- Whatever textures the entry is drawing, by file id.
+            local shown = {}
+            local mf, isAura = ns.FindMirror(rule)
+            if mf and isAura then
+                for _, key in ipairs({ "Icon", "icon", "Texture", "texture" }) do
+                    local t = mf[key]
+                    if t and t.GetTexture then
+                        local ok, tex = pcall(t.GetTexture, t)
+                        if ok and tex ~= nil then
+                            shown[#shown + 1] = ("%s=%s"):format(key,
+                                IsSecret(tex) and "secret" or tostring(tex))
+                        end
+                    end
+                end
+                if #shown == 0 then
+                    local ok = pcall(function()
+                        for _, r in ipairs({ mf:GetRegions() }) do
+                            if r.GetTexture and r.GetObjectType and r:GetObjectType() == "Texture" then
+                                local ok2, tex = pcall(r.GetTexture, r)
+                                if ok2 and tex ~= nil then
+                                    shown[#shown + 1] = IsSecret(tex) and "secret"
+                                        or tostring(tex)
+                                end
+                            end
+                        end
+                    end)
+                    if not ok then shown[#shown + 1] = "<regions blocked>" end
+                end
+            end
+
+            say("%s: spell icon %s | override %s | entry %s", name, tostring(base),
+                override, #shown > 0 and table.concat(shown, ", ") or "no mirror")
+        end
+    end
+end
 ---------------------------------------------------------------------------]]
 function ns.AuraCheck(rules, say)
     say("--- aura check ---")
