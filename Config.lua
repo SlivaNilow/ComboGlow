@@ -1788,6 +1788,23 @@ local function Handler(msg)
         else
             Say(L("usage: /cg peace <#>", "формат: /cg peace <№>"))
         end
+    elseif cmd == "mac" then
+        -- Every macro on the bars: what the game says it casts right now, and
+        -- what reading its body found. A macro that lights nothing shows here
+        -- as an empty list, which says the body scan missed rather than the
+        -- rule being wrong.
+        local n = 0
+        for slot = 1, 180 do
+            local name, cast, list, blen = ns.MacroReport(slot)
+            if name then
+                n = n + 1
+                Say("%d. %s | GetMacroSpell=%s | body(%d chars): %s",
+                    slot, name, cast, blen,
+                    #list > 0 and table.concat(list, ", ")
+                        or "|cffff4040nothing|r")
+            end
+        end
+        if n == 0 then Say(L("no macros on the bars", "макросов на панелях нет")) end
     elseif cmd == "tidy" then
         -- Removes only what cannot ever do anything: switched off, on no
         -- button, and tracked by nothing. A rule in that state has no way back

@@ -567,6 +567,21 @@ end
 ns.ForEachActionButton = ForEachActionButton
 ns.ActionSpellID = ActionSpellID
 
+-- For diagnostics: what a macro slot resolved to, and how.
+function ns.MacroReport(slot)
+    local actionType, id = GetActionInfo(slot)
+    if actionType ~= "macro" then return nil end
+    local name = _G.GetMacroInfo and GetMacroInfo(id)
+    local cast = _G.GetMacroSpell and GetMacroSpell(id)
+    local body = _G.GetMacroBody and GetMacroBody(id)
+    local list = {}
+    for _, sid in ipairs(MacroSpellList(id)) do
+        list[#list + 1] = ns.SpellName(sid)
+    end
+    return tostring(name), tostring(cast), list,
+           body and #body or -1
+end
+
 -- How many buttons each rule actually landed on, and how many buttons were
 -- seen at all. A rule that matches nothing is the most common reason for
 -- "it says it added it but nothing glows", so /cg list reports both.
