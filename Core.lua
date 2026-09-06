@@ -309,7 +309,18 @@ function ns.ApplyCDMVisibility()
     -- is configured, and a half-pixel frame cannot be configured.
     local em = _G.EditModeManagerFrame
     local editing = em and em.IsEditModeActive and em:IsEditModeActive()
-    local hide = CG.db and CG.db.hideCDM and not editing
+    -- Per viewer now. They are four separate displays answering four separate
+    -- questions, and wanting the tracked buffs while not wanting the utility
+    -- row is an ordinary preference rather than an exotic one. The old
+    -- single flag still means "all of them", so nobody's setting is lost.
+    local db = CG.db or {}
+    local all = db.hideCDM
+    local per = db.hideViewer or {}
+    local function wanted(name)
+        if editing then return false end
+        if per[name] ~= nil then return per[name] and true or false end
+        return all and true or false
+    end
 
     for _, name in ipairs(CDM_ALL_VIEWERS) do
         local f = _G[name]
@@ -318,7 +329,7 @@ function ns.ApplyCDMVisibility()
                 local okS, s = pcall(f.GetScale, f)
                 cdmWas[f] = (okS and s and s > HIDDEN_SCALE and s) or 1
             end
-            pcall(f.SetScale, f, hide and HIDDEN_SCALE or cdmWas[f])
+            pcall(f.SetScale, f, wanted(name) and HIDDEN_SCALE or cdmWas[f])
 
             if not cdmHooked[f] then
                 cdmHooked[f] = true
@@ -329,7 +340,11 @@ function ns.ApplyCDMVisibility()
                     pcall(f.HookScript, f, "OnShow", function(self)
                         local e = _G.EditModeManagerFrame
                         local ed = e and e.IsEditModeActive and e:IsEditModeActive()
-                        if CG.db and CG.db.hideCDM and not ed then
+                        local d = CG.db or {}
+                        local pv = d.hideViewer or {}
+                        local want = pv[name]
+                        if want == nil then want = d.hideCDM end
+                        if want and not ed then
                             pcall(self.SetScale, self, HIDDEN_SCALE)
                         end
                     end)

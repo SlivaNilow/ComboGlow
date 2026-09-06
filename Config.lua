@@ -1585,7 +1585,10 @@ local function Handler(msg)
             CG.db.minimap.hide and L("off", "выкл") or L("on", "вкл"))
 
     elseif cmd == "hidecdm" then
+        -- The blanket switch. Per-viewer choices are made in the options
+        -- window and override it; this clears them so "all" means all.
         CG.db.hideCDM = OnOff(rest:lower(), not CG.db.hideCDM)
+        CG.db.hideViewer = nil
         ns.ApplyCDMVisibility()
         Say(L("Cooldown Manager hidden: %s", "Cooldown Manager скрыт: %s"),
             CG.db.hideCDM and L("yes", "да") or L("no", "нет"))

@@ -176,9 +176,12 @@ local function RefreshRows(list)
     UI.onCDM.text:SetText(CG.db.cdm
         and L("marking: Cooldown Manager ON", "отмечать: Cooldown Manager ВКЛ")
         or L("marking: Cooldown Manager off", "отмечать: Cooldown Manager выкл"))
-    UI.hideCDM.text:SetText(CG.db.hideCDM
-        and L("show the Cooldown Manager", "показать Cooldown Manager")
-        or L("hide the Cooldown Manager", "скрыть Cooldown Manager"))
+    for _, b in ipairs(UI.viewerBtns or {}) do
+        local hidden = (CG.db.hideViewer or {})[b.viewer.key]
+        if hidden == nil then hidden = CG.db.hideCDM and true or false end
+        b.text:SetText((hidden and L("show %s", "показать: %s")
+                               or L("hide %s", "скрыть: %s")):format(b.viewer.label))
+    end
 end
 
 local function RefreshTiles()
@@ -996,15 +999,37 @@ local function Build()
     end)
     bPreset:SetPoint("BOTTOMLEFT", 12, 10)
 
-    -- Alpha, not Hide: the aura states read that frame, and a hidden one is
-    -- not guaranteed to keep updating.
-    UI.hideCDM = TextButton(UI, "", 190, 22, function()
-        CG.db.hideCDM = not CG.db.hideCDM
-        ns.ApplyCDMVisibility()
-        Refresh()
-    end)
-    -- Above the status line, clear of the buttons along the bottom.
-    UI.hideCDM:SetPoint("BOTTOMLEFT", 14, 62)
+    -- One per viewer. They are four separate displays answering four separate
+    -- questions, and wanting the tracked buffs on screen while the utility row
+    -- is not is an ordinary preference. Scale, not Hide: the aura states read
+    -- these frames, and a hidden frame is not guaranteed to keep updating.
+    UI.viewerBtns = {}
+    local viewers = {
+        { key = "EssentialCooldownViewer", label = L("essential", "основные") },
+        { key = "UtilityCooldownViewer",   label = L("utility", "утилиты") },
+        { key = "BuffIconCooldownViewer",  label = L("tracked buffs", "баффы") },
+        { key = "BuffBarCooldownViewer",   label = L("buff bars", "полосы баффов") },
+    }
+    local prev
+    for _, v in ipairs(viewers) do
+        local b = TextButton(UI, "", 190, 22, function()
+            CG.db.hideViewer = CG.db.hideViewer or {}
+            local cur = CG.db.hideViewer[v.key]
+            if cur == nil then cur = CG.db.hideCDM and true or false end
+            CG.db.hideViewer[v.key] = not cur
+            ns.ApplyCDMVisibility()
+            Refresh()
+        end)
+        b.viewer = v
+        if prev then
+            b:SetPoint("BOTTOMLEFT", prev, "TOPLEFT", 0, 4)
+        else
+            b:SetPoint("BOTTOMLEFT", 14, 62)
+        end
+        prev = b
+        UI.viewerBtns[#UI.viewerBtns + 1] = b
+    end
+    UI.hideCDM = prev
 
     -- Where the marks go. Two surfaces, and neither is a fallback for the
     -- other: the Cooldown Manager is the one place that draws the EMPOWERED
