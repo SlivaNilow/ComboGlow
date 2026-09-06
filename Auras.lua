@@ -1084,20 +1084,49 @@ local function EntryIcon(itemFrame)
     return found or nil
 end
 
+-- Was the last cast of this spell an empowered one?
+--
+-- On a target debuff the entry's icon comes back SECRET, so the reading above
+-- answers nothing there -- which is the whole 12.1 story again: anything
+-- derived from an aura on someone else is closed.
+--
+-- What is not closed is the override. While Tiger's Fury is up, Rake and Rip
+-- are overridden by their empowered forms -- that is why the button art
+-- changes -- and GetOverrideSpell is an ordinary call. So the question moves
+-- from "what is on the target" to "what did I cast", which is answerable, and
+-- is the same answer for as long as nobody recasts.
+--
+-- It says the last application was empowered, not that it is still up. Those
+-- differ only when the dot has expired unnoticed, and the "gone" marker is
+-- lit by then anyway.
+local empoweredCast = {}
+
+function ns.NoteCastEmpowerment(spellID)
+    if not (C_Spell and C_Spell.GetOverrideSpell and spellID) then return end
+    local ok, o = pcall(C_Spell.GetOverrideSpell, spellID)
+    empoweredCast[spellID] = (ok and type(o) == "number" and o ~= spellID) or nil
+end
+
 local function EntryEmpowered(itemFrame, rule)
     if not (rule and rule.spell) or rule.empowered == false then return false end
+
+    -- Read it off the entry where the entry will say. Player auras do.
     local want = baseIcon[rule.spell]
     if want == nil then
         local info = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(rule.spell)
         want = (info and info.iconID) or false
         baseIcon[rule.spell] = want
     end
-    if not want then return false end
-    local t = itemFrame and EntryIcon(itemFrame)
-    if not t then return false end
-    local ok, tex = pcall(t.GetTexture, t)
-    if not ok or type(tex) ~= "number" or IsSecret(tex) then return false end
-    return tex ~= want
+    local t = want and itemFrame and EntryIcon(itemFrame)
+    if t then
+        local ok, tex = pcall(t.GetTexture, t)
+        if ok and type(tex) == "number" and not IsSecret(tex) then
+            return tex ~= want
+        end
+    end
+
+    -- Otherwise go by what we cast.
+    return empoweredCast[rule.spell] == true
 end
 ns.EntryEmpowered = EntryEmpowered
 local function ApplyMirror(frame, rule, itemFrame)
@@ -1188,6 +1217,7 @@ function ns.OnPlayerCast(spellID)
         castAt[rule] = now
         castGen[rule] = (castGen[rule] or 0) + 1
     end
+    ns.NoteCastEmpowerment(spellID)
     return true
 end
 
