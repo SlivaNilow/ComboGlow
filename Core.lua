@@ -124,6 +124,8 @@ local DEFAULTS = {
     version    = DB_VERSION,
     enabled    = true,
     combatOnly = false,
+    showBars   = true,   -- mark the action bars
+
     secretMode = true,   -- keep working in restricted (secret-value) content
     cdm        = false,  -- also glow Cooldown Manager icons
     auraPoll   = 0.2,    -- re-read aura state every N seconds (0 = events only)
@@ -742,7 +744,13 @@ function CG:Rebuild()
             end
         end
     end
-    ForEachActionButton(collect)
+    -- Two surfaces, one switch each. The Cooldown Manager path has been here
+    -- since the beginning, buried in a slash command; the bars are what it was
+    -- always paired with. Turning the bars off is a real preference: the
+    -- Cooldown Manager is the only place that draws the EMPOWERED art for a
+    -- dot, so marking state there and leaving the buttons clean is a coherent
+    -- way to run it.
+    if self.db.showBars ~= false then ForEachActionButton(collect) end
     if self.db.cdm then ForEachCooldownViewerFrame(collect) end
 
     local centerRules = {}

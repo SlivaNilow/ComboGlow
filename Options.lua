@@ -170,6 +170,12 @@ local function RefreshRows(list)
         UI.source:SetText(L("Cooldown Manager: %d auras, %d cooldowns",
                             "Cooldown Manager: аур %d, кулдаунов %d"):format(nAura, nEss))
     end
+    UI.onBars.text:SetText(CG.db.showBars ~= false
+        and L("marking: action bars ON", "отмечать: панели ВКЛ")
+        or L("marking: action bars off", "отмечать: панели выкл"))
+    UI.onCDM.text:SetText(CG.db.cdm
+        and L("marking: Cooldown Manager ON", "отмечать: Cooldown Manager ВКЛ")
+        or L("marking: Cooldown Manager off", "отмечать: Cooldown Manager выкл"))
     UI.hideCDM.text:SetText(CG.db.hideCDM
         and L("show the Cooldown Manager", "показать Cooldown Manager")
         or L("hide the Cooldown Manager", "скрыть Cooldown Manager"))
@@ -1000,6 +1006,26 @@ local function Build()
     -- Above the status line, clear of the buttons along the bottom.
     UI.hideCDM:SetPoint("BOTTOMLEFT", 14, 62)
 
+    -- Where the marks go. Two surfaces, and neither is a fallback for the
+    -- other: the Cooldown Manager is the one place that draws the EMPOWERED
+    -- art for a dot, so marking state there and leaving the buttons clean is
+    -- a coherent way to run it.
+    UI.onBars = TextButton(UI, "", 190, 22, function()
+        CG.db.showBars = (CG.db.showBars == false) or nil
+        CG.lastSig = nil
+        CG:Rebuild()
+        Refresh()
+    end)
+    UI.onBars:SetPoint("BOTTOMLEFT", UI.hideCDM, "TOPLEFT", 0, 4)
+
+    UI.onCDM = TextButton(UI, "", 190, 22, function()
+        CG.db.cdm = not CG.db.cdm
+        CG.lastSig = nil
+        CG:Rebuild()
+        Refresh()
+    end)
+    UI.onCDM:SetPoint("BOTTOMLEFT", UI.onBars, "TOPLEFT", 0, 4)
+
     -- Per state, not one number for everything: how much warning a dot needs
     -- depends on the dot. Sits at -128, under the "watching" row, on the line
     -- the gallery starts below.
@@ -1049,7 +1075,7 @@ local function Build()
                      "не удалось открыть — Меню игры, Режим редактирования, Cooldown Manager"))
         end
     end)
-    UI.openCDM:SetPoint("BOTTOMLEFT", UI.hideCDM, "TOPLEFT", 0, 4)
+    UI.openCDM:SetPoint("BOTTOMLEFT", UI.onCDM, "TOPLEFT", 0, 4)
 
     local bDot = TextButton(UI, L("Add last cast", "Добавить последний каст"), 160, 22, function()
         if not CG.lastCast then
