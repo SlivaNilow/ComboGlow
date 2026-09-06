@@ -176,6 +176,25 @@ local function RefreshRows(list)
     end
     UI.empty:SetShown(total == 0)
 
+    -- The list scrolls on the wheel and never said so. A track with a thumb
+    -- sized to the visible share: present only when there is something out of
+    -- sight, so it reads as "there is more" rather than as decoration.
+    if UI.scroll then
+        if total > ROWS then
+            local h = UI.scroll:GetHeight()
+            local frac = ROWS / total
+            local thumb = math.max(16, h * frac)
+            local room = h - thumb
+            local at = (maxOffset > 0) and (offset / maxOffset) or 0
+            UI.scroll.thumb:SetHeight(thumb)
+            UI.scroll.thumb:ClearAllPoints()
+            UI.scroll.thumb:SetPoint("TOP", UI.scroll, "TOP", 0, -room * at)
+            UI.scroll:Show()
+        else
+            UI.scroll:Hide()
+        end
+    end
+
     local nAura, nEss = 0, 0
     for _ in pairs(ns.cdmAuraSpells or {}) do nAura = nAura + 1 end
     for _ in pairs(ns.cdmEssentialSpells or {}) do nEss = nEss + 1 end
@@ -500,6 +519,17 @@ local function Build()
         Refresh()
     end)
 
+    UI.scroll = CreateFrame("Frame", nil, UI)
+    UI.scroll:SetWidth(3)
+    UI.scroll:SetPoint("TOPRIGHT", UI.rows[1], "TOPRIGHT", 4, 0)
+    UI.scroll:SetPoint("BOTTOM", UI.rows[#UI.rows], "BOTTOM", 0, 0)
+    local track = UI.scroll:CreateTexture(nil, "BACKGROUND")
+    track:SetAllPoints(UI.scroll)
+    track:SetColorTexture(1, 1, 1, 0.05)
+    UI.scroll.thumb = UI.scroll:CreateTexture(nil, "ARTWORK")
+    UI.scroll.thumb:SetWidth(3)
+    UI.scroll.thumb:SetColorTexture(0.05, 0.82, 0.62, 0.5)
+    UI.scroll:Hide()
     UI.empty = Label(UI, L("nothing here yet - use the buttons below",
                            "пока пусто — используй кнопки внизу"), 11, 0.7, 0.7, 0.7)
     UI.empty:SetPoint("TOPLEFT", 14, -62)
@@ -1172,7 +1202,7 @@ local function Build()
 
     OnPage("spells", UI.hint, UI.warn, UI.empty, UI.title, UI.titleIcon,
            UI.auraRow, UI.auraList, UI.countRow, UI.soonRow, UI.delSpell,
-           bPreset, bDot)
+           bPreset, bDot, UI.scroll)
     for _, w in ipairs(UI.rows or {}) do OnPage("spells", w) end
     for _, w in ipairs(UI.slots or {}) do OnPage("spells", w) end
     for _, w in ipairs(UI.tiles or {}) do OnPage("spells", w) end
@@ -1188,7 +1218,11 @@ local function Build()
             page = d.key
             ns.ShowPage()
         end)
-        t:SetPoint("TOPLEFT", 12 + (i - 1) * 114, -34)
+        -- On the header line, right-aligned. The line below it belongs to the
+        -- hint, and putting them on the same one is how the text ended up
+        -- printed over the tabs.
+        t:SetPoint("TOPRIGHT", UI, "TOPRIGHT",
+                   -12 - (#pageDefs - i) * 114, -10)
         t.pageKey = d.key
         UI.pageTabs[i] = t
     end
