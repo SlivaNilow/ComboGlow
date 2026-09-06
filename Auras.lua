@@ -1166,7 +1166,10 @@ ns.badgeOK = nil
     ordering below the sweep costs nothing to maintain.
 ---------------------------------------------------------------------------]]
 local function EntryBadge(frame, rule, itemFrame)
-    if not ns.showEntryIcon or rule.badge == false then return false end
+    -- Off unless asked for, per state. It covers the button's own art, which
+    -- is a real trade: worth it on a dot, where the empowered form appears
+    -- nowhere else, and not worth it on everything else.
+    if rule.badge ~= true or not ns.showEntryIcon then return false end
     if rule.missing or frame.secondary then return false end
 
     -- The BUFF entry first, whatever kind of rule this is. A cooldown entry
