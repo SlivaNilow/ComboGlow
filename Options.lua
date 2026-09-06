@@ -16,7 +16,7 @@
 local ADDON, ns = ...
 local CG = ns.CG
 
-local ROWS       = 12      -- visible spell rows before the wheel scrolls
+local ROWS       = 17      -- visible spell rows before the wheel scrolls
 local ROW_H      = 22
 local TILE       = 46      -- preview icon size
 local TILE_PAD_X = 92
