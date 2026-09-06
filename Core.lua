@@ -1154,9 +1154,24 @@ function CG:UpdateAuras()
     -- pass, because an aura event does not reach the power frames on its own
     -- and the resource marker would otherwise stay lit until the next power
     -- tick.
+    -- Debuffs on something else are kept to combat by default, the same way a
+    -- burst cooldown is. A dot missing from a training dummy, or from whatever
+    -- you last had targeted in town, is not news -- and the row of red marks
+    -- that produces is the kind of noise that teaches you to stop reading the
+    -- markers at all.
+    --
+    -- Buffs on yourself are left alone: those you do keep up before a pull.
+    -- Per rule, so /cgl combat and the rule's own flag still win.
+    local peace = not InCombatLockdown()
     ns.procDirty = false
     for _, frame in ipairs(self.auraFrames) do
-        ns.ApplyAuraRule(frame, frame.rule)
+        local rule = frame.rule
+        if peace and rule and rule.kind == "aura" and rule.combat ~= false
+           and rule.unit and rule.unit ~= "player" then
+            Silence(frame)
+        else
+            ns.ApplyAuraRule(frame, rule)
+        end
     end
     if ns.procDirty then
         ns.procDirty = false

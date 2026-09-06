@@ -1736,6 +1736,21 @@ local function Handler(msg)
         if not CG.db.enabled then CG:HideAll() end
         Say(L("addon: %s", "аддон: %s"), CG.db.enabled and L("on", "вкл") or L("off", "выкл"))
 
+    elseif cmd == "peace" then
+        -- Per rule: show this one out of combat as well. Debuffs on another
+        -- unit are quiet outside a fight by default, which is right for a dot
+        -- and wrong for the occasional thing you do want to see in town.
+        local rule = GetRule(rest)
+        if rule then
+            rule.combat = (rule.combat == false) and nil or false
+            CG:UpdateNow()
+            Say(L("%s outside combat: %s", "%s вне боя: %s"),
+                ns.SpellName(rule.spell),
+                rule.combat == false and L("shown", "показывать")
+                    or L("hidden", "скрывать"))
+        else
+            Say(L("usage: /cg peace <#>", "формат: /cg peace <№>"))
+        end
     elseif cmd == "combat" then
         CG.db.combatOnly = OnOff(rest:lower(), CG.db.combatOnly)
         CG:UpdateNow()
