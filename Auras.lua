@@ -1579,6 +1579,26 @@ function ns.AuraCheck(rules, say)
                     tostring(ns.cdmViewerOf and ns.cdmViewerOf[mf] or "?"),
                     tostring(mf.IsActive ~= nil),
                     tostring(isAuraEntry and usable or false))
+                -- What icon the entry is drawing. Feral's Tiger's Fury
+                -- empowers a dot for its whole duration and the button forgets
+                -- the moment the buff drops, so if the empowered aura keeps
+                -- its own icon here, that is an answer about the target we are
+                -- otherwise not allowed to have.
+                local drawn = {}
+                for _, key in ipairs({ "Icon", "icon", "Texture", "texture" }) do
+                    local t = mf[key]
+                    if t and t.GetTexture then
+                        local okt, tex = pcall(t.GetTexture, t)
+                        if okt and tex ~= nil then
+                            drawn[#drawn + 1] = IsSecret(tex) and "secret" or tostring(tex)
+                        end
+                    end
+                end
+                local info = C_Spell and C_Spell.GetSpellInfo
+                    and C_Spell.GetSpellInfo(rule.spell)
+                say("     icon: spell %s | entry %s",
+                    tostring(info and info.iconID or "?"),
+                    #drawn > 0 and table.concat(drawn, ", ") or "none found")
                 say("     aura link: auraDataUnit=%s auraInstanceID=%s | %s",
                     tostring(type(mf.auraDataUnit) ~= "nil"),
                     tostring(type(mf.auraInstanceID) ~= "nil"),
