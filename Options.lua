@@ -977,25 +977,27 @@ local function Build()
         { key = "stacks", auraOnly = true, label = L("stacks", "стаки"),
           get = function(r) return r.stacks ~= false end,
           set = function(r) r.stacks = not (r.stacks ~= false) end },
-        -- Which unit the aura is looked for on -- and which KIND, because the
-        -- two are one decision. Moving a rule to yourself without moving it to
-        -- helpful leaves it hunting a harmful aura on the player, which is
-        -- almost always nothing at all: that is what "debuff player" meant in
-        -- the rule list, and why a Prowl rule sat on three buttons doing
-        -- nothing. Set both, or the switch is a trap.
+        -- Unit and kind, as two switches rather than one.
         --
-        -- Focus, mouseover and pet stay on /cg unit: rare enough that a
+        -- They were one, because the sensible pairs are helpful-on-you and
+        -- harmful-on-them and a scan sets exactly those. But the pairs are not
+        -- laws: a harmful aura you carry, or a buff you watch on the target,
+        -- are both real, and a switch that silently rewrites the other half
+        -- takes that decision away from whoever knew better.
+        --
+        -- The scan still pairs them; from then on they are the player's.
+        -- Focus, mouseover and pet stay on /cg unit, being rare enough that a
         -- checkbox would cost more room in the editor than it earns.
         { key = "onself", auraOnly = true,
           label = L("on yourself", "на себе"),
           get = function(r) return r.unit == "player" end,
           set = function(r)
-              if r.unit == "player" then
-                  r.unit, r.helpful = "target", nil
-              else
-                  r.unit, r.helpful = "player", true
-              end
+              r.unit = (r.unit == "player") and "target" or "player"
           end },
+        { key = "helpful", auraOnly = true,
+          label = L("a buff, not a debuff", "бафф, а не дебафф"),
+          get = function(r) return r.helpful and true or false end,
+          set = function(r) r.helpful = (not r.helpful) or nil end },
         -- Only offered where it can do anything: an aura state has no resource
         -- to be ready for, and a spell with its own "proc" state has already
         -- answered the question -- the proc belongs to that marker.
