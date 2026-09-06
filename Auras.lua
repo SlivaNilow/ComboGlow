@@ -1150,7 +1150,13 @@ ns.badgeOK = nil
 
 local function EntryBadge(frame, rule, itemFrame)
     if not ns.showEntryIcon or rule.missing or frame.secondary then return false end
-    local src = itemFrame and EntryIcon(itemFrame)
+
+    -- The BUFF entry first, whatever kind of rule this is. A cooldown entry
+    -- draws the ability as it sits on the bar -- always looking available --
+    -- while the buff entry draws what is actually on you, which is the
+    -- question worth answering and the only place empowered art appears.
+    local from = (ns.cdmAuraFrames and ns.cdmAuraFrames[rule.spell]) or itemFrame
+    local src = from and EntryIcon(from)
     if not src then return false end
 
     local tex = frame.EntryIcon
@@ -1175,9 +1181,44 @@ local function EntryBadge(frame, rule, itemFrame)
     ns.badgeOK = ok2
     if not ok2 then
         tex:Hide()
+        if frame.EntryCD then frame.EntryCD:Hide() end
         return false
     end
     tex:Show()
+
+    -- And the sweep, so a borrowed icon cannot read as "ready" while the
+    -- ability is still coming back. A spell's own cooldown is the player's own
+    -- business and comes back as plain numbers -- nothing secret is involved,
+    -- and nothing of Blizzard's is touched: this is a cooldown of ours drawn
+    -- over a texture of ours.
+    local cd = frame.EntryCD
+    if not cd then
+        cd = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
+        cd:SetHideCountdownNumbers(true)
+        cd:SetDrawBling(false)
+        cd:SetDrawEdge(false)
+        frame.EntryCD = cd
+    end
+    cd:ClearAllPoints()
+    cd:SetAllPoints(tex)
+    cd:SetFrameLevel(frame:GetFrameLevel() + 1)
+
+    local start, dur = 0, 0
+    if C_Spell and C_Spell.GetSpellCooldown then
+        local okc, info = pcall(C_Spell.GetSpellCooldown, rule.spell)
+        if okc and type(info) == "table"
+           and type(info.startTime) == "number" and type(info.duration) == "number"
+           and not IsSecret(info.startTime) and not IsSecret(info.duration) then
+            start, dur = info.startTime, info.duration
+        end
+    end
+    if dur > 1.5 then
+        cd:SetCooldown(start, dur)
+        cd:Show()
+    else
+        cd:Clear()
+        cd:Hide()
+    end
     return true
 end
 local function ApplyMirror(frame, rule, itemFrame)
@@ -1213,6 +1254,7 @@ local function ApplyMirror(frame, rule, itemFrame)
     -- The tracker's own art, borrowed unread.
     if not EntryBadge(frame, rule, itemFrame) and frame.EntryIcon then
         frame.EntryIcon:Hide()
+        if frame.EntryCD then frame.EntryCD:Hide() end
     end
     if not MirrorTimerText(frame, rule, itemFrame, soon ~= nil) then
         frame.TimerText:SetText("")
