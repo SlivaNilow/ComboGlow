@@ -436,10 +436,18 @@ function ComboGlowOverlayMixin:OnHide()
 end
 
 function ComboGlowOverlayMixin:Attach(button)
+    -- A Cooldown Manager entry wears a border of its own, and a mark drawn to
+    -- the entry's own size lands inside it and reads as part of it. Blizzard's
+    -- art is not ours to remove -- that is what emptied the action bars in
+    -- combat once, and it comes back on every Layout anyway -- so the mark
+    -- goes around the outside instead, where nothing has to be taken away for
+    -- it to be seen.
+    local onCDM = button.cooldownID ~= nil
     local w, h = button:GetSize()
     if not w or w <= 1 then w, h = 45, 45 end
     if not h or h <= 1 then h = w end
 
+    if onCDM then w, h = w * 1.28, h * 1.28 end
     local W, H = w * 1.8, h * 1.8
 
     self:SetParent(button)
