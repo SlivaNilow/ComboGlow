@@ -1661,6 +1661,26 @@ function CG:Initialize()
     -- into ours unread. On by default because it is the only way the
     -- empowered art reaches the button at all.
 
+    -- One-off repair for damage I did with the "on yourself" checkbox: it
+    -- moved a rule's unit to the player without moving its kind, leaving it
+    -- hunting a HARMFUL aura on you. Nothing this addon creates is ever that
+    -- -- AddAuraRule pairs helpful with player and harmful with target -- so
+    -- any rule in that state was made by the broken switch.
+    --
+    -- Done once and remembered, so it can never overrule a later deliberate
+    -- choice. It repairs rather than deletes: colour, style and everything
+    -- else the rule carries were chosen by hand and are worth keeping.
+    if not self.db.fixedSelfHarm then
+        self.db.fixedSelfHarm = true
+        for _, specRules in pairs(self.db.specs or {}) do
+            for _, r in ipairs(specRules) do
+                if r.kind == "aura" and r.unit == "player" and not r.helpful then
+                    r.helpful = true
+                end
+            end
+        end
+    end
+
     self.initialized = true
     if ns.CreateMinimapButton then ns.CreateMinimapButton() end
 
