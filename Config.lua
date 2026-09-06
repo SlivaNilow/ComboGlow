@@ -1779,6 +1779,34 @@ local function Handler(msg)
         else
             Say(L("usage: /cg peace <#>", "формат: /cg peace <№>"))
         end
+    elseif cmd == "tidy" then
+        -- Removes only what cannot ever do anything: switched off, on no
+        -- button, and tracked by nothing. A rule in that state has no way back
+        -- -- there is nothing for it to read and nowhere for it to draw -- so
+        -- it is not a setting, it is sediment from repeated scans.
+        --
+        -- Anything still enabled is left alone however useless it looks, and
+        -- so is anything with a button or a Cooldown Manager entry: those can
+        -- come back to life the moment a bar is rearranged.
+        ns.RebuildCDMMap()
+        local rules = CG:GetRules()
+        local gone, kept = 0, 0
+        for i = #rules, 1, -1 do
+            local r = rules[i]
+            local mf = r.spell and ns.FindMirror(r)
+            local onBar = (ns.buttonCount[r] or 0) > 0
+            if r.enabled == false and not onBar and not mf then
+                table.remove(rules, i)
+                gone = gone + 1
+            else
+                kept = kept + 1
+            end
+        end
+        CG.lastSig = nil
+        CG:Rebuild()
+        if ns.RefreshOptions then ns.RefreshOptions() end
+        Say(L("removed %d dead rules, kept %d",
+              "убрано мёртвых правил: %d, осталось: %d"), gone, kept)
     elseif cmd == "combat" then
         CG.db.combatOnly = OnOff(rest:lower(), CG.db.combatOnly)
         CG:UpdateNow()
