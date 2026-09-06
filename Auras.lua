@@ -1023,6 +1023,42 @@ local function MirrorTimerText(frame, rule, itemFrame, allowMissing)
     return true
 end
 
+--[[-------------------------------------------------------------------------
+    A stronger version of the same aura
+
+    Feral empowers Rake and Rip while Tiger's Fury is up, and the empowerment
+    lasts the dot's whole duration -- but the button reverts the moment the
+    buff does. So a stronger dot gets overwritten with a weaker one and nothing
+    on screen says a word about it.
+
+    What is on the target cannot be read. The Cooldown Manager keeps tracking
+    the empowered version though, and it draws the empowered ICON while doing
+    it -- and a texture id is an ordinary number, not a secret. So the question
+    "is the thing up the strong one" is answered by comparing what the entry
+    draws against the spell's own icon.
+
+    Nothing here is Feral-specific: any aura whose empowered form carries its
+    own art answers the same way, and one whose form does not simply never
+    reports empowered.
+---------------------------------------------------------------------------]]
+local baseIcon = {}
+
+local function EntryEmpowered(itemFrame, rule)
+    if not (rule and rule.spell) or rule.empowered == false then return false end
+    local want = baseIcon[rule.spell]
+    if want == nil then
+        local info = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(rule.spell)
+        want = (info and info.iconID) or false
+        baseIcon[rule.spell] = want
+    end
+    if not want then return false end
+    local t = itemFrame and (itemFrame.Icon or itemFrame.icon)
+    if not (t and t.GetTexture) then return false end
+    local ok, tex = pcall(t.GetTexture, t)
+    if not ok or type(tex) ~= "number" or IsSecret(tex) then return false end
+    return tex ~= want
+end
+ns.EntryEmpowered = EntryEmpowered
 local function ApplyMirror(frame, rule, itemFrame)
     local flag, ok = MirrorFlag(itemFrame)
     if not ok or not frame.SetAlphaFromBoolean then return false end
@@ -1070,8 +1106,16 @@ local function ApplyMirror(frame, rule, itemFrame)
     frame:StartArt()
 
     -- Recolour towards the warning colour as the aura runs out.
-    if not rule.missing and not ApplyWarnColor(frame, rule, durObj) then
-        frame:SetArtColor(rule.r or 0, rule.g or 1, rule.b or 0)
+    -- Recolour towards the warning colour as the aura runs out; and if what is
+    -- up is the empowered version, say so instead. That one outranks the
+    -- countdown: "do not overwrite this" matters more than "it is running out",
+    -- and the timer is on the icon anyway.
+    if not rule.missing then
+        if EntryEmpowered(itemFrame, rule) then
+            frame:SetArtColor(rule.er or 0.7, rule.eg or 0.4, rule.eb or 1)
+        elseif not ApplyWarnColor(frame, rule, durObj) then
+            frame:SetArtColor(rule.r or 0, rule.g or 1, rule.b or 0)
+        end
     end
 
     local shown, hidden = 1, 0

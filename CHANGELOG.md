@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.4.0
+
+**An empowered aura is marked in its own colour.** Feral empowers Rake and Rip
+while Tiger's Fury is up and the empowerment lasts the dot's whole duration --
+but the button reverts the moment the buff does, so a stronger dot gets
+overwritten with a weaker one and nothing says a word about it.
+
+What is on the target still cannot be read. The Cooldown Manager keeps tracking
+the empowered version, though, and draws the empowered ICON while it does --
+and a texture id is an ordinary number. So the "up" marker turns violet
+whenever the entry is drawing something other than the spell's own icon.
+
+Nothing about it is Feral-specific: any aura whose empowered form carries its
+own art is marked the same way, and one whose form does not simply never
+reports empowered. It outranks the "running out" colour, because "do not
+overwrite this" matters more than "it is nearly gone", and the countdown is on
+the icon regardless.
+
 ## 1.3.2
 
 **The countdown colouring is off by default now, and opt-in.** It works by
