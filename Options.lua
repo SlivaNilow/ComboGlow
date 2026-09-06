@@ -939,6 +939,17 @@ local function Build()
         { key = "stacks", auraOnly = true, label = L("stacks", "стаки"),
           get = function(r) return r.stacks ~= false end,
           set = function(r) r.stacks = not (r.stacks ~= false) end },
+        -- Which unit the aura is looked for on. A heal-over-time you keep on
+        -- yourself is the same question as a dot on the target, asked the
+        -- other way round, and it was only reachable by command until now.
+        -- Focus, mouseover and pet stay on /cg unit: they are rare enough
+        -- that a checkbox would cost more room than it earns.
+        { key = "onself", auraOnly = true,
+          label = L("on yourself", "на себе"),
+          get = function(r) return r.unit == "player" end,
+          set = function(r)
+              r.unit = (r.unit == "player") and "target" or "player"
+          end },
         -- Only offered where it can do anything: an aura state has no resource
         -- to be ready for, and a spell with its own "proc" state has already
         -- answered the question -- the proc belongs to that marker.
