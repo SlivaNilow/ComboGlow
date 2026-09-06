@@ -1793,13 +1793,33 @@ local function Handler(msg)
         -- what reading its body found. A macro that lights nothing shows here
         -- as an empty list, which says the body scan missed rather than the
         -- rule being wrong.
+        -- What this client actually offers, rather than what I keep guessing
+        -- it offers. Three rounds of renaming functions is two too many.
+        local names = {}
+        if type(C_Macro) == "table" then
+            for k, v in pairs(C_Macro) do
+                if type(v) == "function" then names[#names + 1] = k end
+            end
+            table.sort(names)
+            Say("C_Macro: %s", #names > 0 and table.concat(names, ", ") or "empty")
+        else
+            Say("C_Macro: |cffff4040absent|r")
+        end
+        local globals = {}
+        for _, k in ipairs({ "GetMacroSpell", "GetMacroBody", "GetMacroInfo",
+                             "GetMacroIndexByName", "EditMacro" }) do
+            globals[#globals + 1] = k .. "=" .. type(_G[k])
+        end
+        Say("globals: %s", table.concat(globals, " "))
+
         local n = 0
         for slot = 1, 180 do
             local name, cast, list, blen = ns.MacroReport(slot)
             if name then
                 n = n + 1
-                Say("%d. %s | GetMacroSpell=%s | body(%d chars): %s",
-                    slot, name, cast, blen,
+                local at, aid = GetActionInfo(slot)
+                Say("%d. %s | action=%s/%s | cast=%s | body(%d): %s",
+                    slot, name, tostring(at), tostring(aid), cast, blen,
                     #list > 0 and table.concat(list, ", ")
                         or "|cffff4040nothing|r")
             end
