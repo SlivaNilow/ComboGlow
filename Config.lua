@@ -1748,7 +1748,7 @@ local function Handler(msg)
         -- and wrong for the occasional thing you do want to see in town.
         local rule = GetRule(rest)
         if rule then
-            rule.combat = (rule.combat == false) and nil or false
+            if rule.combat == false then rule.combat = nil else rule.combat = false end
             CG:UpdateNow()
             Say(L("%s outside combat: %s", "%s вне боя: %s"),
                 ns.SpellName(rule.spell),
