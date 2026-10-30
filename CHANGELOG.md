@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.1
+
+A colour wash that starts at login no longer comes out square on EllesmereUI's
+hexagon and circle buttons: it takes its shape from the bar's settings instead of
+waiting for the button to get its own.
+
 ## 1.5.0
 
 **Glow on the resource bar.** With EllesmereUI's class resource bar, the pips
@@ -12,7 +18,7 @@ working where the count is secret.
 **Marks follow the button's shape.** On EllesmereUI's hexagon and circle buttons
 the colour wash takes the button's own shape instead of a square over the icon,
 a pixel mark becomes an outline of that shape, and gold marks use a glow that follows the shape. A proc gets that glow on top of
-its wash. A wash that starts at login no longer comes out square.
+its wash.
 
 **"Gone" marks wait for the cooldown.** A spell still on cooldown no longer shows
 that its buff has fallen off: there is nothing to press yet. A spell with a
