@@ -243,6 +243,22 @@ local function ShapeOutline(button)
     return shape and borders and borders[shape]
 end
 
+-- The wash's own mask, cut from the shape the bar is set to. The button's mask
+-- is not there yet when a mark starts at login, before EllesmereUI shapes its
+-- buttons, and that wash stayed square until the mark next restarted. Anything
+-- not named in the bar settings still borrows the button's mask.
+local function WashMask(self)
+    local A, button = self.Art, self.maskButton
+    local E, shape = _G.EllesmereUI, ShapeName(button)
+    local path = shape and E and E.SHAPE_MASKS and E.SHAPE_MASKS[shape]
+    if not path then return ShapeMask(button) end
+    if not A.ShapeMask then A.ShapeMask = A:CreateMaskTexture() end
+    A.ShapeMask:SetTexture(path, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    A.ShapeMask:ClearAllPoints()
+    A.ShapeMask:SetAllPoints(button)
+    return A.ShapeMask
+end
+
 local STYLE_SHAPE_GLOW = 4   -- EllesmereUI.Glows: needs the shape's art, passed here
 
 -- Start a gold-style glow that follows the button's shape where it has one.
@@ -326,7 +342,7 @@ function StartArt(self)
         A.Fill:SetAlpha(a)
         A.Fill:Show()
         A.SolidT:Hide(); A.SolidB:Hide(); A.SolidL:Hide(); A.SolidR:Hide()
-        local mask = ShapeMask(self.maskButton)
+        local mask = WashMask(self)
         if A.FillMask ~= mask then
             if A.FillMask then A.Fill:RemoveMaskTexture(A.FillMask) end
             if mask then A.Fill:AddMaskTexture(mask) end
