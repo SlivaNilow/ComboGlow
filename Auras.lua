@@ -198,6 +198,20 @@ end
 --[[-------------------------------------------------------------------------
     Display
 ---------------------------------------------------------------------------]]
+-- Does this spell have an enabled "came off cooldown" rule of its own?
+local function HasReadyMark(spell)
+    for _, r in ipairs(ns.CG:GetRules()) do
+        if r.kind == "cd" and r.spell == spell and r.enabled ~= false then return true end
+    end
+    return false
+end
+
+-- A "gone" mark says "cast this". On a spell still on cooldown that only muddies
+-- the icon, and a spell with its own "ready" glow already says it.
+local function MissingMuted(rule)
+    return rule.missing and (not ns.CooldownReady(rule.spell) or HasReadyMark(rule.spell))
+end
+
 local function FormatTime(t)
     if t >= 60 then return ("%d:%02d"):format(t / 60, t % 60) end
     if t >= 10 then return ("%d"):format(t) end
@@ -1283,6 +1297,12 @@ function ns.ApplyAuraRule(frame, rule)
     -- path for the rest of the session and the marker then vanished every time
     -- the read came back empty.
     if found ~= true and ns.mirrorEnabled then
+        if MissingMuted(rule) then
+            frame.pandemicOn = nil
+            frame:StopArt()
+            frame:Hide()
+            return false
+        end
         local itemFrame, isAuraEntry = ns.FindMirror(rule)
         if itemFrame and isAuraEntry and ApplyMirror(frame, rule, itemFrame) then
             -- The engine owns this one now; we cannot say whether it is on.
@@ -1344,6 +1364,9 @@ function ns.ApplyAuraRule(frame, rule)
         if glow and rule.unit ~= "player"
            and not UnitCanAttack("player", rule.unit or "target") then
             glow = false   -- do not nag about something you cannot hit
+        end
+        if glow and MissingMuted(rule) then
+            glow = false
         end
     else
         glow = present

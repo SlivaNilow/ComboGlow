@@ -1001,6 +1001,9 @@ local function PrintHelp()
         { "/cg blizzglow on|off",      L("the game's own gold proc glow (off by default)", "штатное золотое свечение прока (по умолчанию выключено)") },
         { "/cg procstrip on|off",      L("show procs in the reminder strip (on by default)", "показывать проки в полосе напоминаний (по умолчанию вкл)") },
         { "/cg hidecdm on|off",        L("hide the Cooldown Manager without stopping it", "скрыть Cooldown Manager, не выключая его") },
+        { "/cg gap <#>",               L("how far the strip sits above the resource bar", "на сколько полоса выше полосы ресурса") },
+        { "/cg bar on|off|<#>",        L("glow on the resource bar, from this count", "свечение на полосе ресурса, от этого количества") },
+        { "/cg bar style <name>",      L("its look: pixel, shine, modern", "его вид: pixel, shine, modern") },
         { "/cg minimap on|off",        L("the minimap button", "кнопка у миникарты") },
         { "/cg pack on|off",           L("close gaps in the reminder strip", "закрывать дырки в полосе напоминаний") },
         { "/cg rows on|off",           L("one strip row per kind, procs on top", "полоса строками по типу, проки сверху") },
@@ -1623,6 +1626,36 @@ local function Handler(msg)
         CG:Rebuild()
         Say(L("close gaps in the strip: %s", "закрывать дырки в полосе: %s"),
             CG.db.center.pack and L("on", "вкл") or L("off", "выкл"))
+
+    elseif cmd == "gap" then
+        local n = tonumber(rest)
+        if n then
+            CG.db.center.gap = math.floor(n)
+            CG:PositionAnchor()
+        end
+        Say(L("strip sits %d above the resource bar", "полоса на %d выше полосы ресурса"), CG.db.center.gap or 10)
+
+    elseif cmd == "bar" then
+        local RG = ns.ResourceGlow
+        local s = CG.db.barGlow
+        local word, arg = rest:lower():match("^(%S*)%s*(.*)$")
+        local n = tonumber(word)
+        if n then
+            n = math.floor(n)
+            if n < 1 or n > RG.Max() or not RG.SetThreshold(n) then
+                Say(L("nothing to set: 1-%d on a resource with pips", "нечего менять: 1-%d на ресурсе с делениями"), RG.Max())
+                return
+            end
+        elseif word == "style" then
+            for _, st in ipairs(RG.Styles()) do
+                if st.key == arg then s.style = st.key end
+            end
+        elseif word ~= "" then
+            s.enabled = OnOff(word, s.enabled)
+        end
+        RG.Refresh()
+        Say(L("resource bar glow: %s, from %d, style %s", "свечение полосы ресурса: %s, от %d, стиль %s"),
+            s.enabled and L("on", "вкл") or L("off", "выкл"), RG.Threshold(), s.style)
 
     elseif cmd == "minimap" then
         -- The command talks about showing it; the flag stores the opposite.

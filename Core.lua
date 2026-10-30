@@ -118,7 +118,7 @@ ns.AutoPowerType = AutoPowerType
 --[[-------------------------------------------------------------------------
     Saved variables
 ---------------------------------------------------------------------------]]
-local DB_VERSION = 13
+local DB_VERSION = 17
 
 local DEFAULTS = {
     version    = DB_VERSION,
@@ -136,12 +136,17 @@ local DEFAULTS = {
     stackPos   = "topleft",  -- where the aura stack count sits on the marker
     stackScale = 100,        -- its size, as a percentage of the default
     presetDone = {},     -- [specID] = the default rules were offered once
+    barGlow = {
+        enabled = true,
+        style   = "modern",
+        at      = {},    -- [powerType] = glow from this count
+    },
     center = {
         enabled = true,
-        size    = 44,
-        spacing = 8,
+        size    = 32,
+        spacing = 6,
         point   = "auto",  -- sit above the class resource bar
-        gap     = 16,
+        gap     = 79,    -- clear of the stack above the resource bar and the proc row on it
         x       = 0,
         y       = -170,
         locked  = true,
@@ -577,12 +582,18 @@ local function ForEachActionButton(fn)
     -- deliberately nils them out of ActionBarButtonEventsFrame.frames, so a
     -- scan of Blizzard's registry alone finds nothing on an EUI setup. Its own
     -- modules address them by name; do the same.
+    local hasEUI = false
     for slot = 1, MAX_ACTION_SLOT do
         local b = _G["EABButton" .. slot]
-        if b then visit(b, ActionSpellID(b.action or slot)) end
+        if b then
+            hasEUI = true
+            visit(b, ActionSpellID(b.action or slot))
+        end
     end
 
-    if ActionBarButtonEventsFrame and ActionBarButtonEventsFrame.frames then
+    -- Its replaced stock buttons can still be registered here. They hold the
+    -- same spells, so a second, square mark landed on them too.
+    if not hasEUI and ActionBarButtonEventsFrame and ActionBarButtonEventsFrame.frames then
         for _, b in pairs(ActionBarButtonEventsFrame.frames) do
             if b and b.action then visit(b, ActionSpellID(b.action)) end
         end
@@ -1705,6 +1716,21 @@ function CG:Initialize()
             end
         end
     end
+    -- v15: with the resource bar at the bottom of a stack (health and power above
+    -- it) the strip landed on top of them. Only the untouched gap is moved.
+    if hadDB and fromVersion < 15 and self.db.center.gap == 16 then
+        self.db.center.gap = 64
+    end
+
+    -- v17: a smaller strip above a proc row. Only untouched values move; 22, 4
+    -- and 94 were the short-lived v16 defaults.
+    if hadDB and fromVersion < 17 then
+        local c = self.db.center
+        if c.size == 44 or c.size == 22 then c.size = 32 end
+        if c.spacing == 8 or c.spacing == 4 then c.spacing = 6 end
+        if c.gap == 64 or c.gap == 94 then c.gap = 79 end
+    end
+
     self.db.version = DB_VERSION
 
     self.pool = CreateFramePool("Frame", UIParent, "ComboGlowOverlayTemplate")

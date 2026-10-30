@@ -208,6 +208,12 @@ local function RefreshRows(list)
     UI.onBars.text:SetText(CG.db.showBars ~= false
         and L("marking: action bars ON", "отмечать: панели ВКЛ")
         or L("marking: action bars off", "отмечать: панели выкл"))
+    local RG, bg = ns.ResourceGlow, CG.db.barGlow
+    UI.barGlow.text:SetText(bg.enabled
+        and L("resource bar glow ON", "свечение полосы ресурса ВКЛ")
+        or L("resource bar glow off", "свечение полосы ресурса выкл"))
+    UI.barAt.text:SetText(L("glow from: %d", "светиться от: %d"):format(RG.Threshold()))
+    UI.barStyle.text:SetText(L("glow look: %s", "вид свечения: %s"):format(ns.StyleByKey(bg.style).short))
     UI.onCDM.text:SetText(CG.db.cdm
         and L("marking: Cooldown Manager ON", "отмечать: Cooldown Manager ВКЛ")
         or L("marking: Cooldown Manager off", "отмечать: Cooldown Manager выкл"))
@@ -1131,6 +1137,37 @@ local function Build()
     end)
     UI.onCDM:SetPoint("BOTTOMLEFT", UI.onBars, "TOPLEFT", 0, 4)
 
+    -- The glow on the resource bar. Its own column: it is about the resource,
+    -- not about any spell or where marks land.
+    UI.barGlow = TextButton(UI, "", 190, 22, function()
+        CG.db.barGlow.enabled = not CG.db.barGlow.enabled
+        ns.ResourceGlow.Refresh()
+        Refresh()
+    end)
+    UI.barGlow:SetPoint("LEFT", UI.onCDM, "RIGHT", 8, 0)
+
+    UI.barAt = TextButton(UI, "", 190, 22, function()
+        local RG = ns.ResourceGlow
+        local n = RG.Threshold() % RG.Max() + 1
+        RG.SetThreshold(n)
+        Refresh()
+    end)
+    UI.barAt:SetPoint("TOPLEFT", UI.barGlow, "BOTTOMLEFT", 0, -4)
+
+    UI.barStyle = TextButton(UI, "", 190, 22, function()
+        local RG = ns.ResourceGlow
+        local list, nextKey = RG.Styles()
+        for i, st in ipairs(list) do
+            if st.key == CG.db.barGlow.style then
+                nextKey = list[i % #list + 1].key
+            end
+        end
+        CG.db.barGlow.style = nextKey or list[1].key
+        RG.Refresh()
+        Refresh()
+    end)
+    UI.barStyle:SetPoint("TOPLEFT", UI.barAt, "BOTTOMLEFT", 0, -4)
+
     -- Rules that cannot ever fire, with the count on the button. Shown only
     -- when there are any: a permanent "clean up (0)" is an invitation to
     -- worry about nothing.
@@ -1229,7 +1266,8 @@ local function Build()
     -- the second page. It had all accumulated in the bottom-left corner of the
     -- spell editor, and six global buttons stacked in a corner is a corner
     -- that has quietly become a second window.
-    OnPage("settings", UI.onBars, UI.onCDM, UI.source, UI.tidy)
+    OnPage("settings", UI.onBars, UI.onCDM, UI.source, UI.tidy,
+           UI.barGlow, UI.barAt, UI.barStyle)
     for _, b in ipairs(UI.viewerBtns or {}) do OnPage("settings", b) end
 
     OnPage("spells", UI.hint, UI.warn, UI.empty, UI.title, UI.titleIcon,

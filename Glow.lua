@@ -192,6 +192,76 @@ local function LayoutSolid(self, t)
     A.SolidR:SetWidth(t)
 end
 
+-- The mask a shaped button (EllesmereUI hexagons, circles) puts on its icon. A
+-- wash reuses it: the overlay sits on the button, so shape and size match by
+-- construction, where a square of colour over a hexagon reads as a glitch.
+-- IconMask is Blizzard's stock rounded square, which is not a shape.
+--
+-- Remembered per button: EllesmereUI takes the mask off and puts it back when a
+-- button changes state, and a mark starting in that gap came out square and
+-- stayed square until it next restarted.
+local knownMask = setmetatable({}, { __mode = "k" })
+
+local function ShapeMask(button)
+    local icon = button and (button.icon or button.Icon)
+    if not (icon and icon.GetNumMaskTextures) then return nil end
+    for i = icon:GetNumMaskTextures(), 1, -1 do
+        local m = icon:GetMaskTexture(i)
+        if m and m ~= button.IconMask then
+            knownMask[button] = m
+            return m
+        end
+    end
+    return knownMask[button]
+end
+
+-- The shape name of an EllesmereUI button ("hexagon", "circle"), nil on anything
+-- else: square glows sit badly on a shape, the shape's own art does not.
+local function ShapeName(button)
+    if not button then return nil end
+    local db = _G.EllesmereUIDB
+    if not (db and db.profiles) then return nil end
+    local profile = db.profiles[db.activeProfile or "Default"]
+    local addon = profile and profile.addons and profile.addons.EllesmereUIActionBars
+    local bars = addon and addon.bars
+    if not bars then return nil end
+    -- EllesmereUI builds its own buttons (EABButton<slot>) inside EABBar_<key>.
+    local parent = button:GetParent()
+    while parent do
+        local key = (parent:GetName() or ""):match("^EABBar_(.+)$")
+        if key then
+            local bar = bars[key]
+            return bar and bar.buttonShape
+        end
+        parent = parent:GetParent()
+    end
+end
+
+local function ShapeOutline(button)
+    local shape = ShapeName(button)
+    local borders = _G.EllesmereUI and _G.EllesmereUI.SHAPE_BORDERS
+    return shape and borders and borders[shape]
+end
+
+local STYLE_SHAPE_GLOW = 4   -- EllesmereUI.Glows: needs the shape's art, passed here
+
+-- Start a gold-style glow that follows the button's shape where it has one.
+-- Returns false when the button has no shape, or the restricted swap applies:
+-- Shape Glow is Lua-driven, so the caller's safe FlipBook stays in charge there.
+local function StartShapeGlow(self, G, r, g, b, wantSafe)
+    if wantSafe then return false end
+    local E, shape = _G.EllesmereUI, ShapeName(self.maskButton)
+    if not (shape and E and E.SHAPE_MASKS and E.SHAPE_MASKS[shape]) then return false end
+    local A = self.Art
+    local opts = {
+        maskPath    = E.SHAPE_MASKS[shape],
+        borderPath  = E.SHAPE_BORDERS and E.SHAPE_BORDERS[shape],
+        anchorFrame = self.maskButton,
+    }
+    -- The engine reads the size as how far the glow reaches past the button.
+    return (pcall(G.StartGlow, A.Wrap or A, STYLE_SHAPE_GLOW, self.artW * 0.5, r, g, b, opts, self.artH))
+end
+
 local function HideMarkers(A)
     if not A.SolidT then return end
     A.SolidT:Hide(); A.SolidB:Hide(); A.SolidL:Hide(); A.SolidR:Hide()
@@ -215,7 +285,19 @@ function StartArt(self)
     local G = EUIGlows()
     local st = self.styleEntry or ns.StyleByKey("modern")
     local r, g, b = self.r or 0, self.g or 1, self.b or 0
-    if st.fallback == "none" and not failed then
+    if (st.key == "pixel" or st.key == "solid") and ShapeOutline(self.maskButton) then
+        A.Proc:Hide(); A.Border:Hide(); A.Highlight:Hide()
+        HideMarkers(A)
+        if not A.Outline then
+            A.Outline = A:CreateTexture(nil, "OVERLAY", nil, 7)
+        end
+        A.Outline:SetTexture(ShapeOutline(self.maskButton))
+        A.Outline:ClearAllPoints()
+        A.Outline:SetAllPoints(self.maskButton)
+        A.Outline:SetVertexColor(r, g, b)
+        A.Outline:SetAlpha(self.alpha or 1)
+        A.Outline:Show()
+    elseif st.fallback == "none" and not failed then
         -- The duration widget is the whole marker; no border art at all.
         A.Proc:Hide(); A.Border:Hide()
         if A.Highlight then A.Highlight:Hide() end
@@ -244,6 +326,26 @@ function StartArt(self)
         A.Fill:SetAlpha(a)
         A.Fill:Show()
         A.SolidT:Hide(); A.SolidB:Hide(); A.SolidL:Hide(); A.SolidR:Hide()
+        local mask = ShapeMask(self.maskButton)
+        if A.FillMask ~= mask then
+            if A.FillMask then A.Fill:RemoveMaskTexture(A.FillMask) end
+            if mask then A.Fill:AddMaskTexture(mask) end
+            A.FillMask = mask
+        end
+        if mask then
+            -- A proc's wash is easy to miss on a shape, so it gets a glow too.
+            -- Procs only: a "missing" wash means something else entirely, and a
+            -- glow on it reads as "press me" on a spell that may be on cooldown.
+            if G and self.useEUI and self.rule and self.rule.proc
+               and not StartShapeGlow(self, G, 1, 0.85, 0.1, wantSafe) then
+                local idx = ns.StyleByKey("modern").euiIndex
+                if wantSafe and G.RestrictionSafeStyle then
+                    local ok, safe = pcall(G.RestrictionSafeStyle, idx)
+                    if ok and safe then idx = safe end
+                end
+                pcall(G.StartGlow, A.Wrap or A, idx, self.artW, 1, 0.85, 0.1, nil, self.artH)
+            end
+        end
     elseif st.fallback == "highlight" then
         -- Plain state marker, no engine and no animation.
         A.Proc:Hide()
@@ -252,6 +354,10 @@ function StartArt(self)
         A.Highlight:SetVertexColor(r, g, b)
         A.Highlight:SetAlpha(self.alpha or 1)
         A.Highlight:Show()
+    elseif st.key == "modern" and G and self.useEUI
+           and StartShapeGlow(self, G, r, g, b, wantSafe) then
+        A.Proc:Hide(); A.Border:Hide(); A.Highlight:Hide()
+        HideMarkers(A)
     elseif st.euiIndex and G and self.useEUI then
         local idx = st.euiIndex
         if wantSafe and G.RestrictionSafeStyle then
@@ -285,6 +391,7 @@ function StopArt(self)
     end
     if A.ProcLoop:IsPlaying() then A.ProcLoop:Stop() end
     if A.Pulse:IsPlaying() then A.Pulse:Stop() end
+    if A.Outline then A.Outline:Hide() end
     A.Proc:Hide()
     A.Border:Hide()
     if A.Highlight then A.Highlight:Hide() end
@@ -315,6 +422,7 @@ local function SetArtColor(self, r, g, b)
         A.SolidR:SetVertexColor(r, g, b)
     end
     if A.Fill and A.Fill:IsShown() then A.Fill:SetVertexColor(r, g, b) end
+    if A.Outline and A.Outline:IsShown() then A.Outline:SetVertexColor(r, g, b) end
     if A.Highlight and A.Highlight:IsShown() then A.Highlight:SetVertexColor(r, g, b) end
     if A.Border and A.Border:IsShown() then A.Border:SetVertexColor(r, g, b) end
 end
@@ -465,6 +573,9 @@ function ComboGlowOverlayMixin:Attach(button)
     end
 
     self.artW, self.artH = w, h
+
+    self.maskButton = button
+
     if self.gateH then
         ResizeGate(self, W, H)
         -- A pooled frame can arrive with the gate parked where its previous

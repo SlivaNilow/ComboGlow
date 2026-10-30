@@ -1,11 +1,11 @@
-## Interface: 120100, 120007, 120005, 120000
+## Interface: 120105, 120100, 120007, 120005, 120000
 ## Title: ComboGlow
 ## Notes: Highlights action bar abilities at a chosen class-resource count (combo points, holy power, chi, ...)
 ## Notes-ruRU: Подсветка способностей на панели при заданном количестве ресурса (КП, святая сила, ци, ...)
 ## Author: SLCode
 ## X-Website: https://github.com/SlivaNilow/ComboGlow
 ## X-License: MIT
-## Version: 1.4.1
+## Version: 1.5.0
 ## IconTexture: Interface\Icons\ability_rogue_eviscerate
 ## Category: Combat
 ## Category-ruRU: Бой
@@ -15,5 +15,6 @@
 Glow.xml
 Core.lua
 Auras.lua
+ResourceGlow.lua
 Config.lua
 Options.lua

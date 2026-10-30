@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.5.0
+
+**Glow on the resource bar.** With EllesmereUI's class resource bar, the pips
+themselves light up from a chosen count, so the moment to spend is where you are
+already looking. Three switches on the Settings page, or `/cg bar`: on or off,
+from which count (per resource, kept per character: 5 combo points and 3 holy
+power by default), and the look. Only the pips you have filled glow, and it keeps
+working where the count is secret.
+
+**Marks follow the button's shape.** On EllesmereUI's hexagon and circle buttons
+the colour wash takes the button's own shape instead of a square over the icon,
+a pixel mark becomes an outline of that shape, and gold marks use a glow that follows the shape. A proc gets that glow on top of
+its wash.
+
+**"Gone" marks wait for the cooldown.** A spell still on cooldown no longer shows
+that its buff has fallen off: there is nothing to press yet. A spell with a
+"ready" glow skips the mark altogether, since the glow already says it.
+
+**The reminder strip sits higher and smaller**, so it clears health and power
+stacked above the resource bar. Untouched settings move on their own; `/cg gap`
+sets the distance by hand.
+
+**One mark per button with EllesmereUI.** Its replaced stock buttons were being
+marked as well.
+
 ## 1.4.1
 
 **Clear dead rules** — a button on the Settings page with the count on it, or
